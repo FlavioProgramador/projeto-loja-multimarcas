@@ -16,17 +16,22 @@ const getEnvVar = (viteKey: string, nextKey: string): string => {
   return '';
 };
 
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY');
+const PLACEHOLDER_URL = 'https://placeholder.supabase.co';
+const PLACEHOLDER_KEY = 'placeholder-key';
 
-const PLACEHOLDER_URL = 'https://your-project-id.supabase.co';
-const PLACEHOLDER_KEY = 'your-anon-key-here';
+const rawUrl = getEnvVar('VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
+const rawKey = getEnvVar('VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY');
+
+// Usar placeholder para evitar crash no createClient quando as vars não estão definidas.
+// isSupabaseConfigured=false bloqueia todas as chamadas ao banco.
+const supabaseUrl = rawUrl || PLACEHOLDER_URL;
+const supabaseAnonKey = rawKey || PLACEHOLDER_KEY;
 
 export const isSupabaseConfigured = Boolean(
-  supabaseUrl &&
-  supabaseAnonKey &&
-  supabaseUrl !== PLACEHOLDER_URL &&
-  supabaseAnonKey !== PLACEHOLDER_KEY
+  rawUrl &&
+  rawKey &&
+  rawUrl !== 'https://your-project-id.supabase.co' &&
+  rawKey !== 'your-anon-key-here'
 );
 
 export const supabase = createClient(

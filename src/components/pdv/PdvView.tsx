@@ -37,8 +37,8 @@ export const PdvView: React.FC = () => {
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
 
-  // Categories list
-  const categories = ['Todos', 'Camisas', 'Jaquetas', 'Calçados', 'Acessórios', 'Moletons', 'Calças'];
+  // Categorias derivadas dinamicamente dos produtos (sem hardcode)
+  const categories = ['Todos', ...Array.from(new Set(products.map(p => p.categoria).filter(Boolean))).sort()];
 
   // Filter products
   const filteredProducts = products.filter(p => {

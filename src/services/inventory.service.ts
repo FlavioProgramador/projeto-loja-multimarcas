@@ -147,14 +147,15 @@ export const InventoryService = {
         currentStock = 0;
       }
 
-      // 2. Incrementar estoque da variante
-      const newStock = currentStock + params.qtd;
-      const { error: updateErr } = await supabase
-        .from('product_variants')
-        .update({ stock_quantity: newStock })
-        .eq('id', targetVariantId);
+      // 2. Incrementar estoque de forma ATÔMICA via RPC (evita race condition)
+      const { error: updateErr } = await supabase.rpc('increment_variant_stock', {
+        p_variant_id: targetVariantId,
+        p_amount: params.qtd
+      });
 
       if (updateErr) throw updateErr;
+
+      const newStock = currentStock + params.qtd;
 
       // 3. Registrar movimentação de estoque (ENTRY)
       await supabase.from('inventory_movements').insert({
@@ -170,7 +171,7 @@ export const InventoryService = {
       const totalExpense = params.custoUnitario * params.qtd;
       if (totalExpense > 0) {
         await supabase.from('financial_transactions').insert({
-          type: 'saida',
+          type: 'EXPENSE',
           category: 'Estoque / Compras',
           description: `Entrada de estoque: ${params.productName} (${params.qtd} un)`,
           amount: totalExpense,

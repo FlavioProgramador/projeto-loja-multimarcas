@@ -13,6 +13,8 @@ import { CustomersView } from './components/customers/CustomersView';
 import { SuppliersView } from './components/suppliers/SuppliersView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AutomationsView } from './components/automations/AutomationsView';
+import { AuthModal } from './components/auth/AuthModal';
+import { useAuth } from './contexts/AuthContext';
 import { ActiveModule } from './types';
 
 const VALID_MODULES: ActiveModule[] = [
@@ -38,6 +40,7 @@ function getInitialModule(): ActiveModule {
 }
 
 export function AppContent() {
+  const { user, loading, isConfigured } = useAuth();
   const [currentModule, setCurrentModule] = useState<ActiveModule>(getInitialModule);
 
   useEffect(() => {
@@ -56,6 +59,47 @@ export function AppContent() {
     setCurrentModule(module);
     window.location.hash = `#/${module}`;
   };
+
+  // ─── Auth Guard ────────────────────────────────────────────────────────────
+  // Se o Supabase está configurado, exigir autenticação.
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'var(--bg-main)',
+        color: 'var(--text-secondary)',
+        fontSize: '14px',
+        gap: '10px'
+      }}>
+        <div className="spinner" style={{
+          width: 20, height: 20,
+          border: '2px solid var(--border-color)',
+          borderTop: '2px solid var(--primary)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+        Carregando...
+      </div>
+    );
+  }
+
+  if (isConfigured && !user) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'var(--bg-main)'
+      }}>
+        <AuthModal isOpen={true} onClose={() => {}} />
+      </div>
+    );
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   const renderCurrentModule = () => {
     switch (currentModule) {
@@ -102,3 +146,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+

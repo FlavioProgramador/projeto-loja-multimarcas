@@ -43,7 +43,7 @@ BEGIN
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1)),
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'role', 'ADMIN') -- Primeiro usuário ou default como ADMIN/EMPLOYEE
+    COALESCE(NEW.raw_user_meta_data->>'role', 'EMPLOYEE') -- Padrão EMPLOYEE; defina 'ADMIN' via metadados no cadastro
   )
   ON CONFLICT (id) DO UPDATE
   SET full_name = EXCLUDED.full_name,
@@ -273,7 +273,7 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_variant ON public.sale_items(product_v
 CREATE TABLE IF NOT EXISTS public.payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
-  method TEXT NOT NULL CHECK (method IN ('PIX', 'CREDIT_CARD', 'DEBIT_CARD', 'CASH', 'Cartão', 'Dinheiro')),
+  method TEXT NOT NULL CHECK (method IN ('PIX', 'CREDIT_CARD', 'DEBIT_CARD', 'CASH', 'VOUCHER')),
   amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
   status TEXT NOT NULL CHECK (status IN ('PENDING', 'PROCESSING', 'APPROVED', 'DECLINED', 'CANCELLED', 'REFUNDED')) DEFAULT 'APPROVED',
   installments INTEGER DEFAULT 1 CHECK (installments >= 1),
@@ -295,7 +295,7 @@ CREATE TRIGGER update_payments_updated_at
 
 CREATE TABLE IF NOT EXISTS public.financial_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type TEXT NOT NULL CHECK (type IN ('INCOME', 'EXPENSE', 'entrada', 'saida')),
+  type TEXT NOT NULL CHECK (type IN ('INCOME', 'EXPENSE')),
   category TEXT,
   description TEXT NOT NULL,
   amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
@@ -361,7 +361,7 @@ DECLARE
   v_variant RECORD;
   v_item_total NUMERIC(12,2);
   v_current_stock INT;
-  v_coupon RECORD;
+  -- v_coupon RECORD removido (cupons descontinuados)
   v_resolved_customer_id UUID := p_customer_id;
   v_normalized_method TEXT;
 BEGIN
@@ -375,11 +375,12 @@ BEGIN
 
   -- 3. Normalizar método de pagamento
   v_normalized_method := CASE
-    WHEN UPPER(p_payment_method) LIKE '%PIX%' THEN 'PIX'
-    WHEN UPPER(p_payment_method) LIKE '%CART%' THEN 'CREDIT_CARD'
-    WHEN UPPER(p_payment_method) LIKE '%DINHEIRO%' OR UPPER(p_payment_method) LIKE '%CASH%' THEN 'CASH'
-    WHEN UPPER(p_payment_method) LIKE '%DEBIT%' THEN 'DEBIT_CARD'
-    ELSE p_payment_method
+    WHEN UPPER(p_payment_method) LIKE '%PIX%'    THEN 'PIX'
+    WHEN UPPER(p_payment_method) LIKE '%DEBIT%'  THEN 'DEBIT_CARD'
+    WHEN UPPER(p_payment_method) LIKE '%CART%'   THEN 'CREDIT_CARD'
+    WHEN UPPER(p_payment_method) LIKE '%CASH%'
+      OR UPPER(p_payment_method) LIKE '%DINHEIRO%' THEN 'CASH'
+    ELSE 'CASH'  -- fallback seguro
   END;
 
   -- 4. Tratar / Vincular Cliente por CPF se não fornecido id
@@ -548,7 +549,7 @@ BEGIN
     reference_id,
     paid_at
   ) VALUES (
-    'entrada',
+    'INCOME',
     'Vendas PDV',
     'Venda ' || v_sale_number || ' - ' || COALESCE(p_customer_name, 'Consumidor Final'),
     v_final_total,
@@ -572,6 +573,103 @@ BEGIN
   );
 END;
 $$;
+
+-- ============================================================================
+-- RPC: cancel_mp_pix_sale (Rollback de estoque para PIX não pago)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.cancel_mp_pix_sale(
+  p_sale_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_sale RECORD;
+  v_item RECORD;
+BEGIN
+  -- 1. Verificar se a venda existe e está PENDING ou COMPLETED (evitar double-cancel)
+  SELECT * INTO v_sale FROM public.sales WHERE id = p_sale_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada');
+  END IF;
+
+  IF v_sale.status = 'CANCELLED' THEN
+    RETURN jsonb_build_object('success', true, 'message', 'Venda já cancelada (idempotente)');
+  END IF;
+
+  -- 2. Restaurar estoque de cada item da venda
+  FOR v_item IN
+    SELECT si.product_variant_id, si.quantity, pv.stock_quantity
+    FROM public.sale_items si
+    JOIN public.product_variants pv ON pv.id = si.product_variant_id
+    WHERE si.sale_id = p_sale_id
+  LOOP
+    -- Incrementar estoque atomicamente
+    UPDATE public.product_variants
+      SET stock_quantity = stock_quantity + v_item.quantity
+    WHERE id = v_item.product_variant_id;
+
+    -- Registrar movimentação de devolução
+    INSERT INTO public.inventory_movements (
+      product_variant_id, type, quantity,
+      quantity_before, quantity_after,
+      reference_type, reference_id, notes
+    ) VALUES (
+      v_item.product_variant_id, 'CANCELLATION', v_item.quantity,
+      v_item.stock_quantity, v_item.stock_quantity + v_item.quantity,
+      'SALE', p_sale_id, 'Estorno: PIX cancelado/expirado'
+    );
+  END LOOP;
+
+  -- 3. Marcar venda como CANCELADA
+  UPDATE public.sales SET status = 'CANCELLED' WHERE id = p_sale_id;
+
+  -- 4. Cancelar pagamento associado
+  UPDATE public.payments SET status = 'CANCELLED' WHERE sale_id = p_sale_id;
+
+  -- 5. Estornar transação financeira (registrar saída de estorno)
+  INSERT INTO public.financial_transactions (
+    type, category, description, amount, status, reference_type, reference_id
+  )
+  SELECT 'EXPENSE', 'Estornos', 'Estorno PIX cancelado - venda ' || v_sale.sale_number,
+         v_sale.total, 'PAID', 'SALE', p_sale_id;
+
+  RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Venda cancelada e estoque restaurado');
+END;
+$$;
+
+
+-- ============================================================================
+-- RPC: increment_variant_stock (Incremento atômico de estoque — sem race condition)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.increment_variant_stock(
+  p_variant_id UUID,
+  p_amount INTEGER
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.product_variants
+    SET stock_quantity = stock_quantity + p_amount
+  WHERE id = p_variant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Variante % não encontrada', p_variant_id;
+  END IF;
+END;
+$$;
+
+-- Índices de performance adicionais
+CREATE INDEX IF NOT EXISTS idx_sales_status ON public.sales(status);
+CREATE INDEX IF NOT EXISTS idx_financial_status ON public.financial_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_financial_type ON public.financial_transactions(type);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON public.payments(status);
 
 -- ============================================================================
 -- 12. ROW LEVEL SECURITY (RLS) POLICIES

@@ -225,7 +225,8 @@ export const PdvView: React.FC = () => {
   };
 
   return (
-    <div className="module-fade">
+    <>
+      <div className="module-fade">
       {/* Banner */}
       {notificationBanner && (
         <div
@@ -534,20 +535,20 @@ export const PdvView: React.FC = () => {
         isGeneratingPix={isGeneratingPix}
       />
 
-      {/* Hidden element for printing receipt */}
-      <div style={{ display: 'none' }}>
-        {lastSaleData && (
-          <ReceiptPrinter
-            cartItems={lastSaleData.cartItems}
-            totalFinal={lastSaleData.totalFinal}
-            paymentMethod={lastSaleData.paymentMethod}
-            amountPaid={lastSaleData.amountPaid}
-            change={lastSaleData.change}
-            buyerName={lastSaleData.buyerName}
-            cpf={lastSaleData.cpf}
-          />
-        )}
       </div>
-    </div>
+      
+      {/* Hidden element for printing receipt (visibility handled by CSS class .print-only) */}
+      {lastSaleData && (
+        <ReceiptPrinter
+          cartItems={lastSaleData.cartItems}
+          totalFinal={lastSaleData.totalFinal}
+          paymentMethod={lastSaleData.paymentMethod}
+          amountPaid={lastSaleData.amountPaid}
+          change={lastSaleData.change}
+          buyerName={lastSaleData.buyerName}
+          cpf={lastSaleData.cpf}
+        />
+      )}
+    </>
   );
 };

@@ -1,0 +1,6 @@
+{
+  "name": "ERP Varejo MultiMarcas",
+  "description": "Sistema completo de gestão e PDV para loja de roupas e calçados multimarcas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

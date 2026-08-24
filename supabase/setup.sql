@@ -596,6 +596,10 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada');
   END IF;
 
+  IF v_sale.user_id != auth.uid() AND public.current_user_role() NOT IN ('ADMIN', 'MANAGER') THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Permissão negada para cancelar esta venda');
+  END IF;
+
   IF v_sale.status = 'CANCELLED' THEN
     RETURN jsonb_build_object('success', true, 'message', 'Venda já cancelada (idempotente)');
   END IF;
@@ -702,10 +706,16 @@ CREATE POLICY "Profiles are viewable by authenticated users"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Users can update own profile or Admins can update any"
+CREATE POLICY "Users can update own profile (except role)"
   ON public.profiles FOR UPDATE
   TO authenticated
-  USING (id = auth.uid() OR public.current_user_role() = 'ADMIN');
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid() AND role = public.current_user_role());
+
+CREATE POLICY "Admins can update any profile"
+  ON public.profiles FOR UPDATE
+  TO authenticated
+  USING (public.current_user_role() = 'ADMIN');
 
 -- Policies para BRANDS & CATEGORIES (Leitura pública/autenticada, escrita staff)
 CREATE POLICY "Brands viewable by authenticated"
@@ -744,24 +754,24 @@ CREATE POLICY "Suppliers manageable by Admin and Manager"
 -- Policies para INVENTORY MOVEMENTS
 CREATE POLICY "Movements viewable by authenticated"
   ON public.inventory_movements FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Movements insertable by authenticated"
-  ON public.inventory_movements FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Movements insertable by Admin"
+  ON public.inventory_movements FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 -- Policies para SALES, SALE_ITEMS, PAYMENTS
 CREATE POLICY "Sales viewable by authenticated"
   ON public.sales FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Sales insertable by authenticated"
-  ON public.sales FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Sales insertable by Admin"
+  ON public.sales FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 CREATE POLICY "Sale items viewable by authenticated"
   ON public.sale_items FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Sale items insertable by authenticated"
-  ON public.sale_items FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Sale items insertable by Admin"
+  ON public.sale_items FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 CREATE POLICY "Payments viewable by authenticated"
   ON public.payments FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Payments insertable by authenticated"
-  ON public.payments FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Payments insertable by Admin"
+  ON public.payments FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 -- Policies para FINANCIAL & EXPENSES
 CREATE POLICY "Finance viewable by authenticated"
@@ -903,8 +913,21 @@ ON CONFLICT (code) DO NOTHING;
 -- Inserir Transações Financeiras Iniciais
 INSERT INTO public.financial_transactions (type, category, description, amount, status, created_at)
 VALUES
-  ('entrada', 'Vendas PDV', 'Venda PDV #1001', 189.90, 'PAID', NOW() - INTERVAL '30 days'),
-  ('entrada', 'Vendas PDV', 'Venda PDV #1002', 279.80, 'PAID', NOW() - INTERVAL '25 days'),
-  ('saida', 'Operacional', 'Pagamento de Luz', 120.00, 'PAID', NOW() - INTERVAL '20 days'),
-  ('entrada', 'Vendas PDV', 'Venda PDV #1003', 459.70, 'PAID', NOW() - INTERVAL '5 days')
+  ('INCOME', 'Vendas PDV', 'Venda PDV #1001', 189.90, 'PAID', NOW() - INTERVAL '30 days'),
+  ('INCOME', 'Vendas PDV', 'Venda PDV #1002', 279.80, 'PAID', NOW() - INTERVAL '25 days'),
+  ('EXPENSE', 'Operacional', 'Pagamento de Luz', 120.00, 'PAID', NOW() - INTERVAL '20 days'),
+  ('INCOME', 'Vendas PDV', 'Venda PDV #1003', 459.70, 'PAID', NOW() - INTERVAL '5 days')
 ON CONFLICT DO NOTHING;
+
+-- ============================================================================
+-- 15. RESTRIÇÕES DE EXECUÇÃO DE RPCs (Segurança)
+-- ============================================================================
+
+REVOKE EXECUTE ON FUNCTION public.complete_sale FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.complete_sale TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.cancel_mp_pix_sale FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.increment_variant_stock FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.increment_variant_stock TO authenticated;

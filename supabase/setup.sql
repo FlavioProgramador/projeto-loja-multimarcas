@@ -647,25 +647,65 @@ $$;
 
 
 -- ============================================================================
--- RPC: increment_variant_stock (Incremento atômico de estoque — sem race condition)
+-- RPC: register_stock_entry (Entrada atômica de estoque + movimentação)
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION public.increment_variant_stock(
+CREATE OR REPLACE FUNCTION public.register_stock_entry(
   p_variant_id UUID,
-  p_amount INTEGER
+  p_quantity INTEGER,
+  p_unit_cost NUMERIC,
+  p_product_name TEXT
 )
-RETURNS VOID
+RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_current_stock INTEGER;
+  v_new_stock INTEGER;
+  v_total_expense NUMERIC(12,2);
+  v_user_role TEXT;
 BEGIN
-  UPDATE public.product_variants
-    SET stock_quantity = stock_quantity + p_amount
-  WHERE id = p_variant_id;
+  -- 1. Validar permissão (Apenas ADMIN e MANAGER)
+  v_user_role := public.current_user_role();
+  IF v_user_role NOT IN ('ADMIN', 'MANAGER') THEN
+    RAISE EXCEPTION 'Permissão negada para dar entrada em estoque';
+  END IF;
+
+  -- 2. Obter e travar estoque atual (Lock Pessimista)
+  SELECT stock_quantity INTO v_current_stock 
+  FROM public.product_variants 
+  WHERE id = p_variant_id 
+  FOR UPDATE;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Variante % não encontrada', p_variant_id;
+    RAISE EXCEPTION 'Variação não encontrada';
   END IF;
+
+  -- 3. Atualizar estoque
+  v_new_stock := v_current_stock + p_quantity;
+  UPDATE public.product_variants
+  SET stock_quantity = v_new_stock
+  WHERE id = p_variant_id;
+
+  -- 4. Registrar movimentação
+  INSERT INTO public.inventory_movements (
+    product_variant_id, type, quantity, quantity_before, quantity_after, notes, user_id
+  ) VALUES (
+    p_variant_id, 'ENTRY', p_quantity, v_current_stock, v_new_stock, 'Entrada de estoque: ' || p_product_name, auth.uid()
+  );
+
+  -- 5. Registrar saída financeira (se houver custo)
+  v_total_expense := p_quantity * p_unit_cost;
+  IF v_total_expense > 0 THEN
+    INSERT INTO public.financial_transactions (
+      type, category, description, amount, status, paid_at
+    ) VALUES (
+      'EXPENSE', 'Estoque / Compras', 'Entrada de estoque: ' || p_product_name || ' (' || p_quantity || ' un)', v_total_expense, 'PAID', NOW()
+    );
+  END IF;
+
+  RETURN jsonb_build_object('success', true);
 END;
 $$;
 
@@ -754,24 +794,16 @@ CREATE POLICY "Suppliers manageable by Admin and Manager"
 -- Policies para INVENTORY MOVEMENTS
 CREATE POLICY "Movements viewable by authenticated"
   ON public.inventory_movements FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Movements insertable by Admin"
-  ON public.inventory_movements FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 -- Policies para SALES, SALE_ITEMS, PAYMENTS
 CREATE POLICY "Sales viewable by authenticated"
   ON public.sales FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Sales insertable by Admin"
-  ON public.sales FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 CREATE POLICY "Sale items viewable by authenticated"
   ON public.sale_items FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Sale items insertable by Admin"
-  ON public.sale_items FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 CREATE POLICY "Payments viewable by authenticated"
   ON public.payments FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Payments insertable by Admin"
-  ON public.payments FOR INSERT TO authenticated WITH CHECK (public.current_user_role() = 'ADMIN');
 
 -- Policies para FINANCIAL & EXPENSES
 CREATE POLICY "Finance viewable by authenticated"
@@ -929,5 +961,5 @@ GRANT EXECUTE ON FUNCTION public.complete_sale TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.cancel_mp_pix_sale FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale TO authenticated;
 
-REVOKE EXECUTE ON FUNCTION public.increment_variant_stock FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.increment_variant_stock TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.register_stock_entry FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.register_stock_entry TO authenticated;

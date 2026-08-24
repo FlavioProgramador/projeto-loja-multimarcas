@@ -147,38 +147,15 @@ export const InventoryService = {
         currentStock = 0;
       }
 
-      // 2. Incrementar estoque de forma ATÔMICA via RPC (evita race condition)
-      const { error: updateErr } = await supabase.rpc('increment_variant_stock', {
+      // 2. Incrementar estoque, gerar movimentação e lançar no financeiro de forma ATÔMICA via RPC
+      const { error: updateErr } = await supabase.rpc('register_stock_entry', {
         p_variant_id: targetVariantId,
-        p_amount: params.qtd
+        p_quantity: params.qtd,
+        p_unit_cost: params.custoUnitario,
+        p_product_name: params.productName
       });
 
       if (updateErr) throw updateErr;
-
-      const newStock = currentStock + params.qtd;
-
-      // 3. Registrar movimentação de estoque (ENTRY)
-      await supabase.from('inventory_movements').insert({
-        product_variant_id: targetVariantId,
-        type: 'ENTRY',
-        quantity: params.qtd,
-        quantity_before: currentStock,
-        quantity_after: newStock,
-        notes: `Entrada de estoque: ${params.productName}`
-      });
-
-      // 4. Registrar transação financeira de despesa (EXPENSE / saida)
-      const totalExpense = params.custoUnitario * params.qtd;
-      if (totalExpense > 0) {
-        await supabase.from('financial_transactions').insert({
-          type: 'EXPENSE',
-          category: 'Estoque / Compras',
-          description: `Entrada de estoque: ${params.productName} (${params.qtd} un)`,
-          amount: totalExpense,
-          status: 'PAID',
-          paid_at: new Date().toISOString()
-        });
-      }
 
       return true;
     } catch (err) {

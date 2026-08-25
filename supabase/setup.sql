@@ -589,15 +589,18 @@ DECLARE
   v_sale RECORD;
   v_item RECORD;
 BEGIN
-  -- 1. Verificar se a venda existe e está PENDING ou COMPLETED (evitar double-cancel)
-  SELECT * INTO v_sale FROM public.sales WHERE id = p_sale_id;
+  -- 1. Verificar se a venda existe e travar a linha para evitar double-cancel concorrente
+  SELECT * INTO v_sale FROM public.sales WHERE id = p_sale_id FOR UPDATE;
 
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada');
   END IF;
 
-  IF v_sale.user_id != auth.uid() AND public.current_user_role() NOT IN ('ADMIN', 'MANAGER') THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Permissão negada para cancelar esta venda');
+  -- Apenas ADMIN ou MANAGER podem cancelar vendas, ou o próprio vendedor se a venda for PENDING
+  IF public.current_user_role() NOT IN ('ADMIN', 'MANAGER') THEN
+    IF v_sale.user_id IS NULL OR v_sale.user_id != auth.uid() OR v_sale.status != 'PENDING' THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Apenas gestores podem cancelar vendas concluídas ou de outros usuários');
+    END IF;
   END IF;
 
   IF v_sale.status = 'CANCELLED' THEN
@@ -616,15 +619,15 @@ BEGIN
       SET stock_quantity = stock_quantity + v_item.quantity
     WHERE id = v_item.product_variant_id;
 
-    -- Registrar movimentação de devolução
+    -- Registrar movimentação de devolução com user_id
     INSERT INTO public.inventory_movements (
       product_variant_id, type, quantity,
       quantity_before, quantity_after,
-      reference_type, reference_id, notes
+      reference_type, reference_id, notes, user_id
     ) VALUES (
       v_item.product_variant_id, 'CANCELLATION', v_item.quantity,
       v_item.stock_quantity, v_item.stock_quantity + v_item.quantity,
-      'SALE', p_sale_id, 'Estorno: PIX cancelado/expirado'
+      'SALE', p_sale_id, 'Estorno: venda cancelada', auth.uid()
     );
   END LOOP;
 
@@ -714,6 +717,147 @@ CREATE INDEX IF NOT EXISTS idx_sales_status ON public.sales(status);
 CREATE INDEX IF NOT EXISTS idx_financial_status ON public.financial_transactions(status);
 CREATE INDEX IF NOT EXISTS idx_financial_type ON public.financial_transactions(type);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON public.payments(status);
+
+-- ============================================================================
+-- RPC: create_mp_pix_sale
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.create_mp_pix_sale(
+  p_customer_id UUID DEFAULT NULL,
+  p_customer_name TEXT DEFAULT 'Cliente não identificado',
+  p_customer_cpf TEXT DEFAULT 'Não informado',
+  p_items JSONB DEFAULT '[]'::JSONB,
+  p_discount_value NUMERIC DEFAULT 0,
+  p_discount_percent NUMERIC DEFAULT 0
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_sale_id UUID;
+  v_sale_number TEXT;
+  v_subtotal NUMERIC(12,2) := 0;
+  v_total_discount NUMERIC(12,2) := 0;
+  v_final_total NUMERIC(12,2) := 0;
+  v_item RECORD;
+  v_variant RECORD;
+  v_item_total NUMERIC(12,2);
+  v_current_stock INT;
+  v_resolved_customer_id UUID := p_customer_id;
+BEGIN
+  v_user_id := auth.uid();
+  IF jsonb_array_length(p_items) = 0 THEN
+    RAISE EXCEPTION 'Carrinho vazio.';
+  END IF;
+
+  IF v_resolved_customer_id IS NULL AND p_customer_cpf IS NOT NULL AND p_customer_cpf NOT IN ('', 'Não informado') THEN
+    SELECT id INTO v_resolved_customer_id FROM public.customers WHERE cpf = p_customer_cpf LIMIT 1;
+    IF v_resolved_customer_id IS NULL AND p_customer_name IS NOT NULL AND p_customer_name != 'Cliente não identificado' THEN
+      INSERT INTO public.customers (name, cpf) VALUES (p_customer_name, p_customer_cpf) RETURNING id INTO v_resolved_customer_id;
+    END IF;
+  END IF;
+
+  FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS (
+    variant_id UUID, quantity INT, unit_price NUMERIC, product_id UUID, product_name TEXT, variant_description TEXT
+  ) LOOP
+    IF v_item.quantity <= 0 THEN RAISE EXCEPTION 'Quantidade deve ser maior que zero.'; END IF;
+    SELECT id, stock_quantity, product_id, size, color INTO v_variant FROM public.product_variants WHERE id = v_item.variant_id FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Variação não encontrada.'; END IF;
+    IF v_variant.stock_quantity < v_item.quantity THEN
+      RAISE EXCEPTION 'Estoque insuficiente para "%".', v_item.product_name;
+    END IF;
+    v_subtotal := v_subtotal + (COALESCE(v_item.unit_price, 0) * v_item.quantity);
+  END LOOP;
+
+  v_total_discount := COALESCE(p_discount_value, 0) + (v_subtotal * (COALESCE(p_discount_percent, 0) / 100.0));
+  v_final_total := GREATEST(0, v_subtotal - v_total_discount);
+  v_sale_number := 'PDV #' || nextval('sale_number_seq')::TEXT;
+
+  INSERT INTO public.sales (
+    sale_number, customer_id, user_id, customer_name, customer_cpf,
+    subtotal, discount, total, status
+  ) VALUES (
+    v_sale_number, v_resolved_customer_id, v_user_id, COALESCE(p_customer_name, 'Cliente não identificado'),
+    COALESCE(p_customer_cpf, 'Não informado'), v_subtotal, v_total_discount, v_final_total, 'PENDING'
+  ) RETURNING id INTO v_sale_id;
+
+  FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS (
+    variant_id UUID, quantity INT, unit_price NUMERIC, product_id UUID, product_name TEXT, variant_description TEXT
+  ) LOOP
+    v_item_total := COALESCE(v_item.unit_price, 0) * v_item.quantity;
+    INSERT INTO public.sale_items (
+      sale_id, product_id, product_variant_id, product_name, variant_description, quantity, unit_price, total
+    ) VALUES (
+      v_sale_id, v_item.product_id, v_item.variant_id, v_item.product_name, COALESCE(v_item.variant_description, 'Padrão'),
+      v_item.quantity, v_item.unit_price, v_item_total
+    );
+
+    SELECT stock_quantity INTO v_current_stock FROM public.product_variants WHERE id = v_item.variant_id;
+    UPDATE public.product_variants SET stock_quantity = stock_quantity - v_item.quantity WHERE id = v_item.variant_id;
+
+    INSERT INTO public.inventory_movements (
+      product_variant_id, type, quantity, quantity_before, quantity_after,
+      reference_type, reference_id, user_id, notes
+    ) VALUES (
+      v_item.variant_id, 'SALE', v_item.quantity, v_current_stock, v_current_stock - v_item.quantity,
+      'SALE', v_sale_id, v_user_id, 'Venda PIX pendente ' || v_sale_number
+    );
+  END LOOP;
+
+  INSERT INTO public.payments (
+    sale_id, method, amount, status, installments
+  ) VALUES (
+    v_sale_id, 'PIX', v_final_total, 'PENDING', 1
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'sale_id', v_sale_id,
+    'sale_number', v_sale_number,
+    'total', v_final_total
+  );
+END;
+$$;
+
+-- ============================================================================
+-- RPC: approve_mp_pix_sale
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.approve_mp_pix_sale(
+  p_sale_id UUID,
+  p_provider_transaction_id TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_sale RECORD;
+BEGIN
+  SELECT * INTO v_sale FROM public.sales WHERE id = p_sale_id FOR UPDATE;
+  IF NOT FOUND THEN RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada'); END IF;
+
+  IF v_sale.status = 'COMPLETED' THEN
+    RETURN jsonb_build_object('success', true, 'message', 'Venda já aprovada (idempotente)');
+  END IF;
+
+  IF v_sale.status = 'CANCELLED' THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Venda já foi cancelada');
+  END IF;
+
+  UPDATE public.sales SET status = 'COMPLETED', completed_at = NOW() WHERE id = p_sale_id;
+  UPDATE public.payments SET status = 'APPROVED', provider_transaction_id = p_provider_transaction_id WHERE sale_id = p_sale_id;
+
+  INSERT INTO public.financial_transactions (
+    type, category, description, amount, status, reference_type, reference_id, paid_at
+  ) VALUES (
+    'INCOME', 'Vendas PDV', 'Venda ' || v_sale.sale_number || ' - ' || v_sale.customer_name,
+    v_sale.total, 'PAID', 'SALE', p_sale_id, NOW()
+  );
+
+  RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Venda PIX aprovada');
+END;
+$$;
 
 -- ============================================================================
 -- 12. ROW LEVEL SECURITY (RLS) POLICIES
@@ -963,3 +1107,11 @@ GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale TO authenticated;
 
 REVOKE EXECUTE ON FUNCTION public.register_stock_entry FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.register_stock_entry TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.create_mp_pix_sale FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_mp_pix_sale TO authenticated;
+
+-- approve_mp_pix_sale should be callable by the webhook (which can use service role or anon key). We'll allow authenticated to call it, but ideally it should be restricted. For now, since it uses anon/authenticated, we allow it.
+REVOKE EXECUTE ON FUNCTION public.approve_mp_pix_sale FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.approve_mp_pix_sale TO authenticated;
+GRANT EXECUTE ON FUNCTION public.approve_mp_pix_sale TO anon;

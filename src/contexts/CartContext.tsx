@@ -47,7 +47,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           preco: product.preco,
           qtd: 1,
           variantId: sku.id,
-          productUuid: product.uuid
+          productUuid: product.id
         }
       ];
     });

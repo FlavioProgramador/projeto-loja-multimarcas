@@ -49,8 +49,7 @@ export const CustomersService = {
       });
 
       return {
-        id: index + 1,
-        uuid: c.id,
+        id: c.id,
         nome: c.name,
         cpf: c.cpf || 'Não informado',
         telefone: c.phone || '',

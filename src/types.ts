@@ -9,8 +9,7 @@ export interface ProductSku {
 export type StockStatus = 'Normal' | 'Baixo Estoque' | 'Esgotado';
 
 export interface Product {
-  id: number;
-  uuid?: string;
+  id: string;
   nome: string;
   marca: string;
   categoria: string;
@@ -19,7 +18,7 @@ export interface Product {
 }
 
 export interface CartItem {
-  produtoId: number;
+  produtoId: string;
   skuIndex: number;
   nome: string;
   tamanho: string;
@@ -38,8 +37,7 @@ export interface CustomerPurchase {
 }
 
 export interface Customer {
-  id: number;
-  uuid?: string;
+  id: string;
   nome: string;
   cpf: string;
   telefone: string;
@@ -49,8 +47,7 @@ export interface Customer {
 }
 
 export interface Supplier {
-  id: number;
-  uuid?: string;
+  id: string;
   nome: string;
   cnpj: string;
   contato: string;
@@ -62,8 +59,7 @@ export interface Supplier {
 export type TransactionType = 'entrada' | 'saida';
 
 export interface FinancialTransaction {
-  id: number;
-  uuid?: string;
+  id: string;
   tipo: TransactionType;
   descricao: string;
   valor: number;
@@ -71,8 +67,7 @@ export interface FinancialTransaction {
 }
 
 export interface FixedExpense {
-  id: number;
-  uuid?: string;
+  id: string;
   descricao: string;
   valor: number;
   dataVencimento: string;

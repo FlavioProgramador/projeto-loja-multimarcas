@@ -15,9 +15,8 @@ export const SuppliersService = {
       return [];
     }
 
-    return (data || []).map((s: any, index: number) => ({
-      id: index + 1,
-      uuid: s.id,
+    return (data || []).map((s: any) => ({
+      id: s.id,
       nome: s.company_name,
       cnpj: s.document || 'Não informado',
       contato: s.contact_name || '',

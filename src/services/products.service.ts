@@ -41,8 +41,7 @@ export const ProductsService = {
       }));
 
       return {
-        id: index + 1, // id numérico para compatibilidade com os componentes
-        uuid: p.id,    // uuid real do banco de dados
+        id: p.id,
         nome: p.name,
         marca: p.brands?.name || 'Genérica',
         categoria: p.categories?.name || 'Geral',

@@ -14,9 +14,8 @@ export const FinanceService = {
       return [];
     }
 
-    return (data || []).map((t: any, index: number) => ({
-      id: index + 1,
-      uuid: t.id,
+    return (data || []).map((t: any) => ({
+      id: t.id,
       tipo: (t.type === 'INCOME' || t.type === 'entrada') ? 'entrada' : 'saida',
       descricao: t.description,
       valor: Number(t.amount) || 0,
@@ -36,9 +35,8 @@ export const FinanceService = {
       return [];
     }
 
-    return (data || []).map((e: any, index: number) => ({
-      id: index + 1,
-      uuid: e.id,
+    return (data || []).map((e: any) => ({
+      id: e.id,
       descricao: e.description,
       valor: Number(e.amount) || 0,
       dataVencimento: e.due_date || '',

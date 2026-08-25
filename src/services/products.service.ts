@@ -21,6 +21,7 @@ export const ProductsService = {
         categories ( id, name ),
         product_variants ( id, sku, barcode, size, color, stock_quantity )
       `)
+      .eq('is_active', true)
       .order('name', { ascending: true });
 
     if (error) {
@@ -170,7 +171,7 @@ export const ProductsService = {
     marca: string;
     categoria: string;
     preco: number;
-    skus: { tamanho: string; cor: string; qtd: number }[];
+    skus: { id?: string; sku?: string; tamanho: string; cor: string; qtd: number }[];
   }>): Promise<void> {
     if (!isSupabaseConfigured || !uuid) return;
 
@@ -182,26 +183,42 @@ export const ProductsService = {
       await supabase.from('products').update(fieldsToUpdate).eq('id', uuid);
     }
 
-    // Se foram enviadas variações, sincronizar variantes
+    // Se foram enviadas variações, atualizar as existentes e inserir as novas usando UPSERT
     if (updates.skus && updates.skus.length > 0) {
-      // Deletar variantes anteriores e recriar ou atualizar
-      await supabase.from('product_variants').delete().eq('product_id', uuid);
-      
-      const newVariants = updates.skus.map((s, idx) => ({
-        product_id: uuid,
-        sku: `${(updates.nome || 'PROD').substring(0, 3).toUpperCase()}-${s.tamanho.toUpperCase()}-${s.cor.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}${idx}`,
-        size: s.tamanho || 'Único',
-        color: s.cor || 'Padrão',
-        stock_quantity: Math.max(0, Number(s.qtd) || 0)
-      }));
+      const variantsToUpsert = updates.skus.map((s, idx) => {
+        const payload: any = {
+          product_id: uuid,
+          size: s.tamanho || 'Único',
+          color: s.cor || 'Padrão',
+          stock_quantity: Math.max(0, Number(s.qtd) || 0)
+        };
+        
+        if (s.id) {
+          payload.id = s.id;
+        }
+        
+        if (s.sku) {
+          payload.sku = s.sku;
+        } else if (!s.id) {
+          payload.sku = `${(updates.nome || 'PROD').substring(0, 3).toUpperCase()}-${s.tamanho.toUpperCase()}-${s.cor.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}${idx}`;
+        }
+        
+        return payload;
+      });
 
-      await supabase.from('product_variants').insert(newVariants);
+      const { error } = await supabase.from('product_variants').upsert(variantsToUpsert, {
+        onConflict: 'id'
+      });
+      
+      if (error) {
+        console.error('Erro ao fazer upsert em product_variants:', error);
+      }
     }
   },
 
   async remove(uuid: string): Promise<void> {
     if (!isSupabaseConfigured || !uuid) return;
-    const { error } = await supabase.from('products').delete().eq('id', uuid);
+    const { error } = await supabase.from('products').update({ is_active: false }).eq('id', uuid);
     if (error) throw error;
   }
 };

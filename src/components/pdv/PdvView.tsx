@@ -6,7 +6,7 @@ import { formatMoeda } from '../../lib/utils';
 import { CheckoutModal } from './CheckoutModal';
 import { ReceiptPrinter } from './ReceiptPrinter';
 import { StatusBadge } from '../ui/StatusBadge';
-import { supabase } from '../../lib/supabase/client';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 
 export const PdvView: React.FC = () => {
   const { products, processSale } = useStore();
@@ -140,6 +140,10 @@ export const PdvView: React.FC = () => {
 
   const handleConfirmSale = async () => {
     if (paymentMethod === 'PIX') {
+      if (!isSupabaseConfigured) {
+        alert('Supabase não configurado corretamente. Verifique seu arquivo .env e reinicie o servidor (npm run dev). O PIX requer o backend real.');
+        return;
+      }
       setIsGeneratingPix(true);
       try {
         // 1. Preparar itens para o payload da RPC dentro da Edge Function

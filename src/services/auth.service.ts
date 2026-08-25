@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
-import { ProfileRow, UserRole } from '../types/database';
+import { ProfileRow } from '../types/database';
 
 export const AuthService = {
   async getSession() {
@@ -47,17 +47,19 @@ export const AuthService = {
     return data;
   },
 
-  async signUp(email: string, password: string, fullName: string, role: UserRole = 'EMPLOYEE') {
+  async signUp(email: string, password: string, fullName: string) {
     if (!isSupabaseConfigured) {
       throw new Error('Supabase não está configurado. Por favor, adicione as chaves no arquivo .env.');
     }
+    // SEGURANÇA: nunca enviar role via metadata.
+    // O trigger handle_new_user no banco sempre cria com EMPLOYEE, ignorando qualquer role enviada.
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          full_name: fullName,
-          role: role
+          full_name: fullName
+          // 'role' removido intencionalmente: o banco define sempre EMPLOYEE
         }
       }
     });

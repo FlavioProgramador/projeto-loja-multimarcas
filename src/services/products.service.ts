@@ -19,7 +19,7 @@ export const ProductsService = {
         image_url,
         brands ( id, name ),
         categories ( id, name ),
-        product_variants ( id, sku, barcode, size, color, stock_quantity )
+        product_variants ( id, sku, barcode, size, color, stock_quantity, is_active )
       `)
       .eq('is_active', true)
       .order('name', { ascending: true });
@@ -31,7 +31,8 @@ export const ProductsService = {
 
     // Mapear para a interface de domínio do frontend
     return (data || []).map((p: any, index: number) => {
-      const skus: ProductSku[] = (p.product_variants || []).map((v: any) => ({
+      const activeVariants = (p.product_variants || []).filter((v: any) => v.is_active !== false);
+      const skus: ProductSku[] = activeVariants.map((v: any) => ({
         id: v.id,
         sku: v.sku,
         tamanho: v.size,
@@ -81,89 +82,29 @@ export const ProductsService = {
   }): Promise<any> {
     if (!isSupabaseConfigured) return null;
 
-    // 1. Obter ou criar Brand
-    let brandId: string | null = null;
-    if (productData.marca) {
-      const { data: brand } = await supabase
-        .from('brands')
-        .select('id')
-        .ilike('name', productData.marca.trim())
-        .maybeSingle();
+    const rpcPayload = {
+      p_product_id: null,
+      p_name: productData.nome,
+      p_brand_name: productData.marca,
+      p_category_name: productData.categoria,
+      p_sale_price: productData.preco,
+      p_cost_price: productData.custo || 0,
+      p_variants: (productData.skus || []).map(s => ({
+        size: s.tamanho,
+        color: s.cor,
+        stock_quantity: Math.max(0, Number(s.qtd) || 0),
+        sku: s.sku || null
+      }))
+    };
 
-      if (brand) {
-        brandId = brand.id;
-      } else {
-        const { data: newBrand } = await supabase
-          .from('brands')
-          .insert({ name: productData.marca.trim() })
-          .select('id')
-          .single();
-        if (newBrand) brandId = newBrand.id;
-      }
+    const { data, error } = await supabase.rpc('manage_product', rpcPayload);
+    
+    if (error) {
+      console.error('Erro na RPC manage_product (create):', error);
+      throw error;
     }
 
-    // 2. Obter ou criar Categoria
-    let categoryId: string | null = null;
-    if (productData.categoria) {
-      const { data: cat } = await supabase
-        .from('categories')
-        .select('id')
-        .ilike('name', productData.categoria.trim())
-        .maybeSingle();
-
-      if (cat) {
-        categoryId = cat.id;
-      } else {
-        const { data: newCat } = await supabase
-          .from('categories')
-          .insert({ name: productData.categoria.trim() })
-          .select('id')
-          .single();
-        if (newCat) categoryId = newCat.id;
-      }
-    }
-
-    // 3. Inserir Produto
-    const { data: product, error: prodError } = await supabase
-      .from('products')
-      .insert({
-        name: productData.nome.trim(),
-        brand_id: brandId,
-        category_id: categoryId,
-        sale_price: productData.preco,
-        cost_price: productData.custo || 0
-      })
-      .select()
-      .single();
-
-    if (prodError) throw prodError;
-
-    // 4. Inserir Variantes (SKUs)
-    if (productData.skus && productData.skus.length > 0) {
-      const variantsToInsert = productData.skus.map((s, idx) => {
-        const generatedSku =
-          s.sku ||
-          `${productData.nome.substring(0, 3).toUpperCase()}-${s.tamanho.toUpperCase()}-${s.cor.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}${idx}`;
-
-        return {
-          product_id: product.id,
-          sku: generatedSku,
-          size: s.tamanho || 'Único',
-          color: s.cor || 'Padrão',
-          stock_quantity: Math.max(0, Number(s.qtd) || 0)
-        };
-      });
-
-      const { error: varError } = await supabase
-        .from('product_variants')
-        .insert(variantsToInsert);
-
-      if (varError) {
-        console.error('Erro ao inserir variantes do produto:', varError);
-      }
-    }
-
-    return product;
+    return { id: data.product_id };
   },
 
   async update(uuid: string, updates: Partial<{
@@ -175,44 +116,26 @@ export const ProductsService = {
   }>): Promise<void> {
     if (!isSupabaseConfigured || !uuid) return;
 
-    const fieldsToUpdate: any = {};
-    if (updates.nome !== undefined) fieldsToUpdate.name = updates.nome;
-    if (updates.preco !== undefined) fieldsToUpdate.sale_price = updates.preco;
+    const rpcPayload = {
+      p_product_id: uuid,
+      p_name: updates.nome || null,
+      p_brand_name: updates.marca || null,
+      p_category_name: updates.categoria || null,
+      p_sale_price: updates.preco || null,
+      p_cost_price: null, // não alteramos custo na UI de edição rápida
+      p_variants: (updates.skus || []).map(s => ({
+        id: s.id || null,
+        size: s.tamanho,
+        color: s.cor,
+        stock_quantity: Math.max(0, Number(s.qtd) || 0),
+        sku: s.sku || null
+      }))
+    };
 
-    if (Object.keys(fieldsToUpdate).length > 0) {
-      await supabase.from('products').update(fieldsToUpdate).eq('id', uuid);
-    }
-
-    // Se foram enviadas variações, atualizar as existentes e inserir as novas usando UPSERT
-    if (updates.skus && updates.skus.length > 0) {
-      const variantsToUpsert = updates.skus.map((s, idx) => {
-        const payload: any = {
-          product_id: uuid,
-          size: s.tamanho || 'Único',
-          color: s.cor || 'Padrão',
-          stock_quantity: Math.max(0, Number(s.qtd) || 0)
-        };
-        
-        if (s.id) {
-          payload.id = s.id;
-        }
-        
-        if (s.sku) {
-          payload.sku = s.sku;
-        } else if (!s.id) {
-          payload.sku = `${(updates.nome || 'PROD').substring(0, 3).toUpperCase()}-${s.tamanho.toUpperCase()}-${s.cor.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}${idx}`;
-        }
-        
-        return payload;
-      });
-
-      const { error } = await supabase.from('product_variants').upsert(variantsToUpsert, {
-        onConflict: 'id'
-      });
-      
-      if (error) {
-        console.error('Erro ao fazer upsert em product_variants:', error);
-      }
+    const { error } = await supabase.rpc('manage_product', rpcPayload);
+    if (error) {
+      console.error('Erro na RPC manage_product (update):', error);
+      throw error;
     }
   },
 

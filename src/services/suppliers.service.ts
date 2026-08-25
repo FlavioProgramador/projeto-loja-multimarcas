@@ -7,6 +7,7 @@ export const SuppliersService = {
     const { data, error } = await supabase
       .from('suppliers')
       .select('*')
+      .eq('is_active', true)
       .order('company_name', { ascending: true });
 
     if (error) {

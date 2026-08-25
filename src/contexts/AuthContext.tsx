@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { AuthService } from '../services/auth.service';
 import { ProfileRow, UserRole } from '../types/database';
@@ -11,7 +11,7 @@ interface AuthContextType {
   loading: boolean;
   isConfigured: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string, role?: UserRole) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -70,17 +70,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AuthService.signIn(email, password);
   };
 
-  const signUp = async (email: string, password: string, fullName: string, role?: UserRole) => {
-    await AuthService.signUp(email, password, fullName, role);
+  const signUp = async (email: string, password: string, fullName: string) => {
+    await AuthService.signUp(email, password, fullName);
   };
 
   const signOut = async () => {
     await AuthService.signOut();
     setUser(null);
     setProfile(null);
+    // V-07: Limpar dados sensíveis do cache local no logout
+    // Clientes, transações, movimentações e fornecedores não devem persistir entre sessões
+    const SENSITIVE_KEYS = [
+      'erp_customers',
+      'erp_transactions',
+      'erp_movements',
+      'erp_suppliers',
+      'erp_fixed_expenses',
+      'erp_notifications',
+    ];
+    SENSITIVE_KEYS.forEach(key => localStorage.removeItem(key));
   };
 
-  const role: UserRole = profile?.role || 'ADMIN'; // Default para visualização completa
+  // SEGURANÇA: fallback deve ser null, nunca ADMIN.
+  // Se o perfil falhar ao carregar, o usuário fica sem permissão — não ganha acesso.
+  const role: UserRole = (profile?.role as UserRole) ?? 'EMPLOYEE';
 
   return (
     <AuthContext.Provider

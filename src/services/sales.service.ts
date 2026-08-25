@@ -83,6 +83,7 @@ export const SalesService = {
         payments ( method, installments ),
         sale_items ( product_name, variant_description, quantity )
       `)
+      .eq('status', 'COMPLETED')
       .order('created_at', { ascending: false });
 
     if (error) {

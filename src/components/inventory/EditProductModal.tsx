@@ -69,6 +69,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
       categoria: categoria.trim(),
       preco: numPreco,
       skus: skus.map(s => ({
+        id: s.id,
+        sku: s.sku,
         tamanho: s.tamanho.trim() || 'Único',
         cor: s.cor.trim() || 'Padrão',
         qtd: Number(s.qtd) || 0

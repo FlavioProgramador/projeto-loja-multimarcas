@@ -25,6 +25,7 @@ export const CustomersService = {
           )
         )
       `)
+      .eq('is_active', true)
       .order('name', { ascending: true });
 
     if (error) {

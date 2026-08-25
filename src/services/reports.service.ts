@@ -11,7 +11,8 @@ export const ReportsService = {
 
     const { data: sales } = await supabase
       .from('sales')
-      .select('id, total, created_at, sale_items(product_name, quantity)');
+      .select('id, total, created_at, sale_items(product_name, quantity)')
+      .eq('status', 'COMPLETED');
 
     const { data: transactions } = await supabase
       .from('financial_transactions')

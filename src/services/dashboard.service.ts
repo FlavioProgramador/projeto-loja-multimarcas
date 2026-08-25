@@ -20,6 +20,7 @@ export const DashboardService = {
       const { data: sales, error: salesError } = await supabase
         .from('sales')
         .select('id, sale_number, total, created_at, customer_name, payments(method, installments), sale_items(product_name, quantity)')
+        .eq('status', 'COMPLETED')
         .order('created_at', { ascending: false });
 
       if (salesError) throw salesError;

@@ -58,11 +58,10 @@ npm install
 ```
 
 3. **Configure as Variáveis de Ambiente:**
-Crie um arquivo `.env` na raiz do projeto baseado no `.env.example`:
+Crie ou configure o arquivo `.env.development` baseado no template (não versione valores reais):
 ```env
-VITE_SUPABASE_URL=sua_url_do_supabase
-VITE_SUPABASE_ANON_KEY=sua_anon_key_do_supabase
-VITE_MERCADO_PAGO_PUBLIC_KEY=sua_chave_publica_mp
+VITE_SUPABASE_URL=sua_url_do_supabase_dev
+VITE_SUPABASE_ANON_KEY=sua_anon_key_do_supabase_dev
 ```
 
 4. **Inicie o servidor de desenvolvimento:**
@@ -70,14 +69,40 @@ VITE_MERCADO_PAGO_PUBLIC_KEY=sua_chave_publica_mp
 npm run dev
 ```
 
-5. **Acesse no navegador:**
-`http://localhost:5173`
+## 🏗️ Arquitetura de Ambientes e Git Flow
 
-## 📦 Banco de Dados (Supabase)
+O VESTRA utiliza uma arquitetura profissional de 3 ambientes separados para garantir segurança e estabilidade, operando em um **único repositório GitHub**.
 
-Para garantir o funcionamento pleno das vendas, certifique-se de executar o arquivo SQL inicial fornecido na pasta `supabase/` no painel de **SQL Editor** do seu projeto no Supabase.
+### Projetos Supabase Independentes
+- **VESTRA_DEV**: Ambiente de desenvolvimento (dados fictícios). *(Este projeto será criado)*
+- **VESTRA_HOMOLOGACAO**: Ambiente de testes/staging (dados fictícios, mesma estrutura da produção). *(Já existente)*
+- **VESTRA_PRODUCAO**: Ambiente real (dados sensíveis, nunca executar testes aqui). *(Já existente)*
 
-Ele cria todas as tabelas (clientes, vendas, estoque) e a principal procedure (`complete_sale`) de processamento atômico de PDV.
+> **Atenção:** Existe um projeto atual (Ref: `ndrjynlbwrugakjqtzwy`) configurado no arquivo `.env`. Antes de configurá-lo como DEV ou PRODUÇÃO, **NÃO execute comandos destrutivos**. Verifique se este projeto contém dados reais. Ele não será resetado nem modificado automaticamente nesta fase.
+
+### Estrutura de Branches (Git Flow)
+- `feature/*` → Funcionalidades criadas a partir da `develop`.
+- `develop` → Branch de **Desenvolvimento** (Deploy para VESTRA_DEV).
+- `main` → Branch de **Produção** (Deploy para VESTRA_PRODUCAO).
+
+**Fluxo Esperado:**
+`feature` → `develop` (DEV) → (Release/PR) → `staging` (HOMOLOGAÇÃO) → `main` (PRODUÇÃO).
+
+## 📦 Banco de Dados (Supabase CLI e Migrations)
+
+A infraestrutura do banco de dados (tabelas, RLS, RPCs) é gerenciada via **Supabase CLI** e versionada na pasta `supabase/migrations`.
+- **Nunca edite o banco de produção manualmente.**
+- **Nunca edite migrations históricas já aplicadas.** Crie sempre uma nova migration.
+
+### Comandos Úteis (CLI)
+- Iniciar Supabase CLI local: `npx supabase init`
+- Linkar a um projeto: `npx supabase link --project-ref [ID_DO_PROJETO]`
+- Aplicar migrations pendentes: `npx supabase db push` (Sempre confirme o ambiente antes!)
+
+## 🔒 Edge Functions e Segurança
+As funções como `mp-webhook` e `create-mp-pix` residem em `supabase/functions/`.
+- Os _secrets_ (como `MERCADOPAGO_ACCESS_TOKEN`) devem ser injetados **diretamente no painel de cada projeto Supabase** via CLI (`supabase secrets set`), e NUNCA devem ser colocados no `.env` do frontend ou versionados no Git.
+- O Frontend possui apenas credenciais públicas (`ANON_KEY`).
 
 ## 📝 Licença
 

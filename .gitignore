@@ -5,7 +5,10 @@ coverage/
 .DS_Store
 *.log
 .env*
-!.env.example
+env/.env*
+!env/.env.development.example
+!env/.env.staging.example
+!env/.env.production.example
 test_fase0.cjs
 
 delete_test_users.cjs

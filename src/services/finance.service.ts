@@ -17,7 +17,7 @@ export const FinanceService = {
     return (data || []).map((t: any, index: number) => ({
       id: index + 1,
       uuid: t.id,
-      tipo: (t.type === 'INCOME' || t.type === 'entrada') ? 'entrada' : 'saida',
+      tipo: (t.type === 'INCOME' || t.type === 'INCOME') ? 'INCOME' : 'EXPENSE',
       descricao: t.description,
       valor: Number(t.amount) || 0,
       data: (t.created_at || t.paid_at || new Date().toISOString()).slice(0, 10)

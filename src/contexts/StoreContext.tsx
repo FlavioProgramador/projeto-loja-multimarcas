@@ -334,7 +334,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ...prev,
       {
         id: newTransId,
-        tipo: 'saida',
+        tipo: 'EXPENSE',
         descricao: `Entrada ${params.productName}`,
         valor: params.custoUnitario * params.qtd,
         data: currentDate
@@ -436,7 +436,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const nextMovId = movements.reduce((max, m) => Math.max(max, m.id), 0) + 1;
     const newMovement: SaleMovement = {
       id: nextMovId,
-      tipo: 'saida',
+      tipo: 'EXPENSE',
       valor: totalFinal,
       formaPagamento: paymentFormatted,
       comprador: resolvedName,
@@ -486,7 +486,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTransactions(prev => [
       {
         id: nextTransId,
-        tipo: 'entrada',
+        tipo: 'INCOME',
         descricao: `Venda ${vendaIdFormatted}`,
         valor: totalFinal,
         data: currentDate

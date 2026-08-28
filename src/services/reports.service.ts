@@ -28,11 +28,11 @@ export const ReportsService = {
     const totalVendasAnt = prevSales.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
 
     const currentExpenses = allTrans
-      .filter(t => (t.created_at || '').startsWith(currentMonth) && (t.type === 'saida' || t.type === 'EXPENSE'))
+      .filter(t => (t.created_at || '').startsWith(currentMonth) && (t.type === 'EXPENSE' || t.type === 'EXPENSE'))
       .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
     const prevExpenses = allTrans
-      .filter(t => (t.created_at || '').startsWith(prevMonth) && (t.type === 'saida' || t.type === 'EXPENSE'))
+      .filter(t => (t.created_at || '').startsWith(prevMonth) && (t.type === 'EXPENSE' || t.type === 'EXPENSE'))
       .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
     return {

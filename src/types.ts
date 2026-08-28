@@ -73,7 +73,7 @@ export interface Supplier {
   produtos: string[];
 }
 
-export type TransactionType = 'entrada' | 'saida';
+export type TransactionType = 'INCOME' | 'EXPENSE';
 
 export interface FinancialTransaction {
   id: number;
@@ -98,7 +98,7 @@ export interface FixedExpense {
 export interface SaleMovement {
   id: number;
   uuid?: string;
-  tipo: 'saida' | 'entrada';
+  tipo: 'EXPENSE' | 'INCOME';
   valor: number;
   formaPagamento: string;
   comprador: string;

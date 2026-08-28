@@ -19,10 +19,10 @@ export const INITIAL_PRODUCTS: Product[] = [
 ];
 
 export const INITIAL_TRANSACTIONS: FinancialTransaction[] = [
-  { id: 1, uuid: "aedddb7a-e806-4f25-85ff-379416bd5b32", tipo: "entrada", descricao: "Venda PDV #1001", valor: 189.90, data: "2026-07-14" },
-  { id: 2, uuid: "3abcfa1a-d470-4b4f-9abf-84ae948f6e88", tipo: "entrada", descricao: "Venda PDV #1002", valor: 279.80, data: "2026-07-15" },
-  { id: 3, uuid: "0a16e6c8-ecd0-46f6-b7bc-eef096605f69", tipo: "saida", descricao: "Pagamento de Luz", valor: 120.00, data: "2026-07-16" },
-  { id: 4, uuid: "5c5e2d00-5461-4bba-9761-343bc60bc924", tipo: "entrada", descricao: "Venda PDV #1003", valor: 459.70, data: "2026-08-17" }
+  { id: 1, uuid: "aedddb7a-e806-4f25-85ff-379416bd5b32", tipo: "INCOME", descricao: "Venda PDV #1001", valor: 189.90, data: "2026-07-14" },
+  { id: 2, uuid: "3abcfa1a-d470-4b4f-9abf-84ae948f6e88", tipo: "INCOME", descricao: "Venda PDV #1002", valor: 279.80, data: "2026-07-15" },
+  { id: 3, uuid: "0a16e6c8-ecd0-46f6-b7bc-eef096605f69", tipo: "EXPENSE", descricao: "Pagamento de Luz", valor: 120.00, data: "2026-07-16" },
+  { id: 4, uuid: "5c5e2d00-5461-4bba-9761-343bc60bc924", tipo: "INCOME", descricao: "Venda PDV #1003", valor: 459.70, data: "2026-08-17" }
 ];
 
 export const INITIAL_MOVEMENTS: SaleMovement[] = [];

@@ -171,9 +171,7 @@ export interface PaymentRow {
 
 export type FinancialTransactionType =
   | 'INCOME'
-  | 'EXPENSE'
-  | 'entrada'
-  | 'saida';
+  | 'EXPENSE';
 
 export type FinancialTransactionStatus = 'PENDING' | 'PAID' | 'CANCELLED';
 

@@ -106,7 +106,7 @@ export const SalesService = {
       return {
         id: index + 1,
         uuid: s.id,
-        tipo: 'saida', // compatibilidade de tipo com o frontend
+        tipo: 'EXPENSE', // compatibilidade de tipo com o frontend
         valor: Number(s.total) || 0,
         formaPagamento: paymentStr,
         comprador: s.customer_name || 'Consumidor Final',

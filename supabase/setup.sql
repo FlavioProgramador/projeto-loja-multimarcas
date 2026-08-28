@@ -117,7 +117,7 @@ CREATE TRIGGER update_products_updated_at
 
 CREATE TABLE IF NOT EXISTS public.product_variants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
   sku TEXT UNIQUE NOT NULL,
   barcode TEXT UNIQUE,
   size TEXT NOT NULL DEFAULT 'Único',
@@ -188,7 +188,7 @@ CREATE TRIGGER update_suppliers_updated_at
 
 CREATE TABLE IF NOT EXISTS public.inventory_movements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_variant_id UUID NOT NULL REFERENCES public.product_variants(id) ON DELETE CASCADE,
+  product_variant_id UUID NOT NULL REFERENCES public.product_variants(id) ON DELETE RESTRICT,
   type TEXT NOT NULL CHECK (type IN ('ENTRY', 'SALE', 'RETURN', 'ADJUSTMENT', 'CANCELLATION')),
   quantity INTEGER NOT NULL,
   quantity_before INTEGER NOT NULL,
@@ -251,7 +251,7 @@ CREATE INDEX IF NOT EXISTS idx_sales_created_at ON public.sales(created_at);
 
 CREATE TABLE IF NOT EXISTS public.sale_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
+  sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE RESTRICT,
   product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
   product_variant_id UUID REFERENCES public.product_variants(id) ON DELETE SET NULL,
   product_name TEXT NOT NULL,
@@ -272,7 +272,7 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_variant ON public.sale_items(product_v
 
 CREATE TABLE IF NOT EXISTS public.payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
+  sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE RESTRICT,
   method TEXT NOT NULL CHECK (method IN ('PIX', 'CREDIT_CARD', 'DEBIT_CARD', 'CASH', 'VOUCHER')),
   amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
   status TEXT NOT NULL CHECK (status IN ('PENDING', 'PROCESSING', 'APPROVED', 'DECLINED', 'CANCELLED', 'REFUNDED')) DEFAULT 'APPROVED',

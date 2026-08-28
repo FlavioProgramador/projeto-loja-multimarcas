@@ -40,6 +40,18 @@ const NAV_ITEMS: NavItemConfig[] = [
   { id: 'automacoes', label: 'Automações', icon: <Bot size={18} /> }
 ];
 
+const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
+  dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  estoque: ['ADMIN', 'MANAGER'],
+  financeiro: ['ADMIN', 'MANAGER'],
+  movimentacoes: ['ADMIN', 'MANAGER'],
+  clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  fornecedores: ['ADMIN', 'MANAGER'],
+  relatorios: ['ADMIN', 'MANAGER'],
+  automacoes: ['ADMIN']
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentModule,
   onNavigate,
@@ -64,6 +76,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .substring(0, 2)
     .toUpperCase() || 'VT';
 
+  const filteredNavItems = NAV_ITEMS.filter(item => 
+    !user || MODULE_PERMISSIONS[item.id]?.includes(role)
+  );
+
   return (
     <>
       <div
@@ -84,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="nav-section-title">Menu Principal</div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map(item => (
+          {filteredNavItems.map(item => (
             <button
               key={item.id}
               className={`nav-item ${currentModule === item.id ? 'active' : ''}`}

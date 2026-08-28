@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, Moon, Sun, Search, LogIn, LogOut } from 'lucide-react';
+import { Menu, Bell, Moon, Sun, Search, LogIn, LogOut, Store } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,7 +12,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenNotifications }) => {
   const { theme, toggleTheme } = useTheme();
-  const { notifications } = useStore();
+  const { notifications, userStores, activeStoreId, setActiveStoreId } = useStore();
   const { user, profile, signOut } = useAuth();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -47,6 +47,34 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenNotificat
         </div>
 
         <div className="header-right">
+          {userStores.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 16 }}>
+              <Store size={16} style={{ color: 'var(--text-muted)' }} />
+              {userStores.length > 1 ? (
+                <select
+                  value={activeStoreId || ''}
+                  onChange={(e) => setActiveStoreId(e.target.value)}
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 4,
+                    padding: '4px 8px',
+                    color: 'var(--text)',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  {userStores.map(s => (
+                    <option key={s.store_id} value={s.store_id}>{s.store_name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                  {userStores[0].store_name}
+                </span>
+              )}
+            </div>
+          )}
+
           <button
             className="icon-btn"
             onClick={onOpenNotifications}

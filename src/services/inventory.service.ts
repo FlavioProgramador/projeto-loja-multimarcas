@@ -26,6 +26,7 @@ export const InventoryService = {
   },
 
   async registerStockEntry(params: {
+    storeId: string;
     productName: string;
     brand?: string;
     category?: string;
@@ -149,6 +150,7 @@ export const InventoryService = {
 
       // 2. Incrementar estoque, gerar movimentação e lançar no financeiro de forma ATÔMICA via RPC
       const { error: updateErr } = await supabase.rpc('register_stock_entry', {
+        p_store_id: params.storeId,
         p_variant_id: targetVariantId,
         p_quantity: params.qtd,
         p_unit_cost: params.custoUnitario,

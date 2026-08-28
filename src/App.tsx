@@ -39,8 +39,20 @@ function getInitialModule(): ActiveModule {
   return 'dashboard';
 }
 
+const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
+  dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  estoque: ['ADMIN', 'MANAGER'],
+  financeiro: ['ADMIN', 'MANAGER'],
+  movimentacoes: ['ADMIN', 'MANAGER'],
+  clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  fornecedores: ['ADMIN', 'MANAGER'],
+  relatorios: ['ADMIN', 'MANAGER'],
+  automacoes: ['ADMIN']
+};
+
 export function AppContent() {
-  const { user, loading, isConfigured } = useAuth();
+  const { user, loading, isConfigured, role } = useAuth();
   const [currentModule, setCurrentModule] = useState<ActiveModule>(getInitialModule);
 
   useEffect(() => {
@@ -61,26 +73,10 @@ export function AppContent() {
   };
 
   // ─── Auth Guard ────────────────────────────────────────────────────────────
-  // Se o Supabase está configurado, exigir autenticação.
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: 'var(--bg-main)',
-        color: 'var(--text-secondary)',
-        fontSize: '14px',
-        gap: '10px'
-      }}>
-        <div className="spinner" style={{
-          width: 20, height: 20,
-          border: '2px solid var(--border-color)',
-          borderTop: '2px solid var(--primary)',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite'
-        }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '14px', gap: '10px' }}>
+        <div className="spinner" style={{ width: 20, height: 20, border: '2px solid var(--border-color)', borderTop: '2px solid var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         Carregando...
       </div>
     );
@@ -88,46 +84,37 @@ export function AppContent() {
 
   if (isConfigured && !user) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: 'var(--bg-main)'
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-main)' }}>
         <AuthModal isOpen={true} onClose={() => {}} />
       </div>
     );
   }
   // ──────────────────────────────────────────────────────────────────────────
 
+  // RBAC Guard
+  const hasPermission = user ? MODULE_PERMISSIONS[currentModule]?.includes(role) : true;
+  const safeModule = hasPermission ? currentModule : 'dashboard';
+  if (!hasPermission && window.location.hash !== '#/dashboard') {
+     window.location.hash = '#/dashboard';
+  }
+
   const renderCurrentModule = () => {
-    switch (currentModule) {
-      case 'dashboard':
-        return <DashboardView />;
-      case 'pdv':
-        return <PdvView />;
-      case 'estoque':
-        return <InventoryView />;
-      case 'financeiro':
-        return <FinanceView />;
-      case 'movimentacoes':
-        return <MovementsView />;
-      case 'clientes':
-        return <CustomersView />;
-      case 'fornecedores':
-        return <SuppliersView />;
-      case 'relatorios':
-        return <ReportsView />;
-      case 'automacoes':
-        return <AutomationsView />;
-      default:
-        return <DashboardView />;
+    switch (safeModule) {
+      case 'dashboard': return <DashboardView />;
+      case 'pdv': return <PdvView />;
+      case 'estoque': return <InventoryView />;
+      case 'financeiro': return <FinanceView />;
+      case 'movimentacoes': return <MovementsView />;
+      case 'clientes': return <CustomersView />;
+      case 'fornecedores': return <SuppliersView />;
+      case 'relatorios': return <ReportsView />;
+      case 'automacoes': return <AutomationsView />;
+      default: return <DashboardView />;
     }
   };
 
   return (
-    <AppLayout currentModule={currentModule} onNavigate={handleNavigate}>
+    <AppLayout currentModule={safeModule} onNavigate={handleNavigate}>
       {renderCurrentModule()}
     </AppLayout>
   );

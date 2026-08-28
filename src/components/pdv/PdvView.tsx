@@ -9,7 +9,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 
 export const PdvView: React.FC = () => {
-  const { products, processSale } = useStore();
+  const { products, processSale, activeStoreId } = useStore();
   const { cart, addItem, updateQuantity, removeItem, clearCart, subtotal } = useCart();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,6 +158,7 @@ export const PdvView: React.FC = () => {
 
         const { data, error } = await supabase.functions.invoke('create-mp-pix', {
           body: {
+            storeId: activeStoreId,
             cartItems: rpcItems,
             buyerName: buyerName.trim() || 'Cliente não identificado',
             cpf: cpf.trim() || 'Não informado',

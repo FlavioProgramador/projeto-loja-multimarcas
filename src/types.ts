@@ -1,3 +1,17 @@
+export interface Store {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  is_active: boolean;
+}
+
+export interface UserStoreAccess {
+  store_id: string;
+  role: string;
+  store_name: string;
+}
+
 export interface ProductSku {
   id?: string;
   sku?: string;

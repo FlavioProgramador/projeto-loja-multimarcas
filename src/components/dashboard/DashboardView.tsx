@@ -24,7 +24,7 @@ export const DashboardView: React.FC = () => {
   const { transactions, movements, products, notifications } = useStore();
 
   const mesAtualStr = mesAtual();
-  const transacoesMes = transactions.filter(t => t.data.startsWith(mesAtualStr));
+  const transacoesMes = transactions.filter(t => t.data?.startsWith(mesAtualStr));
   const totalVendasMes = transacoesMes
     .filter(t => t.tipo === 'entrada')
     .reduce((acc, t) => acc + t.valor, 0);

@@ -26,10 +26,11 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader || '' } }
     });
 
-    const { cartItems, customerId, customerName, customerCpf, discountValue, discountPercent } = await req.json();
+    const { storeId, cartItems, customerId, customerName, customerCpf, discountValue, discountPercent } = await req.json();
 
     // 1. Call RPC to create the pending sale
     const { data: saleResult, error: saleError } = await supabase.rpc('create_mp_pix_sale', {
+      p_store_id: storeId,
       p_customer_id: customerId,
       p_customer_name: customerName,
       p_customer_cpf: customerCpf,

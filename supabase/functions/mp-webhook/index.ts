@@ -19,6 +19,63 @@ serve(async (req) => {
     // Usar Service Key para bypass RLS no webhook (necessário pois webhooks não têm sessão de usuário)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const xSignature = req.headers.get('x-signature');
+    const xRequestId = req.headers.get('x-request-id');
+    const webhookSecret = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET');
+
+    // Validação Criptográfica Obrigatória (Hardening Adicional)
+    if (webhookSecret) {
+      if (!xSignature || !xRequestId) {
+        console.error("Missing x-signature or x-request-id");
+        return new Response("Missing signature headers", { status: 403 });
+      }
+
+      const parts = xSignature.split(',');
+      let ts = '';
+      let v1 = '';
+      for (const part of parts) {
+        const [key, value] = part.split('=');
+        if (key.trim() === 'ts') ts = value;
+        if (key.trim() === 'v1') v1 = value;
+      }
+      
+      if (ts && v1) {
+        // Tolerância de tempo (ex: rejeitar se for mais antigo que 10 minutos para evitar Replay Attacks)
+        const currentTs = Math.floor(Date.now() / 1000);
+        const webhookTs = parseInt(ts, 10);
+        if (Math.abs(currentTs - webhookTs) > 600) { // 10 minutos
+           console.error("Invalid x-signature: timestamp expired");
+           return new Response("Timestamp expired", { status: 403 });
+        }
+
+        // Obter os IDs da URL ou Body. MP usa req.url.searchParams para extrair data.id.
+        // O manifesto oficial do MP: "id:[data.id];request-id:[x-request-id];ts:[ts];"
+        const url = new URL(req.url);
+        let bodyContent;
+        try { bodyContent = await req.clone().json(); } catch(e) {}
+        
+        const dataId = url.searchParams.get('data.id') || (bodyContent && bodyContent.data && bodyContent.data.id) || url.searchParams.get('id');
+        
+        if (dataId) {
+          const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+          const encoder = new TextEncoder();
+          const key = await crypto.subtle.importKey(
+            "raw", encoder.encode(webhookSecret),
+            { name: "HMAC", hash: "SHA-256" },
+            false, ["sign", "verify"]
+          );
+          const signatureBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(manifest));
+          const hashArray = Array.from(new Uint8Array(signatureBuffer));
+          const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          
+          if (hashHex !== v1) {
+             console.error("Invalid x-signature: mismatch");
+             return new Response("Invalid signature", { status: 403 });
+          }
+        }
+      }
+    }
+
     const url = new URL(req.url);
     const paymentId = url.searchParams.get('data.id') || url.searchParams.get('id');
     const topic = url.searchParams.get('type') || url.searchParams.get('topic');

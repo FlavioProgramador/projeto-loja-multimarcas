@@ -7,12 +7,10 @@ import {
   FixedExpense,
   SaleMovement,
   CartItem,
-<<<<<<< HEAD
   ReturnRecord,
-  ReturnItem
-=======
-  UserStoreAccess
->>>>>>> b37aee4cd1c6583f599a80501772df32d7234b9d
+  ReturnItem,
+  UserStoreAccess,
+  CustomerCreditMovement
 } from '../types';
 import {
   INITIAL_PRODUCTS,
@@ -46,11 +44,11 @@ interface StoreContextType {
   fixedExpenses: FixedExpense[];
   notifications: string[];
   isLoading: boolean;
-  
+
   userStores: UserStoreAccess[];
   activeStoreId: string | null;
   setActiveStoreId: (id: string) => void;
-  
+
   // Product & Inventory actions
   addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   updateProduct: (id: number, updated: Partial<Product>) => Promise<void>;
@@ -66,7 +64,7 @@ interface StoreContextType {
     newSize?: string;
     newColor?: string;
   }) => Promise<void>;
-  
+
   // PDV Sale Action
   processSale: (params: {
     cartItems: CartItem[];
@@ -91,13 +89,13 @@ interface StoreContextType {
 
   // Financial actions
   toggleExpensePaid: (id: number) => Promise<void>;
-  
+
   // Customer actions
   addCustomer: (customer: Omit<Customer, 'id' | 'historico'>) => Promise<void>;
-  
+
   // Supplier actions
   addSupplier: (supplier: Omit<Supplier, 'id' | 'produtos'>) => Promise<void>;
-  
+
   // Automation & Alerts
   checkAlerts: () => void;
   refreshData: () => Promise<void>;
@@ -148,7 +146,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  
+
   const [userStores, setUserStores] = useState<UserStoreAccess[]>([]);
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
 
@@ -164,7 +162,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         remoteExpenses,
         remoteMovements,
         remoteCustomers,
-        remoteSuppliers
+        remoteSuppliers,
+        remoteStores
       ] = await Promise.all([
         ProductsService.getAll(),
         FinanceService.getTransactions(),
@@ -417,9 +416,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               prev.map(c =>
                 c.cpf === cpf || c.nome.toLowerCase() === buyerName.toLowerCase()
                   ? {
-                      ...c,
-                      saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed)
-                    }
+                    ...c,
+                    saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed)
+                  }
                   : c
               )
             );
@@ -450,7 +449,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const currentDate = hoje();
     const resolvedName = buyerName.trim() || 'Cliente não identificado';
     const resolvedCpf = cpf.trim() || 'Não informado';
-    
+
     let paymentFormatted = paymentMethod;
     if (paymentMethod === 'Cartão' && installments > 1) {
       paymentFormatted += ` ${installments}x`;
@@ -507,32 +506,29 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         itens: cartItems.map(i => `${i.nome} x${i.qtd}`).join(', ')
       };
 
-      const creditDebitMovement =
-        creditUsed > 0
-          ? [
-              {
-                id: Date.now(),
-                tipo: 'saida' as const,
-                valor: creditUsed,
-                descricao: `Uso de crédito na Venda ${vendaIdFormatted}`,
-                data: currentDate,
-                referenciaId: vendaIdFormatted
-              }
-            ]
-          : [];
+      const creditDebitMovement = creditUsed > 0
+        ? [{
+          id: Date.now(),
+          tipo: 'saida' as const,
+          valor: creditUsed,
+          descricao: `Uso de crédito na Venda ${vendaIdFormatted}`,
+          data: currentDate,
+          referenciaId: vendaIdFormatted
+        }]
+        : [];
 
       if (existingCustomer) {
         return prev.map(c =>
           c.id === existingCustomer.id
             ? {
-                ...c,
-                saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed),
-                historico: [purchaseRecord, ...c.historico],
-                movimentacoesCredito: [
-                  ...creditDebitMovement,
-                  ...(c.movimentacoesCredito || [])
-                ]
-              }
+              ...c,
+              saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed),
+              historico: [purchaseRecord, ...c.historico],
+              movimentacoesCredito: [
+                ...creditDebitMovement,
+                ...(c.movimentacoesCredito || [])
+              ]
+            }
             : c
         );
       } else if (resolvedName !== 'Cliente não identificado') {
@@ -555,14 +551,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return prev;
     });
 
-<<<<<<< HEAD
-    // Add financial entry transaction (apenas o valor efetivamente recebido)
+    // Add financial entry transaction
     if (totalFinal > 0) {
       const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
       setTransactions(prev => [
         {
           id: nextTransId,
-          tipo: 'entrada',
+          tipo: 'INCOME',
           descricao: `Venda ${vendaIdFormatted}`,
           valor: totalFinal,
           data: currentDate
@@ -570,20 +565,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ...prev
       ]);
     }
-=======
-    // Add financial entry transaction
-    const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
-    setTransactions(prev => [
-      {
-        id: nextTransId,
-        tipo: 'INCOME',
-        descricao: `Venda ${vendaIdFormatted}`,
-        valor: totalFinal,
-        data: currentDate
-      },
-      ...prev
-    ]);
->>>>>>> b37aee4cd1c6583f599a80501772df32d7234b9d
 
     // Check low stock notifications
     checkAlerts();
@@ -680,13 +661,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return prev.map(c =>
             c.id === existingCustomer.id
               ? {
-                  ...c,
-                  saldoCredito: (c.saldoCredito || 0) + totalReturnAmount,
-                  movimentacoesCredito: [
-                    creditMovement,
-                    ...(c.movimentacoesCredito || [])
-                  ]
-                }
+                ...c,
+                saldoCredito: (c.saldoCredito || 0) + totalReturnAmount,
+                movimentacoesCredito: [
+                  creditMovement,
+                  ...(c.movimentacoesCredito || [])
+                ]
+              }
               : c
           );
         } else if (resolvedName !== 'Consumidor Final' && resolvedName !== 'Cliente não identificado') {
@@ -714,7 +695,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setTransactions(prev => [
         {
           id: nextTransId,
-          tipo: 'saida',
+          tipo: 'EXPENSE',
           descricao: `Estorno Devolução #${returnCode}`,
           valor: totalReturnAmount,
           data: currentDate
@@ -840,4 +821,3 @@ export const useStore = () => {
   if (!context) throw new Error('useStore must be used within StoreProvider');
   return context;
 };
-

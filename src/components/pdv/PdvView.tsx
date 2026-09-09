@@ -6,18 +6,11 @@ import { formatMoeda } from '../../lib/utils';
 import { CheckoutModal } from './CheckoutModal';
 import { ReceiptPrinter } from './ReceiptPrinter';
 import { StatusBadge } from '../ui/StatusBadge';
-<<<<<<< HEAD
 import { NewReturnModal } from '../returns/NewReturnModal';
-import { supabase } from '../../lib/supabase/client';
-
-export const PdvView: React.FC = () => {
-  const { products, customers, processSale } = useStore();
-=======
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 
 export const PdvView: React.FC = () => {
-  const { products, processSale, activeStoreId } = useStore();
->>>>>>> b37aee4cd1c6583f599a80501772df32d7234b9d
+  const { products, customers, processSale, activeStoreId } = useStore();
   const { cart, addItem, updateQuantity, removeItem, clearCart, subtotal } = useCart();
 
   const [searchTerm, setSearchTerm] = useState('');

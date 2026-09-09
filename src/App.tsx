@@ -45,6 +45,7 @@ const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
   dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
   pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
   estoque: ['ADMIN', 'MANAGER'],
+  trocas: ['ADMIN', 'MANAGER'], // ADICIONADO: permissão para trocas/devoluções
   financeiro: ['ADMIN', 'MANAGER'],
   movimentacoes: ['ADMIN', 'MANAGER'],
   clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
@@ -87,7 +88,7 @@ export function AppContent() {
   if (isConfigured && !user) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-main)' }}>
-        <AuthModal isOpen={true} onClose={() => {}} />
+        <AuthModal isOpen={true} onClose={() => { }} />
       </div>
     );
   }
@@ -97,12 +98,11 @@ export function AppContent() {
   const hasPermission = user ? MODULE_PERMISSIONS[currentModule]?.includes(role) : true;
   const safeModule = hasPermission ? currentModule : 'dashboard';
   if (!hasPermission && window.location.hash !== '#/dashboard') {
-     window.location.hash = '#/dashboard';
+    window.location.hash = '#/dashboard';
   }
 
   const renderCurrentModule = () => {
-<<<<<<< HEAD
-    switch (currentModule) {
+    switch (safeModule) {
       case 'dashboard':
         return <DashboardView />;
       case 'pdv':
@@ -125,19 +125,6 @@ export function AppContent() {
         return <AutomationsView />;
       default:
         return <DashboardView />;
-=======
-    switch (safeModule) {
-      case 'dashboard': return <DashboardView />;
-      case 'pdv': return <PdvView />;
-      case 'estoque': return <InventoryView />;
-      case 'financeiro': return <FinanceView />;
-      case 'movimentacoes': return <MovementsView />;
-      case 'clientes': return <CustomersView />;
-      case 'fornecedores': return <SuppliersView />;
-      case 'relatorios': return <ReportsView />;
-      case 'automacoes': return <AutomationsView />;
-      default: return <DashboardView />;
->>>>>>> b37aee4cd1c6583f599a80501772df32d7234b9d
     }
   };
 
@@ -161,4 +148,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-

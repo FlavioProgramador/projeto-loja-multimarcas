@@ -1066,8 +1066,7 @@ input::placeholder, textarea::placeholder {
 }
 
 @media print {
-  /* Hide sidebar and header */
-  .sidebar, .header {
+  .sidebar, .header, .sidebar-overlay {
     display: none !important;
   }
   
@@ -1087,8 +1086,8 @@ input::placeholder, textarea::placeholder {
     max-width: none !important;
   }
 
-  /* Show receipt if present, hide everything else */
-  #receipt-print-area.print-only {
+  /* Show print elements if present, hide everything else */
+  .print-only {
     display: block !important;
     position: absolute;
     top: 0;
@@ -1096,7 +1095,8 @@ input::placeholder, textarea::placeholder {
     width: 100%;
   }
 
-  /* If receipt is being printed, hide the main app view */
+  /* If receipt or voucher is being printed, hide the main app view */
+  body:has(.print-only) .module-fade,
   body:has(#receipt-print-area) .module-fade {
     display: none !important;
   }

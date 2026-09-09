@@ -1,4 +1,12 @@
-import { Product, FinancialTransaction, Customer, Supplier, FixedExpense, SaleMovement } from '../types';
+import {
+  Product,
+  FinancialTransaction,
+  Customer,
+  Supplier,
+  FixedExpense,
+  SaleMovement,
+  ReturnRecord
+} from '../types';
 
 export const INITIAL_PRODUCTS: Product[] = [
   { id: 1, uuid: "42d17f53-08d2-4923-9991-03143453263a", nome: "Camisa Cyclone", marca: "Cyclone", categoria: "Camisas", preco: 89.90, skus: [{ id: "e1d9c5a1-3f25-4a2e-9cf8-0fd899dcc882", tamanho: "P", cor: "Preto", qtd: 12 }, { id: "f3522230-a973-45a4-9278-a37c17e12efb", tamanho: "M", cor: "Preto", qtd: 8 }, { id: "055c9c80-6b42-414a-a566-abb7985e7561", tamanho: "G", cor: "Preto", qtd: 3 }] },
@@ -28,8 +36,67 @@ export const INITIAL_TRANSACTIONS: FinancialTransaction[] = [
 export const INITIAL_MOVEMENTS: SaleMovement[] = [];
 
 export const INITIAL_CUSTOMERS: Customer[] = [
-  { id: 1, uuid: "faf54d4a-5a07-474d-a35c-b1057bd69248", nome: "João Silva", cpf: "123.456.789-00", telefone: "(11) 99999-9999", email: "joao@email.com", endereco: "Rua das Flores, 123", historico: [] },
-  { id: 2, uuid: "1548fc50-1a3b-4e41-b32b-390c5c59b601", nome: "Maria Santos", cpf: "987.654.321-00", telefone: "(11) 88888-8888", email: "maria@email.com", endereco: "Av. Principal, 456", historico: [] }
+  {
+    id: 1,
+    uuid: "faf54d4a-5a07-474d-a35c-b1057bd69248",
+    nome: "João Silva",
+    cpf: "123.456.789-00",
+    telefone: "(11) 99999-9999",
+    email: "joao@email.com",
+    endereco: "Rua das Flores, 123",
+    saldoCredito: 89.90,
+    historico: [],
+    movimentacoesCredito: [
+      {
+        id: 1,
+        tipo: 'entrada',
+        valor: 89.90,
+        descricao: 'Crédito gerado pela Devolução #DEV-1001 (Camisa Cyclone)',
+        data: '2026-08-20',
+        referenciaId: 'DEV-1001'
+      }
+    ]
+  },
+  {
+    id: 2,
+    uuid: "1548fc50-1a3b-4e41-b32b-390c5c59b601",
+    nome: "Maria Santos",
+    cpf: "987.654.321-00",
+    telefone: "(11) 88888-8888",
+    email: "maria@email.com",
+    endereco: "Av. Principal, 456",
+    saldoCredito: 0,
+    historico: [],
+    movimentacoesCredito: []
+  }
+];
+
+export const INITIAL_RETURNS: ReturnRecord[] = [
+  {
+    id: 1,
+    codigo: "DEV-1001",
+    data: "2026-08-20",
+    vendaOriginalId: "PDV #1001",
+    clienteNome: "João Silva",
+    clienteCpf: "123.456.789-00",
+    clienteId: 1,
+    itens: [
+      {
+        produtoId: 1,
+        nome: "Camisa Cyclone",
+        tamanho: "M",
+        cor: "Preto",
+        precoUnitario: 89.90,
+        qtd: 1,
+        motivo: "Tamanho Incorreto"
+      }
+    ],
+    valorTotal: 89.90,
+    tipoResolucao: "credito_cliente",
+    status: "CONCLUIDO",
+    dataValidade: "2026-09-20",
+    observacoes: "Troca solicitada por tamanho menor. Crédito lançado na conta do cliente."
+  }
 ];
 
 export const INITIAL_SUPPLIERS: Supplier[] = [
@@ -41,9 +108,9 @@ export const INITIAL_FIXED_EXPENSES: FixedExpense[] = [
   { id: 2, uuid: "9897ba7b-d050-449e-9174-06baeac8aaae", descricao: "Salários", valor: 5000.00, dataVencimento: "2026-08-30", categoria: "Pessoal", pago: false }
 ];
 
-
 export const INITIAL_NOTIFICATIONS: string[] = [
   'Tênis Kenner (Branco/M) está sem estoque.',
   'Conta de luz vence amanhã (R$ 120,00).',
   'Aluguel vence em 5 dias.'
 ];
+

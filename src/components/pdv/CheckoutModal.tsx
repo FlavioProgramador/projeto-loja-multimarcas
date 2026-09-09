@@ -16,6 +16,7 @@ interface CheckoutModalProps {
   subtotal: number;
   totalFinal: number;
   discountSummary: string;
+  creditUsed?: number;
   amountPaid: string;
   setAmountPaid: (val: string) => void;
   qrCodeBase64?: string | null;
@@ -33,6 +34,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   cartItems,
   totalFinal,
   discountSummary,
+  creditUsed = 0,
   amountPaid,
   setAmountPaid,
   qrCodeBase64,
@@ -72,7 +74,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
         </div>
 
-        {/* Discount notice */}
+        {/* Credit & Discount notice */}
+        {creditUsed > 0 && (
+          <div style={{ background: 'var(--badge-blue-bg)', color: 'var(--primary)', padding: '8px 12px', borderRadius: 'var(--radius-md)', fontSize: '12px', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+            <span>🏷️ Crédito do Cliente Aplicado:</span>
+            <span style={{ fontFamily: 'var(--font-mono)' }}>- {formatMoeda(creditUsed)}</span>
+          </div>
+        )}
+
         {discountSummary && (
           <div style={{ background: 'var(--badge-green-bg)', color: 'var(--badge-green)', padding: '8px 12px', borderRadius: 'var(--radius-md)', fontSize: '12px', fontWeight: 600 }}>
             Descontos aplicados: {discountSummary}

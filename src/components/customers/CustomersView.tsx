@@ -65,6 +65,7 @@ export const CustomersView: React.FC = () => {
               <th>Cliente / Contato</th>
               <th>Documento (CPF)</th>
               <th>Telefone</th>
+              <th>Crédito / Vale</th>
               <th>Frequência</th>
               <th style={{ textAlign: 'right' }}>Total Acumulado</th>
             </tr>
@@ -72,13 +73,14 @@ export const CustomersView: React.FC = () => {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
                   Nenhum cliente cadastrado ou correspondente à busca.
                 </td>
               </tr>
             ) : (
               filtered.map(c => {
                 const totalGasto = c.historico.reduce((acc, h) => acc + h.valor, 0);
+                const saldo = c.saldoCredito || 0;
                 return (
                   <tr
                     key={c.id}
@@ -94,6 +96,15 @@ export const CustomersView: React.FC = () => {
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{c.cpf}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{c.telefone || '—'}</td>
+                    <td>
+                      {saldo > 0 ? (
+                        <span className="badge-status success" style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                          🏷️ {formatMoeda(saldo)}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>R$ 0,00</span>
+                      )}
+                    </td>
                     <td>
                       <span className="badge-status neutral">{c.historico.length} compras</span>
                     </td>
@@ -123,7 +134,7 @@ export const CustomersView: React.FC = () => {
             <span>Perfil do Cliente: {selectedCustomer?.nome}</span>
           </div>
         }
-        maxWidth="540px"
+        maxWidth="580px"
       >
         {selectedCustomer && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -142,13 +153,47 @@ export const CustomersView: React.FC = () => {
                   <strong>{selectedCustomer.email || 'Não informado'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Total Gasto:</span>
-                  <strong style={{ color: 'var(--badge-green)', fontFamily: 'var(--font-mono)' }}>
-                    {formatMoeda(selectedCustomer.historico.reduce((acc, h) => acc + h.valor, 0))}
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Saldo de Crédito:</span>
+                  <strong style={{ color: (selectedCustomer.saldoCredito || 0) > 0 ? 'var(--primary)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '13.5px' }}>
+                    🏷️ {formatMoeda(selectedCustomer.saldoCredito || 0)}
                   </strong>
                 </div>
               </div>
             </div>
+
+            {/* Credit Movements */}
+            {selectedCustomer.movimentacoesCredito && selectedCustomer.movimentacoesCredito.length > 0 && (
+              <div>
+                <h4 style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🏷️ Histórico de Créditos / Vales ({selectedCustomer.movimentacoesCredito.length})
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '120px', overflowY: 'auto' }}>
+                  {selectedCustomer.movimentacoesCredito.map((mc, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '8px 10px',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-sm)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '11.5px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{mc.descricao}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '10.5px' }}>{mc.data}</div>
+                      </div>
+                      <strong style={{ color: mc.tipo === 'entrada' ? 'var(--badge-green)' : 'var(--badge-red)', fontFamily: 'var(--font-mono)' }}>
+                        {mc.tipo === 'entrada' ? '+' : '-'} {formatMoeda(mc.valor)}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -160,7 +205,7 @@ export const CustomersView: React.FC = () => {
                   Nenhuma compra registrada para este cliente ainda.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
                   {selectedCustomer.historico.map((h, idx) => (
                     <div
                       key={idx}

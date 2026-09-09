@@ -13,6 +13,7 @@ import { CustomersView } from './components/customers/CustomersView';
 import { SuppliersView } from './components/suppliers/SuppliersView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AutomationsView } from './components/automations/AutomationsView';
+import { ReturnsView } from './components/returns/ReturnsView';
 import { AuthModal } from './components/auth/AuthModal';
 import { useAuth } from './contexts/AuthContext';
 import { ActiveModule } from './types';
@@ -21,6 +22,7 @@ const VALID_MODULES: ActiveModule[] = [
   'dashboard',
   'pdv',
   'estoque',
+  'trocas',
   'financeiro',
   'movimentacoes',
   'clientes',
@@ -109,6 +111,8 @@ export function AppContent() {
         return <PdvView />;
       case 'estoque':
         return <InventoryView />;
+      case 'trocas':
+        return <ReturnsView />;
       case 'financeiro':
         return <FinanceView />;
       case 'movimentacoes':

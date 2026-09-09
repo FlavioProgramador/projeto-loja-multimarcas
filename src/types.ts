@@ -14,6 +14,10 @@ export interface Product {
   nome: string;
   marca: string;
   categoria: string;
+  colecao?: string;
+  estacao?: string;
+  genero?: string;
+  imagemUrl?: string;
   preco: number;
   skus: ProductSku[];
 }
@@ -37,6 +41,15 @@ export interface CustomerPurchase {
   itens: string;
 }
 
+export interface CustomerCreditMovement {
+  id: number;
+  tipo: 'entrada' | 'saida';
+  valor: number;
+  descricao: string;
+  data: string;
+  referenciaId?: string;
+}
+
 export interface Customer {
   id: number;
   uuid?: string;
@@ -45,7 +58,9 @@ export interface Customer {
   telefone: string;
   email: string;
   endereco: string;
+  saldoCredito?: number;
   historico: CustomerPurchase[];
+  movimentacoesCredito?: CustomerCreditMovement[];
 }
 
 export interface Supplier {
@@ -80,7 +95,6 @@ export interface FixedExpense {
   pago: boolean;
 }
 
-
 export interface SaleMovement {
   id: number;
   uuid?: string;
@@ -92,15 +106,54 @@ export interface SaleMovement {
   produtos: string;
   data: string;
   vendaId: string;
+  creditoUtilizado?: number;
+}
+
+export type ReturnReason =
+  | 'Tamanho Incorreto'
+  | 'Defeito de Fabricação'
+  | 'Insatisfação com o Modelo'
+  | 'Troca de Cor'
+  | 'Presente / Outro';
+
+export interface ReturnItem {
+  produtoId: number;
+  productUuid?: string;
+  variantId?: string;
+  nome: string;
+  tamanho: string;
+  cor: string;
+  precoUnitario: number;
+  qtd: number;
+  motivo: ReturnReason | string;
+}
+
+export interface ReturnRecord {
+  id: number;
+  uuid?: string;
+  codigo: string;
+  data: string;
+  vendaOriginalId?: string;
+  clienteNome: string;
+  clienteCpf: string;
+  clienteId?: number;
+  itens: ReturnItem[];
+  valorTotal: number;
+  tipoResolucao: 'credito_cliente' | 'vale_troca' | 'estorno_dinheiro';
+  status: 'CONCLUIDO' | 'CANCELADO';
+  dataValidade?: string;
+  observacoes?: string;
 }
 
 export type ActiveModule =
   | 'dashboard'
   | 'pdv'
   | 'estoque'
+  | 'trocas'
   | 'financeiro'
   | 'movimentacoes'
   | 'clientes'
   | 'fornecedores'
   | 'relatorios'
   | 'automacoes';
+

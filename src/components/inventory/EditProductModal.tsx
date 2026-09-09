@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Edit2, Plus, X, Boxes } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Edit2, Plus, X, Boxes, Upload, ImageIcon, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 import { Product, ProductSku } from '../../types';
@@ -17,6 +17,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
   const [marca, setMarca] = useState('');
   const [categoria, setCategoria] = useState('');
   const [preco, setPreco] = useState('');
+  const [imagemUrl, setImagemUrl] = useState<string>('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [skus, setSkus] = useState<ProductSku[]>([]);
 
   useEffect(() => {
@@ -25,11 +28,39 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
       setMarca(product.marca);
       setCategoria(product.categoria);
       setPreco(product.preco.toString());
+      setImagemUrl(product.imagemUrl || '');
+      setImagePreview(product.imagemUrl || null);
       setSkus(product.skus.map(s => ({ ...s })));
     }
   }, [product]);
 
   if (!product) return null;
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione um arquivo de imagem (JPG, PNG, etc).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setImagemUrl(result);
+      setImagePreview(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImagemUrl('');
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleAddSku = () => {
     setSkus(prev => [...prev, { tamanho: 'M', cor: 'Padrão', qtd: 0 }]);
@@ -67,6 +98,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
       nome: nome.trim(),
       marca: marca.trim(),
       categoria: categoria.trim(),
+      imagemUrl: imagemUrl || undefined,
       preco: numPreco,
       skus: skus.map(s => ({
         tamanho: s.tamanho.trim() || 'Único',
@@ -116,6 +148,58 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
           value={preco}
           onChange={e => setPreco(e.target.value)}
         />
+      </div>
+
+      {/* Image Upload */}
+      <div className="form-group">
+        <label>Foto do Produto</label>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          style={{ display: 'none' }}
+          id="edit-product-image-upload"
+        />
+        {imagePreview ? (
+          <div style={{ position: 'relative', width: '100%', height: '180px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)', marginTop: '6px' }}>
+            <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '6px 8px', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Upload size={12} /> Trocar
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                style={{ background: 'rgba(220,38,38,0.8)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '6px 8px', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              width: '100%', height: '120px', marginTop: '6px',
+              border: '2px dashed var(--border-color)', borderRadius: 'var(--radius-md)',
+              background: 'var(--bg-surface-subtle)', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              color: 'var(--text-muted)', fontSize: '12.5px', transition: 'border-color 0.2s'
+            }}
+            onMouseOver={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+            onMouseOut={e => (e.currentTarget.style.borderColor = 'var(--border-color)')}
+          >
+            <ImageIcon size={28} opacity={0.4} />
+            <span>Clique para selecionar uma imagem</span>
+            <span style={{ fontSize: '10.5px', opacity: 0.6 }}>JPG, PNG • Máx. 5MB</span>
+          </button>
+        )}
       </div>
 
       <div className="form-group">

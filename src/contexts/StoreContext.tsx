@@ -6,13 +6,16 @@ import {
   Supplier,
   FixedExpense,
   SaleMovement,
-  CartItem
+  CartItem,
+  ReturnRecord,
+  ReturnItem
 } from '../types';
 import {
   INITIAL_PRODUCTS,
   INITIAL_TRANSACTIONS,
   INITIAL_MOVEMENTS,
   INITIAL_CUSTOMERS,
+  INITIAL_RETURNS,
   INITIAL_SUPPLIERS,
   INITIAL_FIXED_EXPENSES,
   INITIAL_NOTIFICATIONS
@@ -33,6 +36,7 @@ interface StoreContextType {
   transactions: FinancialTransaction[];
   movements: SaleMovement[];
   customers: Customer[];
+  returns: ReturnRecord[];
   suppliers: Supplier[];
   fixedExpenses: FixedExpense[];
   notifications: string[];
@@ -63,7 +67,18 @@ interface StoreContextType {
     installments: number;
     discountValue: number;
     discountPercent: number;
+    creditUsed?: number;
   }) => Promise<{ success: boolean; message: string; totalFinal: number }>;
+
+  // Returns & Exchanges Action
+  processReturn: (params: {
+    clienteNome: string;
+    clienteCpf: string;
+    vendaOriginalId?: string;
+    itens: ReturnItem[];
+    tipoResolucao: 'credito_cliente' | 'vale_troca' | 'estorno_dinheiro';
+    observacoes?: string;
+  }) => Promise<{ success: boolean; message: string; returnRecord: ReturnRecord }>;
 
   // Financial actions
   toggleExpensePaid: (id: number) => Promise<void>;
@@ -102,6 +117,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
   });
 
+  const [returns, setReturns] = useState<ReturnRecord[]>(() => {
+    const saved = localStorage.getItem('erp_returns');
+    return saved ? JSON.parse(saved) : INITIAL_RETURNS;
+  });
+
   const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
     const saved = localStorage.getItem('erp_suppliers');
     return saved ? JSON.parse(saved) : INITIAL_SUPPLIERS;
@@ -112,11 +132,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : INITIAL_FIXED_EXPENSES;
   });
 
-
   const [notifications, setNotifications] = useState<string[]>(() => {
     const saved = localStorage.getItem('erp_notifications');
     return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
   });
+
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -187,6 +207,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem('erp_customers', JSON.stringify(customers));
   }, [customers]);
+
+  useEffect(() => {
+    localStorage.setItem('erp_returns', JSON.stringify(returns));
+  }, [returns]);
 
   useEffect(() => {
     localStorage.setItem('erp_suppliers', JSON.stringify(suppliers));
@@ -325,7 +349,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     paymentMethod,
     installments,
     discountValue,
-    discountPercent
+    discountPercent,
+    creditUsed = 0
   }: {
     cartItems: CartItem[];
     buyerName: string;
@@ -334,6 +359,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     installments: number;
     discountValue: number;
     discountPercent: number;
+    creditUsed?: number;
   }) => {
     if (cartItems.length === 0) {
       return { success: false, message: 'Carrinho vazio', totalFinal: 0 };
@@ -349,11 +375,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           cpf,
           paymentMethod,
           installments,
-          discountValue,
+          discountValue: discountValue + creditUsed,
           discountPercent
         });
 
         if (rpcResult.success) {
+          // Se houve crédito usado, abater do cliente localmente também
+          if (creditUsed > 0) {
+            setCustomers(prev =>
+              prev.map(c =>
+                c.cpf === cpf || c.nome.toLowerCase() === buyerName.toLowerCase()
+                  ? {
+                      ...c,
+                      saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed)
+                    }
+                  : c
+              )
+            );
+          }
           await refreshData();
           return {
             success: true,
@@ -372,18 +411,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Processamento Local / Fallback
     const subtotal = cartItems.reduce((acc, item) => acc + item.preco * item.qtd, 0);
-
-    let totalFinal =
-      subtotal - discountValue - subtotal * (discountPercent / 100);
-    if (totalFinal < 0) totalFinal = 0;
+    const discountTotal = discountValue + subtotal * (discountPercent / 100);
+    const totalFinal = Math.max(0, subtotal - discountTotal - creditUsed);
 
     const nextVendaNum = movements.length + 1004;
     const vendaIdFormatted = `PDV #${nextVendaNum}`;
     const currentDate = hoje();
     const resolvedName = buyerName.trim() || 'Cliente não identificado';
     const resolvedCpf = cpf.trim() || 'Não informado';
-    const paymentFormatted =
-      paymentMethod + (paymentMethod === 'Cartão' && installments > 1 ? ` ${installments}x` : '');
+    
+    let paymentFormatted = paymentMethod;
+    if (paymentMethod === 'Cartão' && installments > 1) {
+      paymentFormatted += ` ${installments}x`;
+    }
+    if (creditUsed > 0) {
+      paymentFormatted += ` (Abatido R$ ${creditUsed.toFixed(2)} de Crédito)`;
+    }
 
     // Deduct stock from products
     setProducts(prev =>
@@ -415,13 +458,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       cpf: resolvedCpf,
       produtos: cartItems.map(i => `${i.nome} (${i.tamanho}/${i.cor}) x${i.qtd}`).join(', '),
       data: currentDate,
-      vendaId: vendaIdFormatted
+      vendaId: vendaIdFormatted,
+      creditoUtilizado: creditUsed
     };
     setMovements(prev => [newMovement, ...prev]);
 
-    // Update customer history
+    // Update customer history and deduct store credit if used
     setCustomers(prev => {
-      const existingCustomer = prev.find(c => c.cpf === resolvedCpf && resolvedCpf !== 'Não informado');
+      const existingCustomer =
+        prev.find(c => c.cpf === resolvedCpf && resolvedCpf !== 'Não informado') ||
+        prev.find(c => c.nome.toLowerCase() === resolvedName.toLowerCase());
+
       const purchaseRecord = {
         vendaId: vendaIdFormatted,
         valor: totalFinal,
@@ -429,10 +476,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         itens: cartItems.map(i => `${i.nome} x${i.qtd}`).join(', ')
       };
 
+      const creditDebitMovement =
+        creditUsed > 0
+          ? [
+              {
+                id: Date.now(),
+                tipo: 'saida' as const,
+                valor: creditUsed,
+                descricao: `Uso de crédito na Venda ${vendaIdFormatted}`,
+                data: currentDate,
+                referenciaId: vendaIdFormatted
+              }
+            ]
+          : [];
+
       if (existingCustomer) {
         return prev.map(c =>
           c.id === existingCustomer.id
-            ? { ...c, historico: [purchaseRecord, ...c.historico] }
+            ? {
+                ...c,
+                saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed),
+                historico: [purchaseRecord, ...c.historico],
+                movimentacoesCredito: [
+                  ...creditDebitMovement,
+                  ...(c.movimentacoesCredito || [])
+                ]
+              }
             : c
         );
       } else if (resolvedName !== 'Cliente não identificado') {
@@ -446,30 +515,178 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             telefone: '',
             email: '',
             endereco: '',
-            historico: [purchaseRecord]
+            saldoCredito: 0,
+            historico: [purchaseRecord],
+            movimentacoesCredito: creditDebitMovement
           }
         ];
       }
       return prev;
     });
 
-    // Add financial entry transaction
-    const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
-    setTransactions(prev => [
-      {
-        id: nextTransId,
-        tipo: 'entrada',
-        descricao: `Venda ${vendaIdFormatted}`,
-        valor: totalFinal,
-        data: currentDate
-      },
-      ...prev
-    ]);
+    // Add financial entry transaction (apenas o valor efetivamente recebido)
+    if (totalFinal > 0) {
+      const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+      setTransactions(prev => [
+        {
+          id: nextTransId,
+          tipo: 'entrada',
+          descricao: `Venda ${vendaIdFormatted}`,
+          valor: totalFinal,
+          data: currentDate
+        },
+        ...prev
+      ]);
+    }
 
     // Check low stock notifications
     checkAlerts();
 
     return { success: true, message: 'Venda realizada com sucesso!', totalFinal };
+  };
+
+  const processReturn = async ({
+    clienteNome,
+    clienteCpf,
+    vendaOriginalId,
+    itens,
+    tipoResolucao,
+    observacoes
+  }: {
+    clienteNome: string;
+    clienteCpf: string;
+    vendaOriginalId?: string;
+    itens: ReturnItem[];
+    tipoResolucao: 'credito_cliente' | 'vale_troca' | 'estorno_dinheiro';
+    observacoes?: string;
+  }) => {
+    const totalReturnAmount = itens.reduce((sum, item) => sum + item.precoUnitario * item.qtd, 0);
+    const returnIdNum = returns.length + 1001;
+    const returnCode = `DEV-${returnIdNum}`;
+    const currentDate = hoje();
+    const resolvedName = clienteNome.trim() || 'Consumidor Final';
+    const resolvedCpf = clienteCpf.trim() || 'Não informado';
+
+    // 1. Aumentar o estoque físico dos SKUs devolvidos
+    setProducts(prev =>
+      prev.map(prod => {
+        const returnedForThisProd = itens.filter(
+          i => i.produtoId === prod.id || (prod.uuid && i.productUuid === prod.uuid)
+        );
+        if (returnedForThisProd.length === 0) return prod;
+
+        const updatedSkus = prod.skus.map(sku => {
+          const matchItem = returnedForThisProd.find(
+            i =>
+              i.tamanho.trim().toLowerCase() === sku.tamanho.trim().toLowerCase() &&
+              i.cor.trim().toLowerCase() === sku.cor.trim().toLowerCase()
+          );
+          if (!matchItem) return sku;
+          return {
+            ...sku,
+            qtd: sku.qtd + matchItem.qtd
+          };
+        });
+
+        return { ...prod, skus: updatedSkus };
+      })
+    );
+
+    // 2. Criar registro da devolução
+    const newReturnRecord: ReturnRecord = {
+      id: returnIdNum,
+      codigo: returnCode,
+      data: currentDate,
+      vendaOriginalId,
+      clienteNome: resolvedName,
+      clienteCpf: resolvedCpf,
+      itens,
+      valorTotal: totalReturnAmount,
+      tipoResolucao,
+      status: 'CONCLUIDO',
+      dataValidade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      observacoes:
+        observacoes ||
+        (tipoResolucao === 'estorno_dinheiro'
+          ? 'Estorno em dinheiro ao cliente'
+          : 'Crédito/Vale gerado para abatimento em futuras compras')
+    };
+
+    setReturns(prev => [newReturnRecord, ...prev]);
+
+    // 3. Atualizar saldo de crédito do cliente
+    if (tipoResolucao === 'credito_cliente' || tipoResolucao === 'vale_troca') {
+      setCustomers(prev => {
+        const existingCustomer =
+          prev.find(c => resolvedCpf !== 'Não informado' && c.cpf === resolvedCpf) ||
+          prev.find(c => c.nome.toLowerCase() === resolvedName.toLowerCase());
+
+        const creditMovement: CustomerCreditMovement = {
+          id: Date.now(),
+          tipo: 'entrada',
+          valor: totalReturnAmount,
+          descricao: `Crédito gerado pela Devolução #${returnCode}`,
+          data: currentDate,
+          referenciaId: returnCode
+        };
+
+        if (existingCustomer) {
+          return prev.map(c =>
+            c.id === existingCustomer.id
+              ? {
+                  ...c,
+                  saldoCredito: (c.saldoCredito || 0) + totalReturnAmount,
+                  movimentacoesCredito: [
+                    creditMovement,
+                    ...(c.movimentacoesCredito || [])
+                  ]
+                }
+              : c
+          );
+        } else if (resolvedName !== 'Consumidor Final' && resolvedName !== 'Cliente não identificado') {
+          const nextCustId = prev.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+          return [
+            ...prev,
+            {
+              id: nextCustId,
+              nome: resolvedName,
+              cpf: resolvedCpf,
+              telefone: '',
+              email: '',
+              endereco: '',
+              saldoCredito: totalReturnAmount,
+              historico: [],
+              movimentacoesCredito: [creditMovement]
+            }
+          ];
+        }
+        return prev;
+      });
+    } else if (tipoResolucao === 'estorno_dinheiro') {
+      // Registrar saída financeira de estorno
+      const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+      setTransactions(prev => [
+        {
+          id: nextTransId,
+          tipo: 'saida',
+          descricao: `Estorno Devolução #${returnCode}`,
+          valor: totalReturnAmount,
+          data: currentDate
+        },
+        ...prev
+      ]);
+    }
+
+    setNotifications(prev => [
+      `🔄 Devolução #${returnCode} registrada. Estoque reabastecido e crédito de R$ ${totalReturnAmount.toFixed(2)} gerado.`,
+      ...prev
+    ]);
+
+    return {
+      success: true,
+      message: `Troca/Devolução #${returnCode} processada com sucesso!`,
+      returnRecord: newReturnRecord
+    };
   };
 
   const toggleExpensePaid = async (id: number) => {
@@ -487,7 +704,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addCustomer = async (data: Omit<Customer, 'id' | 'historico'>) => {
     const nextId = customers.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-    setCustomers(prev => [...prev, { id: nextId, ...data, historico: [] }]);
+    setCustomers(prev => [...prev, { id: nextId, ...data, saldoCredito: 0, historico: [] }]);
 
     if (isSupabaseConfigured) {
       try {
@@ -546,6 +763,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         transactions,
         movements,
         customers,
+        returns,
         suppliers,
         fixedExpenses,
         notifications,
@@ -555,6 +773,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteProduct,
         registerStockEntry,
         processSale,
+        processReturn,
         toggleExpensePaid,
         addCustomer,
         addSupplier,
@@ -572,3 +791,4 @@ export const useStore = () => {
   if (!context) throw new Error('useStore must be used within StoreProvider');
   return context;
 };
+

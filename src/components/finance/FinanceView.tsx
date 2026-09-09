@@ -8,8 +8,8 @@ import { StatusBadge } from '../ui/StatusBadge';
 export const FinanceView: React.FC = () => {
   const { transactions, fixedExpenses, toggleExpensePaid } = useStore();
 
-  const entradas = transactions.filter(t => t.tipo === 'entrada');
-  const saidas = transactions.filter(t => t.tipo === 'saida');
+  const entradas = transactions.filter(t => t.tipo === 'INCOME');
+  const saidas = transactions.filter(t => t.tipo === 'EXPENSE');
 
   const totalEntradas = entradas.reduce((a, t) => a + t.valor, 0);
   const totalSaidas = saidas.reduce((a, t) => a + t.valor, 0);
@@ -95,7 +95,7 @@ export const FinanceView: React.FC = () => {
               </tr>
             ) : (
               sortedTransactions.map(t => {
-                const isEntrada = t.tipo === 'entrada';
+                const isEntrada = t.tipo === 'INCOME';
                 return (
                   <tr key={t.id}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{t.data}</td>

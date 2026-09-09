@@ -1,0 +1,39 @@
+name: Production Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: 
+      name: production
+      # O GitHub Environment 'production' DEVE estar configurado com 'Required reviewers'
+      # Isso garante que o deploy para produção não ocorra automaticamente.
+      url: https://producao.vestra.com.br # Exemplo
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Type Check
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      # O deploy automatizado para Produção ficará aqui quando configurado
+      # Por exemplo, push do build para Vercel, Netlify, ou S3

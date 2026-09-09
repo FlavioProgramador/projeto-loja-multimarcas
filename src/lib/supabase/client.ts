@@ -1,26 +1,15 @@
 /// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js';
 
-// ⚠️  NUNCA coloque credenciais reais aqui.
+// ⚠️ NUNCA coloque credenciais reais aqui.
 // Configure as variáveis de ambiente no arquivo .env (veja .env.example).
-const getEnvVar = (viteKey: string, nextKey: string): string => {
-  const metaEnv = (import.meta as any)?.env;
-  if (metaEnv) {
-    if (metaEnv[viteKey]) return metaEnv[viteKey];
-    if (metaEnv[nextKey]) return metaEnv[nextKey];
-  }
-  if (typeof process !== 'undefined' && process.env) {
-    if (process.env[nextKey]) return process.env[nextKey]!;
-    if (process.env[viteKey]) return process.env[viteKey]!;
-  }
-  return '';
-};
+
+// No Vite, o acesso a import.meta.env precisa ser estático.
+const rawUrl = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_SUPABASE_URL : '';
+const rawKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_SUPABASE_ANON_KEY : '';
 
 const PLACEHOLDER_URL = 'https://placeholder.supabase.co';
 const PLACEHOLDER_KEY = 'placeholder-key';
-
-const rawUrl = getEnvVar('VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
-const rawKey = getEnvVar('VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
 // Usar placeholder para evitar crash no createClient quando as vars não estão definidas.
 // isSupabaseConfigured=false bloqueia todas as chamadas ao banco.

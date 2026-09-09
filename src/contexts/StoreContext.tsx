@@ -7,8 +7,12 @@ import {
   FixedExpense,
   SaleMovement,
   CartItem,
+<<<<<<< HEAD
   ReturnRecord,
   ReturnItem
+=======
+  UserStoreAccess
+>>>>>>> b37aee4cd1c6583f599a80501772df32d7234b9d
 } from '../types';
 import {
   INITIAL_PRODUCTS,
@@ -30,6 +34,7 @@ import {
   SuppliersService,
   FinanceService
 } from '../services';
+import { storeService } from '../services/store.service';
 
 interface StoreContextType {
   products: Product[];
@@ -41,6 +46,10 @@ interface StoreContextType {
   fixedExpenses: FixedExpense[];
   notifications: string[];
   isLoading: boolean;
+  
+  userStores: UserStoreAccess[];
+  activeStoreId: string | null;
+  setActiveStoreId: (id: string) => void;
   
   // Product & Inventory actions
   addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
@@ -139,6 +148,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  
+  const [userStores, setUserStores] = useState<UserStoreAccess[]>([]);
+  const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
 
   // Carregar dados reais do Supabase na inicialização
   const refreshData = useCallback(async () => {
@@ -159,8 +171,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         FinanceService.getFixedExpenses(),
         SalesService.getMovements(),
         CustomersService.getAll(),
-        SuppliersService.getAll()
+        SuppliersService.getAll(),
+        storeService.getUserStores().catch(() => [])
       ]);
+
+      if (remoteStores && remoteStores.length > 0) {
+        setUserStores(remoteStores);
+        if (!activeStoreId || !remoteStores.find(s => s.store_id === activeStoreId)) {
+          setActiveStoreId(remoteStores[0].store_id);
+        }
+      }
 
       if (remoteProducts) {
         setProducts(remoteProducts);
@@ -283,8 +303,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     newColor?: string;
   }) => {
     if (isSupabaseConfigured) {
+      if (!activeStoreId) {
+        console.error('Nenhuma loja ativa selecionada.');
+        return;
+      }
       try {
-        await InventoryService.registerStockEntry(params);
+        await InventoryService.registerStockEntry({
+          ...params,
+          storeId: activeStoreId
+        });
         await refreshData();
         return;
       } catch (err) {
@@ -334,7 +361,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ...prev,
       {
         id: newTransId,
-        tipo: 'saida',
+        tipo: 'EXPENSE',
         descricao: `Entrada ${params.productName}`,
         valor: params.custoUnitario * params.qtd,
         data: currentDate
@@ -367,9 +394,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Se o Supabase estiver configurado e os itens tiverem UUIDs, processar atomicamente via RPC complete_sale
     if (isSupabaseConfigured) {
+      if (!activeStoreId) {
+        return { success: false, message: 'Nenhuma loja ativa selecionada', totalFinal: 0 };
+      }
       const hasVariantIds = cartItems.every(item => item.variantId);
       if (hasVariantIds) {
         const rpcResult = await SalesService.completeSale({
+          storeId: activeStoreId,
           cartItems,
           buyerName,
           cpf,
@@ -451,7 +482,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const nextMovId = movements.reduce((max, m) => Math.max(max, m.id), 0) + 1;
     const newMovement: SaleMovement = {
       id: nextMovId,
-      tipo: 'saida',
+      tipo: 'EXPENSE',
       valor: totalFinal,
       formaPagamento: paymentFormatted,
       comprador: resolvedName,
@@ -524,6 +555,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return prev;
     });
 
+<<<<<<< HEAD
     // Add financial entry transaction (apenas o valor efetivamente recebido)
     if (totalFinal > 0) {
       const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
@@ -538,6 +570,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ...prev
       ]);
     }
+=======
+    // Add financial entry transaction
+    const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+    setTransactions(prev => [
+      {
+        id: nextTransId,
+        tipo: 'INCOME',
+        descricao: `Venda ${vendaIdFormatted}`,
+        valor: totalFinal,
+        data: currentDate
+      },
+      ...prev
+    ]);
+>>>>>>> b37aee4cd1c6583f599a80501772df32d7234b9d
 
     // Check low stock notifications
     checkAlerts();
@@ -768,6 +814,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         fixedExpenses,
         notifications,
         isLoading,
+        userStores,
+        activeStoreId,
+        setActiveStoreId,
         addProduct,
         updateProduct,
         deleteProduct,

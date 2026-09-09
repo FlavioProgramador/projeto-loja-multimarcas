@@ -24,21 +24,21 @@ export const DashboardView: React.FC = () => {
   const { transactions, movements, products, notifications } = useStore();
 
   const mesAtualStr = mesAtual();
-  const transacoesMes = transactions.filter(t => t.data.startsWith(mesAtualStr));
+  const transacoesMes = transactions.filter(t => t.data?.startsWith(mesAtualStr));
   const totalVendasMes = transacoesMes
-    .filter(t => t.tipo === 'entrada')
+    .filter(t => t.tipo === 'INCOME')
     .reduce((acc, t) => acc + t.valor, 0);
 
   const totalVendas = transactions
-    .filter(t => t.tipo === 'entrada')
+    .filter(t => t.tipo === 'INCOME')
     .reduce((acc, t) => acc + t.valor, 0);
 
   const totalSaidas = transactions
-    .filter(t => t.tipo === 'saida')
+    .filter(t => t.tipo === 'EXPENSE')
     .reduce((acc, t) => acc + t.valor, 0);
 
   const lucro = totalVendas - totalSaidas;
-  const entradasCount = transactions.filter(t => t.tipo === 'entrada').length || 1;
+  const entradasCount = transactions.filter(t => t.tipo === 'INCOME').length || 1;
   const ticketMedio = totalVendas / entradasCount;
 
   const movHoje = movements.filter(m => m.data === hoje());
@@ -59,7 +59,7 @@ export const DashboardView: React.FC = () => {
   const { dates: last7Dates, labels: last7Labels } = getLast7Days();
   const revenueData = last7Dates.map(date => {
     return transactions
-      .filter(t => t.data === date && t.tipo === 'entrada')
+      .filter(t => t.data === date && t.tipo === 'INCOME')
       .reduce((sum, t) => sum + t.valor, 0);
   });
   

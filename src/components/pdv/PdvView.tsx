@@ -6,11 +6,18 @@ import { formatMoeda } from '../../lib/utils';
 import { CheckoutModal } from './CheckoutModal';
 import { ReceiptPrinter } from './ReceiptPrinter';
 import { StatusBadge } from '../ui/StatusBadge';
+<<<<<<< HEAD
 import { NewReturnModal } from '../returns/NewReturnModal';
 import { supabase } from '../../lib/supabase/client';
 
 export const PdvView: React.FC = () => {
   const { products, customers, processSale } = useStore();
+=======
+import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
+
+export const PdvView: React.FC = () => {
+  const { products, processSale, activeStoreId } = useStore();
+>>>>>>> b37aee4cd1c6583f599a80501772df32d7234b9d
   const { cart, addItem, updateQuantity, removeItem, clearCart, subtotal } = useCart();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -183,6 +190,10 @@ export const PdvView: React.FC = () => {
 
   const handleConfirmSale = async () => {
     if (paymentMethod === 'PIX') {
+      if (!isSupabaseConfigured) {
+        alert('Supabase não configurado corretamente. Verifique seu arquivo .env e reinicie o servidor (npm run dev). O PIX requer o backend real.');
+        return;
+      }
       setIsGeneratingPix(true);
       try {
         // 1. Preparar itens para o payload da RPC dentro da Edge Function
@@ -197,6 +208,7 @@ export const PdvView: React.FC = () => {
 
         const { data, error } = await supabase.functions.invoke('create-mp-pix', {
           body: {
+            storeId: activeStoreId,
             cartItems: rpcItems,
             buyerName: buyerName.trim() || 'Cliente não identificado',
             cpf: cpf.trim() || 'Não informado',

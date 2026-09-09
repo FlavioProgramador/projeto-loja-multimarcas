@@ -20,10 +20,10 @@ export const ReportsView: React.FC = () => {
   // Current month stats
   const transacoesMes = transactions.filter(t => t.data.startsWith(mesAtualStr));
   const totalVendasMes = transacoesMes
-    .filter(t => t.tipo === 'entrada')
+    .filter(t => t.tipo === 'INCOME')
     .reduce((acc, t) => acc + t.valor, 0);
   const totalSaidasMes = transacoesMes
-    .filter(t => t.tipo === 'saida')
+    .filter(t => t.tipo === 'EXPENSE')
     .reduce((acc, t) => acc + t.valor, 0);
   const lucroMes = totalVendasMes - totalSaidasMes;
   const qtdVendasMes = movements.filter(m => m.data.startsWith(mesAtualStr)).length;
@@ -32,10 +32,10 @@ export const ReportsView: React.FC = () => {
   // Previous month stats
   const transacoesAnt = transactions.filter(t => t.data.startsWith(mesAntStr));
   const totalVendasAnt = transacoesAnt
-    .filter(t => t.tipo === 'entrada')
+    .filter(t => t.tipo === 'INCOME')
     .reduce((acc, t) => acc + t.valor, 0);
   const totalSaidasAnt = transacoesAnt
-    .filter(t => t.tipo === 'saida')
+    .filter(t => t.tipo === 'EXPENSE')
     .reduce((acc, t) => acc + t.valor, 0);
   const lucroAnt = totalVendasAnt - totalSaidasAnt;
   const qtdVendasAnt = movements.filter(m => m.data.startsWith(mesAntStr)).length;

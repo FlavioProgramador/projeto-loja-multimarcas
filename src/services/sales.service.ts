@@ -3,6 +3,7 @@ import { CartItem, SaleMovement } from '../types';
 
 export const SalesService = {
   async completeSale(params: {
+    storeId: string;
     cartItems: CartItem[];
     buyerName: string;
     cpf: string;
@@ -32,6 +33,7 @@ export const SalesService = {
 
       // 2. Chamar a PostgreSQL Function complete_sale atomicamente
       const { data, error } = await supabase.rpc('complete_sale', {
+        p_store_id: params.storeId,
         p_customer_name: params.buyerName.trim() || 'Cliente não identificado',
         p_customer_cpf: params.cpf.trim() || 'Não informado',
         p_items: rpcItems,
@@ -83,6 +85,7 @@ export const SalesService = {
         payments ( method, installments ),
         sale_items ( product_name, variant_description, quantity )
       `)
+      .eq('status', 'COMPLETED')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -103,7 +106,7 @@ export const SalesService = {
       return {
         id: index + 1,
         uuid: s.id,
-        tipo: 'saida', // compatibilidade de tipo com o frontend
+        tipo: 'EXPENSE', // compatibilidade de tipo com o frontend
         valor: Number(s.total) || 0,
         formaPagamento: paymentStr,
         comprador: s.customer_name || 'Consumidor Final',

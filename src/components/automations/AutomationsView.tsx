@@ -43,11 +43,11 @@ export const AutomationsView: React.FC = () => {
     });
 
   const totalVendas = transactions
-    .filter(t => t.tipo === 'entrada')
+    .filter(t => t.tipo === 'INCOME')
     .reduce((acc, t) => acc + t.valor, 0);
   const lucro =
     totalVendas -
-    transactions.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
+    transactions.filter(t => t.tipo === 'EXPENSE').reduce((acc, t) => acc + t.valor, 0);
 
   const handleVerify = () => {
     checkAlerts();

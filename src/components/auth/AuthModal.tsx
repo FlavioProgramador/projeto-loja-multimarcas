@@ -36,7 +36,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       if (isSignUp) {
-        await signUp(email, password, fullName, 'ADMIN');
+        await signUp(email, password, fullName, 'EMPLOYEE');
         setSuccessMsg('Cadastro realizado com sucesso! Você já pode entrar.');
         setIsSignUp(false);
       } else {

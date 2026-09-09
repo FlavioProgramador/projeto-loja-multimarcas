@@ -1,3 +1,17 @@
+export interface Store {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  is_active: boolean;
+}
+
+export interface UserStoreAccess {
+  store_id: string;
+  role: string;
+  store_name: string;
+}
+
 export interface ProductSku {
   id?: string;
   sku?: string;
@@ -74,7 +88,7 @@ export interface Supplier {
   produtos: string[];
 }
 
-export type TransactionType = 'entrada' | 'saida';
+export type TransactionType = 'INCOME' | 'EXPENSE';
 
 export interface FinancialTransaction {
   id: number;
@@ -98,7 +112,7 @@ export interface FixedExpense {
 export interface SaleMovement {
   id: number;
   uuid?: string;
-  tipo: 'saida' | 'entrada';
+  tipo: 'EXPENSE' | 'INCOME';
   valor: number;
   formaPagamento: string;
   comprador: string;

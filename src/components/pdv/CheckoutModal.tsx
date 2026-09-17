@@ -186,12 +186,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2 }} disabled={isGeneratingPix}>
-              <Check size={16} /> {paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}
+            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+              <Check size={16} />
+              <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
+              <kbd className="kbd-key-primary">F4</kbd>
             </button>
           )}
-          <button className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
-            {qrCodeBase64 ? 'Cancelar PIX' : 'Voltar'}
+          <button className="btn btn-outline" onClick={onClose} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <span>{qrCodeBase64 ? 'Cancelar PIX' : 'Voltar'}</span>
+            <kbd className="kbd-key">ESC</kbd>
           </button>
         </div>
       </div>

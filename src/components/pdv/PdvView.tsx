@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, Barcode, User, CreditCard, RotateCcw, Coins, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -15,6 +15,7 @@ export const PdvView: React.FC = () => {
   const { cart, addItem, updateQuantity, removeItem, clearCart, subtotal } = useCart();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedColecao, setSelectedColecao] = useState('');
   const [selectedEstacao, setSelectedEstacao] = useState('');
@@ -107,6 +108,14 @@ export const PdvView: React.FC = () => {
     const result = addItem(prod, skuIndex);
     if (!result.success) {
       alert(result.message || 'Estoque insuficiente.');
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && filteredProducts.length >= 1) {
+      e.preventDefault();
+      handleAddToCart(filteredProducts[0].id);
+      setSearchTerm('');
     }
   };
 
@@ -275,6 +284,74 @@ export const PdvView: React.FC = () => {
     }
   };
 
+  // ── Keyboard Shortcuts (F2: Buscar, F4: Finalizar, ESC: Cancelar/Limpar) ──
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // F2: Focar no campo de busca de produtos
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      // F4: Finalizar Venda / Confirmar Venda
+      if (e.key === 'F4') {
+        e.preventDefault();
+        if (isCheckoutModalOpen) {
+          handleConfirmSale();
+        } else if (cart.length > 0) {
+          setIsCheckoutModalOpen(true);
+        } else {
+          setNotificationBanner('⚠️ Carrinho vazio. Pressione F2 para buscar e adicionar produtos.');
+          setTimeout(() => setNotificationBanner(null), 3500);
+        }
+        return;
+      }
+
+      // ESC: Fechar sugestões, modais ou limpar carrinho
+      if (e.key === 'Escape') {
+        if (showCustomerSuggestions) {
+          setShowCustomerSuggestions(false);
+          return;
+        }
+        if (isCheckoutModalOpen) {
+          setIsCheckoutModalOpen(false);
+          return;
+        }
+        if (isReturnModalOpen) {
+          setIsReturnModalOpen(false);
+          return;
+        }
+        if (isNewCustomerModalOpen) {
+          setIsNewCustomerModalOpen(false);
+          return;
+        }
+        if (document.activeElement === searchInputRef.current && searchTerm) {
+          setSearchTerm('');
+          return;
+        }
+        if (cart.length > 0) {
+          if (window.confirm('Deseja limpar todos os itens do carrinho? (ESC)')) {
+            clearCart();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [
+    isCheckoutModalOpen,
+    isReturnModalOpen,
+    isNewCustomerModalOpen,
+    showCustomerSuggestions,
+    cart.length,
+    searchTerm,
+    clearCart,
+    handleConfirmSale
+  ]);
+
   return (
     <>
       <div className="module-fade">
@@ -297,10 +374,21 @@ export const PdvView: React.FC = () => {
         )}
 
         {/* Page Header */}
-        <div className="page-header">
+        <div className="page-header" style={{ alignItems: 'flex-start' }}>
           <div>
             <h1 className="page-title">PDV • Frente de Caixa</h1>
-            <p className="page-subtitle">Selecione produtos, configure variações e registre vendas com baixa atômica de estoque.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Atalhos Rápidos:</span>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <kbd className="kbd-key">F2</kbd> Buscar produto
+              </span>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <kbd className="kbd-key">F4</kbd> Finalizar venda
+              </span>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <kbd className="kbd-key">ESC</kbd> Cancelar / Limpar
+              </span>
+            </div>
           </div>
           <button className="btn btn-outline" onClick={() => setIsReturnModalOpen(true)}>
             <RotateCcw size={16} /> Troca / Devolução
@@ -310,17 +398,22 @@ export const PdvView: React.FC = () => {
         <div className="pdv-grid">
           {/* Left Column: Catalog & Search */}
           <div className="pdv-left">
-            {/* Search Bar */}
+            {/* Search Bar with F2 shortcut */}
             <div style={{ position: 'relative', marginBottom: '10px' }}>
               <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Buscar por nome, marca ou código..."
+                placeholder="Buscar por nome, marca ou código... (Pressione F2)"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: '38px', paddingRight: '38px', fontSize: '13px' }}
+                onKeyDown={handleSearchKeyDown}
+                style={{ paddingLeft: '38px', paddingRight: '80px', fontSize: '13px' }}
               />
-              <Barcode size={18} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <kbd className="kbd-key" title="Atalho para busca rápida (F2)">F2</kbd>
+                <Barcode size={18} style={{ color: 'var(--text-muted)' }} />
+              </div>
             </div>
 
             {/* Quick Category Chips */}
@@ -785,11 +878,25 @@ export const PdvView: React.FC = () => {
 
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn" onClick={handleOpenCheckout} style={{ flex: 2 }}>
-                <Check size={16} /> Finalizar Venda
+              <button
+                className="btn"
+                onClick={handleOpenCheckout}
+                style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                title="Pressione F4 para finalizar a venda"
+              >
+                <Check size={16} />
+                <span>Finalizar Venda</span>
+                <kbd className="kbd-key-primary">F4</kbd>
               </button>
-              <button className="btn btn-outline" onClick={clearCart} style={{ flex: 1 }}>
-                <Trash2 size={15} /> Limpar
+              <button
+                className="btn btn-outline"
+                onClick={clearCart}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                title="Pressione ESC para limpar o carrinho"
+              >
+                <Trash2 size={15} />
+                <span>Limpar</span>
+                <kbd className="kbd-key">ESC</kbd>
               </button>
             </div>
 

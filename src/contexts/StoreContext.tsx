@@ -678,9 +678,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               id: nextCustId,
               nome: resolvedName,
               cpf: resolvedCpf,
+              rg: '',
               telefone: '',
               email: '',
               endereco: '',
+              dataNascimento: '',
               saldoCredito: totalReturnAmount,
               historico: [],
               movimentacoesCredito: [creditMovement]

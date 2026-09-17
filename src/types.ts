@@ -69,9 +69,11 @@ export interface Customer {
   uuid?: string;
   nome: string;
   cpf: string;
+  rg: string;
   telefone: string;
   email: string;
   endereco: string;
+  dataNascimento: string;
   saldoCredito?: number;
   historico: CustomerPurchase[];
   movimentacoesCredito?: CustomerCreditMovement[];

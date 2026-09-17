@@ -139,10 +139,18 @@ export const CustomersView: React.FC = () => {
         {selectedCustomer && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ background: 'var(--bg-surface-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '14px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '12.5px' }}>
                 <div>
                   <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>CPF:</span>
                   <strong style={{ fontFamily: 'var(--font-mono)' }}>{selectedCustomer.cpf}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>RG:</span>
+                  <strong style={{ fontFamily: 'var(--font-mono)' }}>{selectedCustomer.rg || 'Não informado'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Data de Nascimento:</span>
+                  <strong>{selectedCustomer.dataNascimento ? new Date(selectedCustomer.dataNascimento + 'T00:00:00').toLocaleDateString('pt-BR') : 'Não informado'}</strong>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Telefone:</span>
@@ -159,6 +167,12 @@ export const CustomersView: React.FC = () => {
                   </strong>
                 </div>
               </div>
+              {selectedCustomer.endereco && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-color)', fontSize: '12.5px' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Endereço:</span>
+                  <strong>{selectedCustomer.endereco}</strong>
+                </div>
+              )}
             </div>
 
             {/* Credit Movements */}

@@ -41,9 +41,11 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     uuid: "faf54d4a-5a07-474d-a35c-b1057bd69248",
     nome: "João Silva",
     cpf: "123.456.789-00",
+    rg: "",
     telefone: "(11) 99999-9999",
     email: "joao@email.com",
     endereco: "Rua das Flores, 123",
+    dataNascimento: "",
     saldoCredito: 89.90,
     historico: [],
     movimentacoesCredito: [
@@ -62,9 +64,11 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     uuid: "1548fc50-1a3b-4e41-b32b-390c5c59b601",
     nome: "Maria Santos",
     cpf: "987.654.321-00",
+    rg: "",
     telefone: "(11) 88888-8888",
     email: "maria@email.com",
     endereco: "Av. Principal, 456",
+    dataNascimento: "",
     saldoCredito: 0,
     historico: [],
     movimentacoesCredito: []

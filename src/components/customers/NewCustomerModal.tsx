@@ -13,9 +13,21 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
 
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
+  const [rg, setRg] = useState('');
   const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState('');
   const [endereco, setEndereco] = useState('');
+  const [dataNascimento, setDataNascimento] = useState('');
+
+  const resetForm = () => {
+    setNome('');
+    setCpf('');
+    setRg('');
+    setTelefone('');
+    setEmail('');
+    setEndereco('');
+    setDataNascimento('');
+  };
 
   const handleSave = () => {
     if (!nome.trim() || !cpf.trim()) {
@@ -26,17 +38,15 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
     addCustomer({
       nome: nome.trim(),
       cpf: cpf.trim(),
+      rg: rg.trim(),
       telefone: telefone.trim(),
       email: email.trim(),
-      endereco: endereco.trim()
+      endereco: endereco.trim(),
+      dataNascimento: dataNascimento || ''
     });
 
     onClose();
-    setNome('');
-    setCpf('');
-    setTelefone('');
-    setEmail('');
-    setEndereco('');
+    resetForm();
     alert('Cliente cadastrado com sucesso!');
   };
 
@@ -49,7 +59,15 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
           <UserPlus size={18} /> Novo Cliente
         </>
       }
+      maxWidth="520px"
     >
+      {/* ── Dados Pessoais ────────────────────────── */}
+      <div style={{ marginBottom: '6px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Dados Pessoais
+        </span>
+      </div>
+
       <div className="form-group">
         <label>Nome Completo *</label>
         <input
@@ -59,32 +77,60 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
         />
       </div>
 
-      <div className="form-group">
-        <label>CPF *</label>
-        <input
-          placeholder="000.000.000-00"
-          value={cpf}
-          onChange={e => setCpf(e.target.value)}
-        />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div className="form-group">
+          <label>CPF *</label>
+          <input
+            placeholder="000.000.000-00"
+            value={cpf}
+            onChange={e => setCpf(e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label>RG</label>
+          <input
+            placeholder="00.000.000-0"
+            value={rg}
+            onChange={e => setRg(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="form-group">
-        <label>Telefone / WhatsApp</label>
+        <label>Data de Nascimento</label>
         <input
-          placeholder="(11) 99999-9999"
-          value={telefone}
-          onChange={e => setTelefone(e.target.value)}
+          type="date"
+          value={dataNascimento}
+          onChange={e => setDataNascimento(e.target.value)}
+          style={{ colorScheme: 'dark' }}
         />
       </div>
 
-      <div className="form-group">
-        <label>E-mail</label>
-        <input
-          type="email"
-          placeholder="email@exemplo.com"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
+      {/* ── Contato ────────────────────────── */}
+      <div style={{ margin: '14px 0 6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Contato
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div className="form-group">
+          <label>Telefone / WhatsApp</label>
+          <input
+            placeholder="(11) 99999-9999"
+            value={telefone}
+            onChange={e => setTelefone(e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label>E-mail</label>
+          <input
+            type="email"
+            placeholder="email@exemplo.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="form-group">

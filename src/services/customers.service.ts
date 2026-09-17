@@ -11,9 +11,11 @@ export const CustomersService = {
         id,
         name,
         cpf,
+        rg,
         phone,
         email,
         address,
+        birth_date,
         sales (
           id,
           sale_number,
@@ -53,9 +55,11 @@ export const CustomersService = {
         uuid: c.id,
         nome: c.name,
         cpf: c.cpf || 'Não informado',
+        rg: c.rg || '',
         telefone: c.phone || '',
         email: c.email || '',
         endereco: c.address || '',
+        dataNascimento: c.birth_date || '',
         historico
       };
     });
@@ -64,9 +68,11 @@ export const CustomersService = {
   async create(customer: {
     nome: string;
     cpf?: string;
+    rg?: string;
     telefone?: string;
     email?: string;
     endereco?: string;
+    dataNascimento?: string;
   }): Promise<any> {
     if (!isSupabaseConfigured) return null;
 
@@ -75,9 +81,11 @@ export const CustomersService = {
       .insert({
         name: customer.nome.trim(),
         cpf: customer.cpf?.trim() || null,
+        rg: customer.rg?.trim() || null,
         phone: customer.telefone?.trim() || null,
         email: customer.email?.trim() || null,
-        address: customer.endereco?.trim() || null
+        address: customer.endereco?.trim() || null,
+        birth_date: customer.dataNascimento || null
       })
       .select()
       .single();

@@ -7,6 +7,7 @@ import { CheckoutModal } from './CheckoutModal';
 import { ReceiptPrinter } from './ReceiptPrinter';
 import { StatusBadge } from '../ui/StatusBadge';
 import { NewReturnModal } from '../returns/NewReturnModal';
+import { NewCustomerModal } from '../customers/NewCustomerModal';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 
 export const PdvView: React.FC = () => {
@@ -41,6 +42,7 @@ export const PdvView: React.FC = () => {
   // Modal & Notifications
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
 
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
@@ -657,10 +659,9 @@ export const PdvView: React.FC = () => {
                       style={{ fontSize: '11px', whiteSpace: 'nowrap', padding: '0 10px' }}
                       onClick={() => {
                         setShowCustomerSuggestions(false);
-                        setBuyerName(customerSearchTerm.trim() || '');
-                        setCustomerSearchTerm('');
+                        setIsNewCustomerModalOpen(true);
                       }}
-                      title="Usar como novo cliente"
+                      title="Cadastrar novo cliente"
                     >
                       Novo
                     </button>
@@ -726,7 +727,7 @@ export const PdvView: React.FC = () => {
                       marginTop: '4px', padding: '12px', textAlign: 'center',
                       fontSize: '11.5px', color: 'var(--text-muted)'
                     }}>
-                      Nenhum cliente encontrado. Clique em <strong>"Novo"</strong> para cadastrar.
+                      Nenhum cliente encontrado. Clique em <button type="button" onClick={() => { setShowCustomerSuggestions(false); setIsNewCustomerModalOpen(true); }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 700, cursor: 'pointer', fontSize: 'inherit' }}>"Novo"</button> para cadastrar.
                     </div>
                   )}
                 </div>
@@ -791,6 +792,11 @@ export const PdvView: React.FC = () => {
           cpf={lastSaleData.cpf}
         />
       )}
+
+      <NewCustomerModal
+        isOpen={isNewCustomerModalOpen}
+        onClose={() => setIsNewCustomerModalOpen(false)}
+      />
     </>
   );
 };

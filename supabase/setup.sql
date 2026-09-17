@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   cpf TEXT UNIQUE,
+  rg TEXT,
   phone TEXT,
   email TEXT,
   address TEXT,

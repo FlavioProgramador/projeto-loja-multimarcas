@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Trash2, Check, Tag, ShoppingCart, Barcode, User, CreditCard, RotateCcw, Coins, X } from 'lucide-react';
+import { Search, Plus, Trash2, Check, ShoppingCart, Barcode, User, CreditCard, RotateCcw, Coins, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
 import { formatMoeda } from '../../lib/utils';
@@ -311,57 +311,90 @@ export const PdvView: React.FC = () => {
           {/* Left Column: Catalog & Search */}
           <div className="pdv-left">
             {/* Search Bar */}
-            <div style={{ position: 'relative', marginBottom: '14px' }}>
+            <div style={{ position: 'relative', marginBottom: '10px' }}>
               <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type="text"
-                placeholder="Buscar por nome do produto, marca ou código..."
+                placeholder="Buscar por nome, marca ou código..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: '38px', paddingRight: '38px' }}
+                style={{ paddingLeft: '38px', paddingRight: '38px', fontSize: '13px' }}
               />
               <Barcode size={18} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             </div>
 
-            {/* Filters Row */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              <select
-                value={selectedCategory}
-                onChange={e => setSelectedCategory(e.target.value)}
-                style={{ flex: 1, minWidth: '120px', fontSize: '12px' }}
-              >
-                {categories.map(cat => <option key={cat} value={cat === 'Todos' ? '' : cat}>{cat === 'Todos' ? 'Todas as Categorias' : cat}</option>)}
-              </select>
-
-              <select
-                value={selectedColecao}
-                onChange={e => setSelectedColecao(e.target.value)}
-                style={{ flex: 1, minWidth: '120px', fontSize: '12px' }}
-              >
-                {colecoes.map(c => <option key={c} value={c === 'Todas' ? '' : c}>{c === 'Todas' ? 'Todas as Coleções' : c}</option>)}
-              </select>
-
-              <select
-                value={selectedEstacao}
-                onChange={e => setSelectedEstacao(e.target.value)}
-                style={{ flex: 1, minWidth: '120px', fontSize: '12px' }}
-              >
-                {estacoes.map(e => <option key={e} value={e === 'Todas' ? '' : e}>{e === 'Todas' ? 'Todas as Estações' : e}</option>)}
-              </select>
-
-              <select
-                value={selectedGenero}
-                onChange={e => setSelectedGenero(e.target.value)}
-                style={{ flex: 1, minWidth: '120px', fontSize: '12px' }}
-              >
-                {generos.map(g => <option key={g} value={g === 'Todos' ? '' : g}>{g === 'Todos' ? 'Todos os Gêneros' : g}</option>)}
-              </select>
+            {/* Quick Category Chips */}
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              overflowX: 'auto',
+              paddingBottom: '8px',
+              marginBottom: '10px',
+              scrollbarWidth: 'none'
+            }}>
+              {categories.map(cat => {
+                const isActive = (cat === 'Todos' && !selectedCategory) || selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`category-chip ${isActive ? 'active' : ''}`}
+                    onClick={() => setSelectedCategory(cat === 'Todos' ? '' : cat)}
+                    style={{
+                      fontSize: '11.5px',
+                      padding: '5px 12px',
+                      borderRadius: 'var(--radius-full)',
+                      border: '1px solid var(--border-color)',
+                      background: isActive ? 'var(--primary)' : 'var(--bg-surface)',
+                      color: isActive ? '#ffffff' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Product Cards Grid */}
+            {/* Secondary Filters (Compact) */}
+            {(colecoes.length > 1 || estacoes.length > 1 || generos.length > 1) && (
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                {colecoes.length > 1 && (
+                  <select
+                    value={selectedColecao}
+                    onChange={e => setSelectedColecao(e.target.value)}
+                    style={{ flex: 1, fontSize: '11.5px', padding: '4px 8px' }}
+                  >
+                    {colecoes.map(c => <option key={c} value={c === 'Todas' ? '' : c}>{c === 'Todas' ? 'Coleção: Todas' : c}</option>)}
+                  </select>
+                )}
+                {estacoes.length > 1 && (
+                  <select
+                    value={selectedEstacao}
+                    onChange={e => setSelectedEstacao(e.target.value)}
+                    style={{ flex: 1, fontSize: '11.5px', padding: '4px 8px' }}
+                  >
+                    {estacoes.map(e => <option key={e} value={e === 'Todas' ? '' : e}>{e === 'Todas' ? 'Estação: Todas' : e}</option>)}
+                  </select>
+                )}
+                {generos.length > 1 && (
+                  <select
+                    value={selectedGenero}
+                    onChange={e => setSelectedGenero(e.target.value)}
+                    style={{ flex: 1, fontSize: '11.5px', padding: '4px 8px' }}
+                  >
+                    {generos.map(g => <option key={g} value={g === 'Todos' ? '' : g}>{g === 'Todos' ? 'Gênero: Todos' : g}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Product Cards Grid - Clean POS Style (No Photos) */}
             <div className="product-cards-grid">
               {filteredProducts.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1', padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                <div style={{ gridColumn: '1 / -1', padding: '36px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                   Nenhum produto encontrado com os filtros aplicados.
                 </div>
               ) : (
@@ -372,47 +405,55 @@ export const PdvView: React.FC = () => {
                   const currentSkuStock = selectedSku?.qtd || 0;
 
                   return (
-                    <div key={p.id} className="product-grid-card" style={{ display: 'flex', flexDirection: 'column' }}>
-                      {p.imagemUrl ? (
-                        <div style={{ width: '100%', height: '140px', marginBottom: '12px', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--bg-surface-subtle)' }}>
-                          <img src={p.imagemUrl} alt={p.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                      ) : (
-                        <div style={{ width: '100%', height: '140px', marginBottom: '12px', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--bg-surface-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                          <Tag size={32} opacity={0.3} />
-                        </div>
-                      )}
+                    <div
+                      key={p.id}
+                      className="product-grid-card"
+                      style={{
+                        padding: '12px 14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px'
+                      }}
+                    >
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {/* Header: Brand & Status */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             {p.marca}
                           </span>
                           <StatusBadge status={currentSkuStock > 2 ? 'Normal' : currentSkuStock > 0 ? 'Baixo Estoque' : 'Esgotado'} />
                         </div>
 
-                        <h3 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', lineHeight: 1.3 }}>
+                        {/* Title */}
+                        <h3 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px', lineHeight: 1.35, minHeight: '34px' }}>
                           {p.nome}
                         </h3>
 
-                        <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)', marginBottom: '10px' }}>
-                          {formatMoeda(p.preco)}
+                        {/* Price & Category */}
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '4px' }}>
+                          <span style={{ fontSize: '16.5px', fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>
+                            {formatMoeda(p.preco)}
+                          </span>
+                          {p.categoria && (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {p.categoria}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div>
+                      <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
                         {/* SKU Selector */}
                         <div style={{ marginBottom: '8px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>
-                            Variação:
-                          </label>
                           <select
                             value={currentSkuIdx}
                             onChange={e => handleSkuChange(p.id, parseInt(e.target.value))}
-                            style={{ fontSize: '11.5px', padding: '4px 8px' }}
+                            style={{ fontSize: '11.5px', padding: '4px 6px', width: '100%' }}
                           >
                             {p.skus.map((s, idx) => (
                               <option key={idx} value={idx}>
-                                {s.tamanho} / {s.cor} ({s.qtd} em estoque)
+                                {s.tamanho} / {s.cor} ({s.qtd} un)
                               </option>
                             ))}
                           </select>
@@ -421,11 +462,19 @@ export const PdvView: React.FC = () => {
                         {/* Add Button */}
                         <button
                           className="btn btn-sm"
-                          style={{ width: '100%' }}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            fontSize: '12px',
+                            padding: '6px 10px'
+                          }}
                           onClick={() => handleAddToCart(p.id)}
                           disabled={isOutOfStock || currentSkuStock <= 0}
                         >
-                          <Plus size={14} /> Adicionar
+                          <Plus size={14} /> Adicionar ao Carrinho
                         </button>
                       </div>
                     </div>

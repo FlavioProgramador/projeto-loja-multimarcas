@@ -46,6 +46,7 @@ const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
   dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
   pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
   estoque: ['ADMIN', 'MANAGER'],
+  trocas: ['ADMIN', 'MANAGER'],
   financeiro: ['ADMIN', 'MANAGER'],
   movimentacoes: ['ADMIN', 'MANAGER'],
   clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],

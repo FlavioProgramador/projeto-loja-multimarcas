@@ -22,7 +22,7 @@ export const storeService = {
     return (data || []).map(row => ({
       store_id: row.store_id,
       role: row.role,
-      store_name: row.stores?.name || 'Loja Desconhecida'
+      store_name: (row.stores as any)?.name || 'Loja Desconhecida'
     }));
   }
 };

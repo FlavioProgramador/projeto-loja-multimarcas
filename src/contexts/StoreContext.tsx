@@ -92,6 +92,8 @@ interface StoreContextType {
 
   // Customer actions
   addCustomer: (customer: Omit<Customer, 'id' | 'historico'>) => Promise<void>;
+  updateCustomer: (id: number | string, data: Partial<Customer>) => void;
+  deleteCustomer: (id: number | string) => void;
 
   // Supplier actions
   addSupplier: (supplier: Omit<Supplier, 'id' | 'produtos'>) => Promise<void>;
@@ -745,6 +747,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const updateCustomer = (id: number | string, data: Partial<Customer>) => {
+    setCustomers(prev =>
+      prev.map(c => (String(c.id) === String(id) ? { ...c, ...data } : c))
+    );
+  };
+
+  const deleteCustomer = (id: number | string) => {
+    setCustomers(prev => prev.filter(c => String(c.id) !== String(id)));
+  };
+
   const addSupplier = async (data: Omit<Supplier, 'id' | 'produtos'>) => {
     const nextId = suppliers.reduce((max, s) => Math.max(max, s.id), 0) + 1;
     setSuppliers(prev => [...prev, { id: nextId, ...data, produtos: [] }]);
@@ -808,6 +820,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         processReturn,
         toggleExpensePaid,
         addCustomer,
+        updateCustomer,
+        deleteCustomer,
         addSupplier,
         checkAlerts,
         refreshData

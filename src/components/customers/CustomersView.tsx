@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { UserPlus, Search, User, ShoppingBag, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserPlus, Search, User, ShoppingBag, ArrowRight, Pencil, Trash2, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { Customer } from '../../types';
 import { formatMoeda } from '../../lib/utils';
@@ -8,10 +8,68 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { NewCustomerModal } from './NewCustomerModal';
 
 export const CustomersView: React.FC = () => {
-  const { customers } = useStore();
+  // Nota: Certifique-se de ter updateCustomer e deleteCustomer no seu StoreContext
+  const { customers, updateCustomer, deleteCustomer } = useStore() as any;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
+
+  // Estados para Edição e Exclusão
+  const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+
+  // Estado do formulário de edição
+  const [editForm, setEditForm] = useState({ nome: '', cpf: '', rg: '', telefone: '', email: '', endereco: '', dataNascimento: '' });
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Carrega os dados do cliente para o form quando clica em Editar
+  useEffect(() => {
+    if (customerToEdit) {
+      setEditForm({
+        nome: customerToEdit.nome,
+        cpf: customerToEdit.cpf,
+        rg: customerToEdit.rg || '',
+        telefone: customerToEdit.telefone || '',
+        email: customerToEdit.email || '',
+        endereco: customerToEdit.endereco || '',
+        dataNascimento: customerToEdit.dataNascimento || ''
+      });
+      setEditError(null);
+    }
+  }, [customerToEdit]);
+
+  const showBanner = (message: string) => {
+    setNotificationBanner(message);
+    setTimeout(() => setNotificationBanner(null), 4000);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editForm.nome.trim() || !editForm.cpf.trim()) {
+      setEditError('Os campos Nome e CPF são obrigatórios.');
+      return;
+    }
+
+    if (updateCustomer && customerToEdit) {
+      updateCustomer(customerToEdit.id, editForm);
+      showBanner('✅ Cliente atualizado com sucesso!');
+    } else {
+      showBanner('⚠️ Função de atualizar cliente não encontrada no StoreContext.');
+    }
+
+    setCustomerToEdit(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteCustomer && customerToDelete) {
+      deleteCustomer(customerToDelete.id);
+      showBanner('✅ Cliente excluído com sucesso!');
+    } else {
+      showBanner('⚠️ Função de excluir cliente não encontrada no StoreContext.');
+    }
+    setCustomerToDelete(null);
+  };
 
   const filtered = customers.filter(
     c =>
@@ -21,7 +79,20 @@ export const CustomersView: React.FC = () => {
   );
 
   return (
-    <div className="module-fade">
+    <div className="module-fade" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* Banner de Notificação Superior */}
+      {notificationBanner && (
+        <div style={{
+          background: notificationBanner.includes('⚠️') ? '#f59e0b' : 'var(--badge-green)',
+          color: '#fff', padding: '12px 18px', borderRadius: 'var(--radius-lg)',
+          marginBottom: '16px', fontSize: '13.5px', fontWeight: 600, boxShadow: 'var(--shadow-md)',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          {notificationBanner}
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="page-header">
         <div>
@@ -68,12 +139,13 @@ export const CustomersView: React.FC = () => {
               <th>Crédito / Vale</th>
               <th>Frequência</th>
               <th style={{ textAlign: 'right' }}>Total Acumulado</th>
+              <th style={{ textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
                   Nenhum cliente cadastrado ou correspondente à busca.
                 </td>
               </tr>
@@ -111,6 +183,24 @@ export const CustomersView: React.FC = () => {
                     <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--badge-green)' }}>
                       {formatMoeda(totalGasto)}
                     </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '8px' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setCustomerToEdit(c); }}
+                          style={{ border: 'none', background: 'var(--bg-surface-subtle)', padding: '6px', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+                          title="Editar Cliente"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setCustomerToDelete(c); }}
+                          style={{ border: 'none', background: 'var(--badge-red-bg)', padding: '6px', borderRadius: '4px', cursor: 'pointer', color: 'var(--badge-red)', display: 'flex', alignItems: 'center' }}
+                          title="Excluir Cliente"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })
@@ -122,7 +212,159 @@ export const CustomersView: React.FC = () => {
       <NewCustomerModal
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
+        onSuccess={() => showBanner('✅ Cliente cadastrado com sucesso!')}
       />
+
+      {/* ── Modal de Edição de Cliente ────────────────────────── */}
+      <Modal
+        isOpen={!!customerToEdit}
+        onClose={() => setCustomerToEdit(null)}
+        title={
+          <>
+            <Pencil size={18} /> Editar Cliente
+          </>
+        }
+        maxWidth="520px"
+      >
+        <div style={{ marginBottom: '6px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Dados Pessoais
+          </span>
+        </div>
+
+        <div className="form-group">
+          <label>Nome Completo *</label>
+          <input
+            placeholder="Ex: Carlos Eduardo"
+            value={editForm.nome}
+            onChange={e => { setEditForm({ ...editForm, nome: e.target.value }); setEditError(null); }}
+            style={{ borderColor: editError && !editForm.nome.trim() ? 'var(--badge-red)' : undefined }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div className="form-group">
+            <label>CPF *</label>
+            <input
+              placeholder="000.000.000-00"
+              value={editForm.cpf}
+              onChange={e => { setEditForm({ ...editForm, cpf: e.target.value }); setEditError(null); }}
+              style={{ borderColor: editError && !editForm.cpf.trim() ? 'var(--badge-red)' : undefined }}
+            />
+          </div>
+          <div className="form-group">
+            <label>RG</label>
+            <input
+              placeholder="00.000.000-0"
+              value={editForm.rg}
+              onChange={e => setEditForm({ ...editForm, rg: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Data de Nascimento</label>
+          <input
+            type="date"
+            value={editForm.dataNascimento}
+            onChange={e => setEditForm({ ...editForm, dataNascimento: e.target.value })}
+            style={{ colorScheme: 'dark' }}
+          />
+        </div>
+
+        <div style={{ margin: '14px 0 6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Contato
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div className="form-group">
+            <label>Telefone / WhatsApp</label>
+            <input
+              placeholder="(11) 99999-9999"
+              value={editForm.telefone}
+              onChange={e => setEditForm({ ...editForm, telefone: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label>E-mail</label>
+            <input
+              type="email"
+              placeholder="email@exemplo.com"
+              value={editForm.email}
+              onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Endereço</label>
+          <input
+            placeholder="Rua, número, bairro, cidade"
+            value={editForm.endereco}
+            onChange={e => setEditForm({ ...editForm, endereco: e.target.value })}
+          />
+        </div>
+
+        {editError && (
+          <div style={{
+            marginTop: '12px', padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
+            color: 'var(--badge-red)', fontSize: '12.5px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+            ⚠️ {editError}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '6px', marginTop: '14px' }}>
+          <button type="button" className="btn" onClick={handleSaveEdit} style={{ flex: 1 }}>
+            Salvar Alterações
+          </button>
+          <button type="button" className="btn btn-outline" onClick={() => setCustomerToEdit(null)} style={{ flex: 1 }}>
+            Cancelar
+          </button>
+        </div>
+      </Modal>
+
+      {/* ── Modal de Confirmação de Exclusão ────────────────────────── */}
+      {customerToDelete && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          animation: 'fadeIn 0.15s ease-out'
+        }}>
+          <div style={{
+            background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-xl)', padding: '24px', width: '100%', maxWidth: '380px',
+            boxShadow: 'var(--shadow-lg)'
+          }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Trash2 size={18} color="var(--badge-red)" /> Excluir Cliente
+            </h3>
+            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              Tem certeza que deseja excluir o cliente <strong>{customerToDelete.nome}</strong>? Todo o histórico associado também poderá ser impactado. Esta ação não pode ser desfeita.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                type="button" className="btn btn-outline"
+                onClick={() => setCustomerToDelete(null)}
+                style={{ fontSize: '13px', padding: '8px 14px' }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button" className="btn"
+                onClick={handleConfirmDelete}
+                style={{ fontSize: '13px', padding: '8px 14px', background: 'var(--badge-red)', color: '#fff', border: 'none' }}
+              >
+                Sim, excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Customer Purchase History Modal */}
       <Modal

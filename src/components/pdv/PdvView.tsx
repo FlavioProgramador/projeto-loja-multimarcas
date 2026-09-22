@@ -49,27 +49,11 @@ export const PdvView: React.FC = () => {
 
   // ==========================================
   // OTIMIZAÇÃO DE PERFORMANCE (useMemo)
-  // O React agora "lembra" dessas listas e só recalcula se os 'products' mudarem no banco.
-  // Isso deixa a digitação na busca extremamente rápida.
   // ==========================================
-
   const categories = useMemo(() =>
     ['Todos', ...Array.from(new Set(products.map(p => p.categoria).filter(Boolean)))].sort(),
     [products]);
 
-  const colecoes = useMemo(() =>
-    ['Todas', ...Array.from(new Set(products.map(p => p.colecao).filter(Boolean)))].sort(),
-    [products]);
-
-  const estacoes = useMemo(() =>
-    ['Todas', ...Array.from(new Set(products.map(p => p.estacao).filter(Boolean)))].sort(),
-    [products]);
-
-  const generos = useMemo(() =>
-    ['Todos', ...Array.from(new Set(products.map(p => p.genero).filter(Boolean)))].sort(),
-    [products]);
-
-  // Filtro otimizado: só roda quando os filtros ou o input mudarem.
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const searchLower = searchTerm.toLowerCase();
@@ -97,7 +81,6 @@ export const PdvView: React.FC = () => {
     ).slice(0, 6);
   }, [customers, customerSearchTerm]);
 
-
   // ==========================================
   // CÁLCULOS FINANCEIROS
   // ==========================================
@@ -108,7 +91,6 @@ export const PdvView: React.FC = () => {
   const maxCreditApplicable = Math.min(availableCredit, Math.max(0, subtotal - discountTotal));
   const creditUsed = useCustomerCredit ? maxCreditApplicable : 0;
   const calculatedTotal = Math.max(0, subtotal - discountTotal - creditUsed);
-
 
   // ==========================================
   // AÇÕES DO USUÁRIO
@@ -158,7 +140,7 @@ export const PdvView: React.FC = () => {
   };
 
   // ==========================================
-  // INTEGRAÇÃO PIX & FINALIZAÇÃO (Mantido intacto para segurança)
+  // INTEGRAÇÃO PIX & FINALIZAÇÃO
   // ==========================================
   useEffect(() => {
     if (!pendingSaleId) return;
@@ -343,7 +325,7 @@ export const PdvView: React.FC = () => {
           </button>
         </div>
 
-        <div className="pdv-grid" style={{ flex: 1, gap: '24px' }}>
+        <div className="pdv-grid">
 
           {/* LADO ESQUERDO: Catálogo */}
           <div className="pdv-left" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -446,12 +428,12 @@ export const PdvView: React.FC = () => {
             </div>
           </div>
 
-          {/* LADO DIREITO: Carrinho e Finalização */}
-          <div className="pdv-right" style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+          {/* LADO DIREITO: Carrinho e Finalização (Estrutura de Bloco Organizada) */}
+          <div className="pdv-right">
 
             {/* Header do Carrinho */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                 <ShoppingCart size={20} /> Carrinho
               </h2>
               <span style={{ fontSize: '13px', background: 'var(--bg-surface-subtle)', padding: '4px 10px', borderRadius: '20px', fontWeight: 600 }}>
@@ -460,77 +442,139 @@ export const PdvView: React.FC = () => {
             </div>
 
             {/* Lista do Carrinho */}
-            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px' }}>
+            <div style={{ flex: 1, maxHeight: '350px', overflowY: 'auto', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               {cart.length === 0 ? (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '40px' }}>Bipe ou selecione produtos ao lado.</div>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '13px' }}>Bipe ou selecione produtos ao lado.</div>
               ) : (
                 cart.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px dashed var(--border-color)' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{item.nome}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.tamanho} - {formatMoeda(item.preco)}</div>
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.tamanho} / {item.cor} • {formatMoeda(item.preco)}</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-sm)', padding: '2px' }}>
-                        <button onClick={() => updateQuantity(idx, -1)} style={{ border: 'none', background: 'transparent', padding: '4px 8px', cursor: 'pointer' }}>-</button>
-                        <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)', minWidth: '20px', textAlign: 'center' }}>{item.qtd}</span>
-                        <button onClick={() => updateQuantity(idx, 1)} style={{ border: 'none', background: 'transparent', padding: '4px 8px', cursor: 'pointer' }}>+</button>
-                      </div>
-                      <div style={{ fontSize: '14px', fontWeight: 700, fontFamily: 'var(--font-mono)', minWidth: '70px', textAlign: 'right' }}>
-                        {formatMoeda(item.preco * item.qtd)}
-                      </div>
-                      <button onClick={() => removeItem(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}>
-                        <Trash2 size={16} />
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                      <button onClick={() => updateQuantity(idx, -1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-surface-subtle)', borderRadius: '6px', width: '24px', height: '24px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                      <span style={{ fontSize: '13px', fontWeight: 600, minWidth: '20px', textAlign: 'center' }}>{item.qtd}</span>
+                      <button onClick={() => updateQuantity(idx, 1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-surface-subtle)', borderRadius: '6px', width: '24px', height: '24px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                      <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '60px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoeda(item.preco * item.qtd)}</span>
+                      <button onClick={() => removeItem(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '4px' }}><Trash2 size={16} /></button>
                     </div>
                   </div>
                 ))
               )}
             </div>
 
-            {/* Cliente */}
-            <div style={{ marginBottom: '20px' }}>
+            {/* Crédito do Cliente */}
+            {availableCredit > 0 && (
+              <div style={{ background: 'var(--badge-blue-bg)', border: '1px solid var(--primary-fixed)', borderRadius: 'var(--radius-md)', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--primary)' }}>CRÉDITO DISPONÍVEL</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{formatMoeda(availableCredit)}</div>
+                </div>
+                <button type="button" className={`btn btn-sm ${useCustomerCredit ? '' : 'btn-outline'}`} style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => setUseCustomerCredit(prev => !prev)}>
+                  {useCustomerCredit ? '✓ Aplicado' : 'Abater'}
+                </button>
+              </div>
+            )}
+
+            {/* Seleção de Cliente */}
+            <div style={{ position: 'relative' }}>
               {buyerName ? (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{buyerName}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{cpf || 'Sem CPF'}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{buyerName}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{cpf || 'CPF não informado'}</div>
                   </div>
-                  <button onClick={handleClearCustomer} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><X size={16} /></button>
+                  <button onClick={handleClearCustomer} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
                 </div>
               ) : (
-                <button onClick={() => setIsNewCustomerModalOpen(true)} style={{ width: '100%', padding: '12px', background: 'transparent', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer' }}>
-                  + Adicionar Cliente na Venda (Opcional)
-                </button>
+                <div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Buscar cliente por nome ou CPF..."
+                      value={customerSearchTerm}
+                      onChange={e => {
+                        setCustomerSearchTerm(e.target.value);
+                        setShowCustomerSuggestions(true);
+                      }}
+                      onFocus={() => setShowCustomerSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 200)}
+                      style={{ fontSize: '13px', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
+                    />
+                    <button type="button" className="btn btn-outline" style={{ fontSize: '13px', padding: '0 12px', whiteSpace: 'nowrap' }} onClick={() => setIsNewCustomerModalOpen(true)}>
+                      Novo
+                    </button>
+                  </div>
+                  {showCustomerSuggestions && customerSuggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', marginTop: '4px', maxHeight: '150px', overflowY: 'auto' }}>
+                      {customerSuggestions.map(c => (
+                        <button key={c.id} type="button" onClick={() => handleSelectCustomer(c)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', padding: '10px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: '13px', borderBottom: '1px solid var(--border-color)' }}>
+                          <span>{c.nome}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>{c.cpf || 'Sem CPF'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Totalizador Clean */}
-            <div style={{ padding: '16px', background: 'var(--text-primary)', color: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#a1a1aa', marginBottom: '8px' }}>
+            {/* Descontos e Pagamento */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '8px' }}>
+              <input type="number" placeholder="Desc R$" step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} style={{ fontSize: '13px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }} />
+              <input type="number" placeholder="Desc %" step="1" value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} style={{ fontSize: '13px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }} />
+              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ fontSize: '13px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}>
+                <option value="PIX">PIX</option>
+                <option value="Cartão">Cartão</option>
+                <option value="Dinheiro">Dinheiro</option>
+              </select>
+            </div>
+
+            {paymentMethod === 'Cartão' && (
+              <div>
+                <select value={installments} onChange={e => setInstallments(parseInt(e.target.value))} style={{ fontSize: '13px', padding: '10px 12px', width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}>
+                  <option value={1}>1x à vista</option>
+                  <option value={2}>2x sem juros</option>
+                  <option value={3}>3x sem juros</option>
+                  <option value={4}>4x sem juros</option>
+                  <option value={5}>5x sem juros</option>
+                  <option value={6}>6x sem juros</option>
+                </select>
+              </div>
+            )}
+
+            {/* Totalizador */}
+            <div style={{ padding: '16px', background: 'var(--text-primary)', color: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', marginTop: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#a1a1aa', marginBottom: '6px' }}>
                 <span>Subtotal</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatMoeda(subtotal)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '24px', fontWeight: 700 }}>
-                <span>Total</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '20px', fontWeight: 700 }}>
+                <span>Total a Pagar</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: '#fff' }}>{formatMoeda(calculatedTotal)}</span>
               </div>
             </div>
 
-            {/* Ações */}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={handleOpenCheckout} style={{ flex: 1, padding: '16px', fontSize: '16px', fontWeight: 600, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
-                Pagar <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', marginLeft: '8px' }}>F4</kbd>
+            {/* Botões de Ação */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+              <button onClick={handleOpenCheckout} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', fontSize: '14px', fontWeight: 600, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
+                <Check size={18} /> Finalizar Venda <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#fff', marginLeft: 'auto' }}>F4</kbd>
+              </button>
+              <button onClick={clearCart} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, background: 'var(--bg-surface-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
+                <Trash2 size={16} /> Limpar
               </button>
             </div>
 
           </div>
+
         </div>
 
-        {/* Modais omitidos no preview para focar no layout, mas continuam intactos */}
+        {/* Modais */}
         <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={""} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
         <NewReturnModal isOpen={isReturnModalOpen} onClose={() => setIsReturnModalOpen(false)} />
       </div>
+
       {lastSaleData && (<ReceiptPrinter cartItems={lastSaleData.cartItems} totalFinal={lastSaleData.totalFinal} paymentMethod={lastSaleData.paymentMethod} amountPaid={lastSaleData.amountPaid} change={lastSaleData.change} buyerName={lastSaleData.buyerName} cpf={lastSaleData.cpf} />)}
       <NewCustomerModal isOpen={isNewCustomerModalOpen} onClose={() => setIsNewCustomerModalOpen(false)} />
     </>

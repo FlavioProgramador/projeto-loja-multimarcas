@@ -2,7 +2,8 @@
    VESTRA ERP - DESIGN SYSTEM: RETAIL INTELLIGENCE (GOOGLE STITCH REF)
    ============================================================================ */
 
-:root, [data-theme='light'] {
+:root,
+[data-theme='light'] {
   /* Surface & Backgrounds */
   --bg-canvas: #f9f9ff;
   --bg-surface: #ffffff;
@@ -10,7 +11,7 @@
   --bg-surface-hover: #e7eeff;
   --bg-surface-high: #dee8ff;
   --bg-surface-highest: #d8e3fb;
-  
+
   /* Primary & Accents */
   --primary: #004ac6;
   --primary-hover: #003ea8;
@@ -19,24 +20,24 @@
   --primary-fixed: #dbe1ff;
   --on-primary: #ffffff;
   --accent: #2563eb;
-  
+
   /* Secondary & Neutrals */
   --secondary: #505f76;
   --secondary-container: #d0e1fb;
-  
+
   /* Typography Colors */
   --text-primary: #111c2d;
   --text-secondary: #434655;
   --text-muted: #737686;
   --text-inverse: #ffffff;
-  
+
   /* Borders & Outlines */
   --border-color: #e2e8f0;
   --border-subtle: #f1f5f9;
   --border-glass: #e2e8f0;
   --card-border: #e2e8f0;
   --outline-variant: #c3c6d7;
-  
+
   /* Status Badges & Indicators */
   --badge-green: #007d55;
   --badge-green-bg: #e6f9f0;
@@ -72,14 +73,18 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
 }
 
-:root[data-theme='dark'], html.dark, body.dark, body.dark-mode, [data-theme='dark'] {
+:root[data-theme='dark'],
+html.dark,
+body.dark,
+body.dark-mode,
+[data-theme='dark'] {
   --bg-canvas: #0b1329;
   --bg-surface: #131f37;
   --bg-surface-subtle: #1a2948;
   --bg-surface-hover: #22365d;
   --bg-surface-high: #2a416e;
   --bg-surface-highest: #355085;
-  
+
   --primary: #3b82f6;
   --primary-hover: #60a5fa;
   --primary-container: #2563eb;
@@ -87,21 +92,21 @@
   --primary-fixed: #1e3a8a;
   --on-primary: #ffffff;
   --accent: #3b82f6;
-  
+
   --secondary: #94a3b8;
   --secondary-container: #1e293b;
-  
+
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
   --text-inverse: #0b1329;
-  
+
   --border-color: #243552;
   --border-subtle: #192640;
   --border-glass: #243552;
   --card-border: #243552;
   --outline-variant: #355085;
-  
+
   --badge-green: #34d399;
   --badge-green-bg: rgba(16, 185, 129, 0.2);
   --badge-yellow: #fbbf24;
@@ -143,18 +148,22 @@ body {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: var(--radius-full);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
 
-.mono-text, .tabular-nums {
+.mono-text,
+.tabular-nums {
   font-family: var(--font-mono);
   font-feature-settings: 'tnum';
 }
@@ -658,17 +667,20 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
-.badge-status.success, .badge-status.Normal {
+.badge-status.success,
+.badge-status.Normal {
   background-color: var(--badge-green-bg);
   color: var(--badge-green);
 }
 
-.badge-status.low, .badge-status.warning {
+.badge-status.low,
+.badge-status.warning {
   background-color: var(--badge-yellow-bg);
   color: var(--badge-yellow);
 }
 
-.badge-status.out, .badge-status.danger {
+.badge-status.out,
+.badge-status.danger {
   background-color: var(--badge-red-bg);
   color: var(--badge-red);
 }
@@ -767,7 +779,9 @@ tbody tr:hover {
   color: var(--text-secondary);
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   width: 100%;
   padding: 8px 12px;
   background-color: var(--bg-surface);
@@ -785,12 +799,15 @@ select option {
   color: var(--text-primary);
 }
 
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
-input::placeholder, textarea::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--text-muted);
 }
 
@@ -873,14 +890,15 @@ input::placeholder, textarea::placeholder {
 }
 
 /* ============================================================================
-   PDV MODULE (Google Stitch Optimized)
+   PDV MODULE (Google Stitch Optimized - Fixed Layout)
    ============================================================================ */
 
 .pdv-grid {
   display: grid;
   grid-template-columns: 1fr 380px;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+  /* CORRIGIDO: Permite que as colunas ocupem a altura correta */
 }
 
 .pdv-left {
@@ -889,6 +907,8 @@ input::placeholder, textarea::placeholder {
   border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
 }
 
 .pdv-right {
@@ -897,8 +917,12 @@ input::placeholder, textarea::placeholder {
   border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-sm);
-  position: sticky;
-  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Garante espaçamento vertical limpo entre os blocos */
+  height: fit-content;
+  /* Impede que o painel estique infinitamente */
 }
 
 .category-chips {
@@ -1032,13 +1056,25 @@ input::placeholder, textarea::placeholder {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Responsive Breakpoints */
@@ -1046,6 +1082,7 @@ input::placeholder, textarea::placeholder {
   .pdv-grid {
     grid-template-columns: 1fr;
   }
+
   .pdv-right {
     position: static;
   }
@@ -1055,7 +1092,7 @@ input::placeholder, textarea::placeholder {
   .sidebar {
     transform: translateX(-100%);
   }
-  
+
   .sidebar.open {
     transform: translateX(0);
   }
@@ -1098,20 +1135,23 @@ input::placeholder, textarea::placeholder {
 }
 
 @media print {
-  .sidebar, .header, .sidebar-overlay {
+
+  .sidebar,
+  .header,
+  .sidebar-overlay {
     display: none !important;
   }
-  
+
   /* Reset layout for print */
   .app-layout {
     display: block !important;
   }
-  
+
   .main-wrapper {
     margin-left: 0 !important;
     background-color: white !important;
   }
-  
+
   .page-content {
     padding: 0 !important;
     margin: 0 !important;
@@ -1134,16 +1174,20 @@ input::placeholder, textarea::placeholder {
   }
 
   /* General print adjustments for A4 Reports */
-  body, .main-wrapper, .page-content {
+  body,
+  .main-wrapper,
+  .page-content {
     background: white !important;
     color: black !important;
   }
-  
-  .btn, .global-search {
+
+  .btn,
+  .global-search {
     display: none !important;
   }
 
-  .card, .table-wrap {
+  .card,
+  .table-wrap {
     box-shadow: none !important;
     border: 1px solid #ccc !important;
     page-break-inside: avoid;

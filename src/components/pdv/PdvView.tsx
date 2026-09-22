@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Plus, Trash2, Check, ShoppingCart, Barcode, User, RotateCcw, X } from 'lucide-react';
+import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
 import { formatMoeda } from '../../lib/utils';
@@ -15,6 +15,7 @@ export const PdvView: React.FC = () => {
   const { cart, addItem, updateQuantity, removeItem, clearCart, subtotal } = useCart();
 
   // Estados locais da interface
+  const [isClearCartModalOpen, setIsClearCartModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -93,7 +94,7 @@ export const PdvView: React.FC = () => {
   const calculatedTotal = Math.max(0, subtotal - discountTotal - creditUsed);
 
   // ==========================================
-  // AÇÕES DO USUÁRIO
+  // AÇÕES DO UTILIZADOR
   // ==========================================
   const handleSelectCustomer = (customer: typeof customers[0]) => {
     setBuyerName(customer.nome);
@@ -119,7 +120,7 @@ export const PdvView: React.FC = () => {
     const skuIndex = skuSelections[productId] !== undefined ? skuSelections[productId] : 0;
     const result = addItem(prod, skuIndex);
     if (!result.success) {
-      alert(result.message || 'Estoque insuficiente.');
+      alert(result.message || 'Stock insuficiente.');
     }
   };
 
@@ -264,7 +265,7 @@ export const PdvView: React.FC = () => {
     }
   };
 
-  // ── Keyboard Shortcuts ──
+  // ── Atalhos de Teclado ──
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
@@ -278,7 +279,7 @@ export const PdvView: React.FC = () => {
         if (isCheckoutModalOpen) handleConfirmSale();
         else if (cart.length > 0) setIsCheckoutModalOpen(true);
         else {
-          setNotificationBanner('⚠️ Carrinho vazio. Pressione F2 para buscar produtos.');
+          setNotificationBanner('⚠️ Carrinho vazio. Pressione F2 para procurar produtos.');
           setTimeout(() => setNotificationBanner(null), 3500);
         }
         return;
@@ -289,7 +290,9 @@ export const PdvView: React.FC = () => {
         if (isReturnModalOpen) return setIsReturnModalOpen(false);
         if (isNewCustomerModalOpen) return setIsNewCustomerModalOpen(false);
         if (document.activeElement === searchInputRef.current && searchTerm) return setSearchTerm('');
-        if (cart.length > 0 && window.confirm('Deseja limpar todos os itens do carrinho? (ESC)')) clearCart();
+        if (cart.length > 0) {
+          setIsClearCartModalOpen(true);
+        }
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -315,7 +318,7 @@ export const PdvView: React.FC = () => {
           <div>
             <h1 className="page-title" style={{ fontSize: '24px', letterSpacing: '-0.5px' }}>PDV</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><kbd className="kbd-key">F2</kbd> Buscar</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><kbd className="kbd-key">F2</kbd> Procurar</span>
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><kbd className="kbd-key">F4</kbd> Finalizar</span>
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><kbd className="kbd-key">ESC</kbd> Limpar</span>
             </div>
@@ -327,137 +330,162 @@ export const PdvView: React.FC = () => {
 
         <div className="pdv-grid">
 
-          {/* LADO ESQUERDO: Catálogo */}
-          <div className="pdv-left" style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* LADO ESQUERDO: Catálogo em Tabela Profissional (Opção 1) */}
+          <div className="pdv-left" style={{ display: 'flex', flexDirection: 'column', background: 'transparent', border: 'none', boxShadow: 'none', padding: 0 }}>
 
-            {/* Busca Clean */}
+            {/* Barra de Procura Limpa */}
             <div style={{ position: 'relative', marginBottom: '16px' }}>
-              <Search size={18} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Search size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Busque por código ou nome..."
+                placeholder="Procurar por código, nome ou marca (Pressione F2)..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 style={{
-                  width: '100%', padding: '14px 14px 14px 44px', fontSize: '14px',
-                  borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)',
-                  background: 'var(--bg-surface)', transition: 'box-shadow 0.2s', outline: 'none'
+                  width: '100%', padding: '14px 14px 14px 48px', fontSize: '14px',
+                  borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)',
+                  background: 'var(--bg-surface)', boxShadow: 'var(--shadow-sm)', outline: 'none',
+                  transition: 'all 0.2s ease'
                 }}
-                onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--primary)'}
-                onBlur={e => e.target.style.boxShadow = 'none'}
+                onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+                onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
               />
             </div>
 
-            {/* Filtros em Pílulas (Scroll horizontal) */}
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>
-              {categories.map(cat => (
-                <button
-                  key={cat} type="button"
-                  onClick={() => setSelectedCategory(cat === 'Todos' ? '' : cat)}
-                  style={{
-                    fontSize: '12px', padding: '6px 16px', borderRadius: '20px', fontWeight: 500,
-                    border: '1px solid',
-                    borderColor: (!selectedCategory && cat === 'Todos') || selectedCategory === cat ? 'var(--primary)' : 'var(--border-color)',
-                    background: (!selectedCategory && cat === 'Todos') || selectedCategory === cat ? 'var(--primary)' : 'transparent',
-                    color: (!selectedCategory && cat === 'Todos') || selectedCategory === cat ? '#fff' : 'var(--text-secondary)',
-                    cursor: 'pointer', whiteSpace: 'nowrap'
-                  }}
-                >
-                  {cat}
-                </button>
-              ))}
+            {/* Abas de Categorias Minimalistas */}
+            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'none' }}>
+              {categories.map(cat => {
+                const isActive = (!selectedCategory && cat === 'Todos') || selectedCategory === cat;
+                return (
+                  <button
+                    key={cat} type="button"
+                    onClick={() => setSelectedCategory(cat === 'Todos' ? '' : cat)}
+                    style={{
+                      fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--radius-md)', fontWeight: isActive ? 600 : 400,
+                      border: 'none',
+                      background: isActive ? 'var(--text-primary)' : 'var(--bg-surface)',
+                      color: isActive ? 'var(--bg-canvas)' : 'var(--text-secondary)',
+                      boxShadow: isActive ? 'none' : '0 1px 2px rgba(0,0,0,0.02)',
+                      cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Grid de Produtos */}
-            <div className="product-cards-grid" style={{ overflowY: 'auto', paddingRight: '8px', flex: 1, alignContent: 'start' }}>
-              {filteredProducts.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1', padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  Produto não encontrado.
-                </div>
-              ) : (
-                filteredProducts.map(p => {
-                  const currentSkuIdx = skuSelections[p.id] || 0;
-                  const selectedSku = p.skus[currentSkuIdx] || p.skus[0];
-                  const currentSkuStock = selectedSku?.qtd || 0;
+            {/* Tabela de Produtos Moderna (Estilo Stripe/Linear) */}
+            <div style={{ flex: 1, background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', overflowY: 'auto', maxHeight: '560px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-surface-subtle)' }}>
+                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Produto</th>
+                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variação (SKU)</th>
+                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Preço</th>
+                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Stock</th>
+                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        Nenhum produto encontrado.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredProducts.map(p => {
+                      const currentSkuIdx = skuSelections[p.id] || 0;
+                      const selectedSku = p.skus[currentSkuIdx] || p.skus[0];
+                      const currentSkuStock = selectedSku?.qtd || 0;
 
-                  return (
-                    <div key={p.id} className="product-grid-card" style={{
-                      padding: '16px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px'
-                    }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{p.marca}</span>
-                          <StatusBadge status={currentSkuStock > 0 ? 'Normal' : 'Esgotado'} />
-                        </div>
-                        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, minHeight: '36px' }}>{p.nome}</h3>
-                        <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)', marginTop: '8px' }}>
-                          {formatMoeda(p.preco)}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                        <select
-                          value={currentSkuIdx}
-                          onChange={e => handleSkuChange(p.id, parseInt(e.target.value))}
-                          style={{ flex: 1, fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}
+                      return (
+                        <tr
+                          key={p.id}
+                          style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.15s ease' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-subtle)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          {p.skus.map((s, idx) => (
-                            <option key={idx} value={idx}>{s.tamanho} / {s.cor}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => handleAddToCart(p.id)}
-                          disabled={currentSkuStock <= 0}
-                          style={{
-                            width: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: currentSkuStock > 0 ? 'var(--primary)' : 'var(--bg-surface-subtle)',
-                            color: currentSkuStock > 0 ? '#fff' : 'var(--text-muted)',
-                            border: 'none', borderRadius: 'var(--radius-sm)', cursor: currentSkuStock > 0 ? 'pointer' : 'not-allowed'
-                          }}
-                        >
-                          <Plus size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{p.marca}</div>
+                            <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{p.nome}</div>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <select
+                              value={currentSkuIdx}
+                              onChange={e => handleSkuChange(p.id, parseInt(e.target.value))}
+                              style={{ fontSize: '12px', padding: '6px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)', color: 'var(--text-primary)' }}
+                            >
+                              {p.skus.map((s, idx) => (
+                                <option key={idx} value={idx}>{s.tamanho} / {s.cor}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-primary)', fontSize: '13.5px' }}>
+                            {formatMoeda(p.preco)}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <StatusBadge status={currentSkuStock > 0 ? 'Normal' : 'Esgotado'} />
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <button
+                              onClick={() => handleAddToCart(p.id)}
+                              disabled={currentSkuStock <= 0}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                padding: '6px 12px', fontSize: '12px', fontWeight: 600,
+                                background: currentSkuStock > 0 ? 'var(--primary)' : 'var(--bg-surface-subtle)',
+                                color: currentSkuStock > 0 ? '#fff' : 'var(--text-muted)',
+                                border: 'none', borderRadius: 'var(--radius-md)', cursor: currentSkuStock > 0 ? 'pointer' : 'not-allowed',
+                                transition: 'background 0.15s ease'
+                              }}
+                            >
+                              <Plus size={14} /> Adicionar
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
+
           </div>
 
-          {/* LADO DIREITO: Carrinho e Finalização (Estrutura de Bloco Organizada) */}
-          <div className="pdv-right">
+          {/* LADO DIREITO: Carrinho e Finalização (Painel Corporativo Sólido) */}
+          <div className="pdv-right" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-xl)', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
 
             {/* Header do Carrinho */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                <ShoppingCart size={20} /> Carrinho
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-primary)' }}>
+                <ShoppingCart size={18} style={{ color: 'var(--primary)' }} /> Carrinho
               </h2>
-              <span style={{ fontSize: '13px', background: 'var(--bg-surface-subtle)', padding: '4px 10px', borderRadius: '20px', fontWeight: 600 }}>
+              <span style={{ fontSize: '12px', background: 'var(--bg-surface-subtle)', color: 'var(--text-secondary)', padding: '2px 10px', borderRadius: 'var(--radius-full)', fontWeight: 600 }}>
                 {cart.reduce((acc, i) => acc + i.qtd, 0)} itens
               </span>
             </div>
 
             {/* Lista do Carrinho */}
-            <div style={{ flex: 1, maxHeight: '350px', overflowY: 'auto', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+            <div style={{ flex: 1, maxHeight: '280px', overflowY: 'auto', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '14px' }}>
               {cart.length === 0 ? (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '13px' }}>Bipe ou selecione produtos ao lado.</div>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '13px' }}>Nenhum item adicionado.<br /><span style={{ fontSize: '11.5px', opacity: 0.8 }}>Selecione produtos na tabela ao lado.</span></div>
               ) : (
                 cart.map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome}</div>
+                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.tamanho} / {item.cor} • {formatMoeda(item.preco)}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                      <button onClick={() => updateQuantity(idx, -1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-surface-subtle)', borderRadius: '6px', width: '24px', height: '24px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                      <span style={{ fontSize: '13px', fontWeight: 600, minWidth: '20px', textAlign: 'center' }}>{item.qtd}</span>
-                      <button onClick={() => updateQuantity(idx, 1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-surface-subtle)', borderRadius: '6px', width: '24px', height: '24px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                      <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '60px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoeda(item.preco * item.qtd)}</span>
-                      <button onClick={() => removeItem(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '4px' }}><Trash2 size={16} /></button>
+                      <button onClick={() => updateQuantity(idx, -1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                      <span style={{ fontSize: '12px', fontWeight: 600, minWidth: '16px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qtd}</span>
+                      <button onClick={() => updateQuantity(idx, 1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                      <span style={{ fontSize: '12.5px', fontWeight: 700, minWidth: '60px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoeda(item.preco * item.qtd)}</span>
+                      <button onClick={() => removeItem(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }} title="Remover"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 ))
@@ -466,7 +494,7 @@ export const PdvView: React.FC = () => {
 
             {/* Crédito do Cliente */}
             {availableCredit > 0 && (
-              <div style={{ background: 'var(--badge-blue-bg)', border: '1px solid var(--primary-fixed)', borderRadius: 'var(--radius-md)', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ background: 'var(--badge-blue-bg)', border: '1px solid var(--primary-fixed)', borderRadius: 'var(--radius-md)', padding: '10px 12px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--primary)' }}>CRÉDITO DISPONÍVEL</div>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{formatMoeda(availableCredit)}</div>
@@ -478,39 +506,42 @@ export const PdvView: React.FC = () => {
             )}
 
             {/* Seleção de Cliente */}
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', marginBottom: '12px' }}>
               {buyerName ? (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{buyerName}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{cpf || 'CPF não informado'}</div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{buyerName}</div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{cpf || 'CPF não informado'}</div>
                   </div>
-                  <button onClick={handleClearCustomer} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
+                  <button onClick={handleClearCustomer} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={15} /></button>
                 </div>
               ) : (
                 <div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="Buscar cliente por nome ou CPF..."
-                      value={customerSearchTerm}
-                      onChange={e => {
-                        setCustomerSearchTerm(e.target.value);
-                        setShowCustomerSuggestions(true);
-                      }}
-                      onFocus={() => setShowCustomerSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 200)}
-                      style={{ fontSize: '13px', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
-                    />
-                    <button type="button" className="btn btn-outline" style={{ fontSize: '13px', padding: '0 12px', whiteSpace: 'nowrap' }} onClick={() => setIsNewCustomerModalOpen(true)}>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <User size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      <input
+                        type="text"
+                        placeholder="Cliente (Nome ou CPF)..."
+                        value={customerSearchTerm}
+                        onChange={e => {
+                          setCustomerSearchTerm(e.target.value);
+                          setShowCustomerSuggestions(true);
+                        }}
+                        onFocus={() => setShowCustomerSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 200)}
+                        style={{ fontSize: '12px', width: '100%', padding: '8px 8px 8px 30px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }}
+                      />
+                    </div>
+                    <button type="button" className="btn btn-sm btn-outline" style={{ fontSize: '11px', padding: '0 10px', whiteSpace: 'nowrap' }} onClick={() => setIsNewCustomerModalOpen(true)}>
                       Novo
                     </button>
                   </div>
                   {showCustomerSuggestions && customerSuggestions.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', marginTop: '4px', maxHeight: '150px', overflowY: 'auto' }}>
                       {customerSuggestions.map(c => (
-                        <button key={c.id} type="button" onClick={() => handleSelectCustomer(c)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', padding: '10px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: '13px', borderBottom: '1px solid var(--border-color)' }}>
-                          <span>{c.nome}</span>
+                        <button key={c.id} type="button" onClick={() => handleSelectCustomer(c)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
+                          <span style={{ fontWeight: 500 }}>{c.nome}</span>
                           <span style={{ color: 'var(--text-muted)' }}>{c.cpf || 'Sem CPF'}</span>
                         </button>
                       ))}
@@ -520,11 +551,11 @@ export const PdvView: React.FC = () => {
               )}
             </div>
 
-            {/* Descontos e Pagamento */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '8px' }}>
-              <input type="number" placeholder="Desc R$" step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} style={{ fontSize: '13px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }} />
-              <input type="number" placeholder="Desc %" step="1" value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} style={{ fontSize: '13px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }} />
-              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ fontSize: '13px', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}>
+            {/* Descontos e Pagamento Unificados */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '6px', marginBottom: '12px' }}>
+              <input type="number" placeholder="Desc R$" step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
+              <input type="number" placeholder="Desc %" step="1" value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
+              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }}>
                 <option value="PIX">PIX</option>
                 <option value="Cartão">Cartão</option>
                 <option value="Dinheiro">Dinheiro</option>
@@ -532,8 +563,8 @@ export const PdvView: React.FC = () => {
             </div>
 
             {paymentMethod === 'Cartão' && (
-              <div>
-                <select value={installments} onChange={e => setInstallments(parseInt(e.target.value))} style={{ fontSize: '13px', padding: '10px 12px', width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <select value={installments} onChange={e => setInstallments(parseInt(e.target.value))} style={{ fontSize: '12px', padding: '8px', width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }}>
                   <option value={1}>1x à vista</option>
                   <option value={2}>2x sem juros</option>
                   <option value={3}>3x sem juros</option>
@@ -544,25 +575,25 @@ export const PdvView: React.FC = () => {
               </div>
             )}
 
-            {/* Totalizador */}
-            <div style={{ padding: '16px', background: 'var(--text-primary)', color: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', marginTop: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#a1a1aa', marginBottom: '6px' }}>
+            {/* Totalizador Clean */}
+            <div style={{ padding: '14px 16px', background: 'var(--text-primary)', color: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', marginTop: 'auto', marginBottom: '12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#a1a1aa', marginBottom: '4px' }}>
                 <span>Subtotal</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatMoeda(subtotal)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '20px', fontWeight: 700 }}>
-                <span>Total a Pagar</span>
+                <span style={{ fontSize: '15px', alignSelf: 'center', color: '#e4e4e7' }}>Total a Pagar</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: '#fff' }}>{formatMoeda(calculatedTotal)}</span>
               </div>
             </div>
 
             {/* Botões de Ação */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-              <button onClick={handleOpenCheckout} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', fontSize: '14px', fontWeight: 600, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
-                <Check size={18} /> Finalizar Venda <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#fff', marginLeft: 'auto' }}>F4</kbd>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={handleOpenCheckout} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', fontSize: '14px', fontWeight: 600, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', boxShadow: 'var(--shadow-sm)' }}>
+                <Check size={16} /> Finalizar Venda <kbd style={{ background: 'rgba(255,255,255,0.25)', padding: '2px 5px', borderRadius: '4px', fontSize: '10.5px', color: '#fff', marginLeft: 'auto' }}>F4</kbd>
               </button>
-              <button onClick={clearCart} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, background: 'var(--bg-surface-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
-                <Trash2 size={16} /> Limpar
+              <button onClick={() => { if (cart.length > 0) setIsClearCartModalOpen(true); }} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '12px 14px', fontSize: '13px', fontWeight: 600, background: 'var(--bg-surface-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
+                <Trash2 size={15} /> Limpar
               </button>
             </div>
 
@@ -573,6 +604,61 @@ export const PdvView: React.FC = () => {
         {/* Modais */}
         <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={""} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
         <NewReturnModal isOpen={isReturnModalOpen} onClose={() => setIsReturnModalOpen(false)} />
+
+        {/* Modal Customizado de Confirmação para Limpar o Carrinho */}
+        {isClearCartModalOpen && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}>
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '380px',
+              boxShadow: 'var(--shadow-lg)'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                Limpar Carrinho
+              </h3>
+              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+                Deseja remover todos os itens do carrinho? Esta ação não pode ser desfeita.
+              </p>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setIsClearCartModalOpen(false)}
+                  style={{ fontSize: '13px', padding: '8px 14px' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    clearCart();
+                    setIsClearCartModalOpen(false);
+                  }}
+                  style={{ fontSize: '13px', padding: '8px 14px', background: 'var(--badge-red)', color: '#fff', border: 'none' }}
+                >
+                  Sim, limpar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {lastSaleData && (<ReceiptPrinter cartItems={lastSaleData.cartItems} totalFinal={lastSaleData.totalFinal} paymentMethod={lastSaleData.paymentMethod} amountPaid={lastSaleData.amountPaid} change={lastSaleData.change} buyerName={lastSaleData.buyerName} cpf={lastSaleData.cpf} />)}

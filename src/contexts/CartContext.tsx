@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 import { CartItem, Product } from '../types';
 
 interface CartContextType {
@@ -15,7 +15,8 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  const addItem = (product: Product, skuIndex: number): { success: boolean; message?: string } => {
+  // useCallback evita que essa função seja recriada em toda renderização
+  const addItem = useCallback((product: Product, skuIndex: number): { success: boolean; message?: string } => {
     const sku = product.skus[skuIndex];
     if (!sku || sku.qtd <= 0) {
       return { success: false, message: 'Estoque insuficiente para este item.' };
@@ -47,48 +48,63 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           preco: product.preco,
           qtd: 1,
           variantId: sku.id,
-          productUuid: product.uuid
-        }
+          productUuid: product.uuid,
+          maxStock: sku.qtd // Salvamos o estoque máximo aqui para usar depois!
+        } as CartItem // Cast necessário até você atualizar o src/types.ts
       ];
     });
 
     return { success: true };
-  };
+  }, []);
 
-  const updateQuantity = (index: number, delta: number) => {
+  const updateQuantity = useCallback((index: number, delta: number) => {
     setCart(prev => {
       if (!prev[index]) return prev;
+
       const newQtd = prev[index].qtd + delta;
+
       if (newQtd <= 0) {
         return prev.filter((_, idx) => idx !== index);
       }
+
+      // Trava de segurança: impede que o '+' passe do estoque disponível
+      // Como não podemos usar alert aqui dentro do state, ele simplesmente trava a soma.
+      // O ideal na interface do usuário é desabilitar o botão '+' quando qtd === maxStock.
+      if (prev[index].maxStock !== undefined && newQtd > prev[index].maxStock) {
+        return prev;
+      }
+
       const copy = [...prev];
       copy[index] = { ...copy[index], qtd: newQtd };
       return copy;
     });
-  };
+  }, []);
 
-  const removeItem = (index: number) => {
+  const removeItem = useCallback((index: number) => {
     setCart(prev => prev.filter((_, idx) => idx !== index));
-  };
+  }, []);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([]);
-  };
+  }, []);
 
-  const subtotal = cart.reduce((acc, item) => acc + item.preco * item.qtd, 0);
+  // O subtotal agora só é recalculado SE o array 'cart' mudar.
+  const subtotal = useMemo(() => {
+    return cart.reduce((acc, item) => acc + item.preco * item.qtd, 0);
+  }, [cart]);
+
+  // Congelamos o objeto do provider na memória para evitar re-renderizações em cascata
+  const contextValue = useMemo(() => ({
+    cart,
+    addItem,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    subtotal
+  }), [cart, addItem, updateQuantity, removeItem, clearCart, subtotal]);
 
   return (
-    <CartContext.Provider
-      value={{
-        cart,
-        addItem,
-        updateQuantity,
-        removeItem,
-        clearCart,
-        subtotal
-      }}
-    >
+    <CartContext.Provider value={contextValue}>
       {children}
     </CartContext.Provider>
   );

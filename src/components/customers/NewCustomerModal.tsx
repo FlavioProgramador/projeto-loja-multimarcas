@@ -6,9 +6,10 @@ import { useStore } from '../../contexts/StoreContext';
 interface NewCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void; // Prop adicionada para disparar o aviso de sucesso sem alert()
 }
 
-export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose }) => {
+export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { addCustomer } = useStore();
 
   const [nome, setNome] = useState('');
@@ -18,6 +19,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
   const [email, setEmail] = useState('');
   const [endereco, setEndereco] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
+  const [error, setError] = useState<string | null>(null); // Estado para o erro visual
 
   const resetForm = () => {
     setNome('');
@@ -27,11 +29,12 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
     setEmail('');
     setEndereco('');
     setDataNascimento('');
+    setError(null);
   };
 
   const handleSave = () => {
     if (!nome.trim() || !cpf.trim()) {
-      alert('Nome e CPF são obrigatórios.');
+      setError('Os campos Nome e CPF são obrigatórios.');
       return;
     }
 
@@ -45,15 +48,23 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
       dataNascimento: dataNascimento || ''
     });
 
+    if (onSuccess) {
+      onSuccess();
+    }
+
     onClose();
     resetForm();
-    alert('Cliente cadastrado com sucesso!');
+  };
+
+  const handleClose = () => {
+    onClose();
+    resetForm();
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={
         <>
           <UserPlus size={18} /> Novo Cliente
@@ -73,7 +84,8 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
         <input
           placeholder="Ex: Carlos Eduardo"
           value={nome}
-          onChange={e => setNome(e.target.value)}
+          onChange={e => { setNome(e.target.value); setError(null); }}
+          style={{ borderColor: error && !nome.trim() ? 'var(--badge-red)' : undefined }}
         />
       </div>
 
@@ -83,7 +95,8 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
           <input
             placeholder="000.000.000-00"
             value={cpf}
-            onChange={e => setCpf(e.target.value)}
+            onChange={e => { setCpf(e.target.value); setError(null); }}
+            style={{ borderColor: error && !cpf.trim() ? 'var(--badge-red)' : undefined }}
           />
         </div>
         <div className="form-group">
@@ -142,11 +155,30 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
         />
       </div>
 
+      {/* Mensagem de Erro Visual */}
+      {error && (
+        <div style={{
+          marginTop: '12px',
+          padding: '10px 12px',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          borderRadius: 'var(--radius-md)',
+          color: 'var(--badge-red)',
+          fontSize: '12.5px',
+          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '6px', marginTop: '14px' }}>
         <button type="button" className="btn" onClick={handleSave} style={{ flex: 1 }}>
           Salvar Cliente
         </button>
-        <button type="button" className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
+        <button type="button" className="btn btn-outline" onClick={handleClose} style={{ flex: 1 }}>
           Cancelar
         </button>
       </div>

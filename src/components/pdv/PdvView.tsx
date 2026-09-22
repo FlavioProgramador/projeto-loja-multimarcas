@@ -48,6 +48,12 @@ export const PdvView: React.FC = () => {
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
   const [lastSaleData, setLastSaleData] = useState<any>(null);
 
+  // Helper para exibir avisos visuais sem usar pop-up do navegador
+  const showBanner = (message: string) => {
+    setNotificationBanner(message);
+    setTimeout(() => setNotificationBanner(null), 4000);
+  };
+
   // ==========================================
   // OTIMIZAÇÃO DE PERFORMANCE (useMemo)
   // ==========================================
@@ -120,7 +126,7 @@ export const PdvView: React.FC = () => {
     const skuIndex = skuSelections[productId] !== undefined ? skuSelections[productId] : 0;
     const result = addItem(prod, skuIndex);
     if (!result.success) {
-      alert(result.message || 'Stock insuficiente.');
+      showBanner(`⚠️ ${result.message || 'Stock insuficiente.'}`);
     }
   };
 
@@ -134,7 +140,7 @@ export const PdvView: React.FC = () => {
 
   const handleOpenCheckout = () => {
     if (cart.length === 0) {
-      alert('O carrinho está vazio. Adicione produtos para prosseguir.');
+      showBanner('⚠️ O carrinho está vazio. Adicione produtos para prosseguir.');
       return;
     }
     setIsCheckoutModalOpen(true);
@@ -153,7 +159,7 @@ export const PdvView: React.FC = () => {
         { event: 'UPDATE', schema: 'public', table: 'sales', filter: `id=eq.${pendingSaleId}` },
         async (payload) => {
           if (payload.new.status === 'COMPLETED') {
-            setNotificationBanner('✅ Pagamento PIX aprovado com sucesso!');
+            showBanner('✅ Pagamento PIX aprovado com sucesso!');
 
             const saleDataToPrint = {
               cartItems: [...cart],
@@ -175,7 +181,6 @@ export const PdvView: React.FC = () => {
             setPendingSaleId(null);
 
             setTimeout(() => window.print(), 300);
-            setTimeout(() => setNotificationBanner(null), 5000);
           }
         }
       )
@@ -187,7 +192,7 @@ export const PdvView: React.FC = () => {
   const handleConfirmSale = async () => {
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
-        alert('Supabase não configurado corretamente. O PIX requer o backend real.');
+        showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
         return;
       }
       setIsGeneratingPix(true);
@@ -218,11 +223,11 @@ export const PdvView: React.FC = () => {
           setQrCodeBase64(data.qr_code_base64);
           setPendingSaleId(data.sale_id);
         } else {
-          alert('Erro ao gerar PIX: Resposta inválida.');
+          showBanner('⚠️ Erro ao gerar PIX: Resposta inválida.');
         }
       } catch (err: any) {
         console.error('PIX Error:', err);
-        alert(`Erro ao gerar PIX: ${err.message}`);
+        showBanner(`⚠️ Erro ao gerar PIX: ${err.message}`);
       } finally {
         setIsGeneratingPix(false);
       }
@@ -256,12 +261,11 @@ export const PdvView: React.FC = () => {
       handleClearCustomer();
       setDiscountValue('');
       setDiscountPercent('');
-      setNotificationBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
+      showBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
 
       setTimeout(() => window.print(), 300);
-      setTimeout(() => setNotificationBanner(null), 5000);
     } else {
-      alert(result.message);
+      showBanner(`⚠️ ${result.message}`);
     }
   };
 
@@ -279,8 +283,7 @@ export const PdvView: React.FC = () => {
         if (isCheckoutModalOpen) handleConfirmSale();
         else if (cart.length > 0) setIsCheckoutModalOpen(true);
         else {
-          setNotificationBanner('⚠️ Carrinho vazio. Pressione F2 para procurar produtos.');
-          setTimeout(() => setNotificationBanner(null), 3500);
+          showBanner('⚠️ Carrinho vazio. Pressione F2 para procurar produtos.');
         }
         return;
       }
@@ -302,7 +305,7 @@ export const PdvView: React.FC = () => {
   return (
     <>
       <div className="module-fade" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Banner */}
+        {/* Banner de Notificação Superior */}
         {notificationBanner && (
           <div style={{
             background: notificationBanner.includes('⚠️') ? '#f59e0b' : 'var(--badge-green)',
@@ -662,7 +665,15 @@ export const PdvView: React.FC = () => {
       </div>
 
       {lastSaleData && (<ReceiptPrinter cartItems={lastSaleData.cartItems} totalFinal={lastSaleData.totalFinal} paymentMethod={lastSaleData.paymentMethod} amountPaid={lastSaleData.amountPaid} change={lastSaleData.change} buyerName={lastSaleData.buyerName} cpf={lastSaleData.cpf} />)}
-      <NewCustomerModal isOpen={isNewCustomerModalOpen} onClose={() => setIsNewCustomerModalOpen(false)} />
+
+      {/* Modal de Novo Cliente com feedback visual integrado */}
+      <NewCustomerModal
+        isOpen={isNewCustomerModalOpen}
+        onClose={() => setIsNewCustomerModalOpen(false)}
+        onSuccess={() => {
+          showBanner('✅ Cliente cadastrado com sucesso!');
+        }}
+      />
     </>
   );
 };

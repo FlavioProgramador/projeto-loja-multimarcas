@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, Rota
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { HeaderAgenda } from './HeaderAgenda';
 
 interface AppLayoutProps {
   currentModule: ActiveModule;
@@ -161,6 +162,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
 
           {/* Ações do Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <HeaderAgenda />
+
             <button
               onClick={toggleTheme}
               style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '8px', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}

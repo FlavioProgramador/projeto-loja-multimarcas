@@ -22,9 +22,18 @@ const PERIOD_LABELS: Record<PeriodKey, string> = {
   ano: 'Este Ano'
 };
 
+
+// Returns "YYYY-MM-DD" in the browser's LOCAL timezone — avoids UTC drift at GMT-3
+function localDateStr(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function getDateRange(period: PeriodKey): { start: string; end: string } {
   const now = new Date();
-  const end = now.toISOString().slice(0, 10);
+  const end = localDateStr(now);
 
   switch (period) {
     case 'hoje':
@@ -32,27 +41,33 @@ function getDateRange(period: PeriodKey): { start: string; end: string } {
     case '7dias': {
       const d = new Date();
       d.setDate(d.getDate() - 6);
-      return { start: d.toISOString().slice(0, 10), end };
+      return { start: localDateStr(d), end };
     }
     case 'mes': {
-      return { start: now.toISOString().slice(0, 7) + '-01', end };
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      return { start: `${y}-${m}-01`, end };
     }
     case 'ano': {
-      return { start: now.getFullYear() + '-01-01', end };
+      return { start: `${now.getFullYear()}-01-01`, end };
     }
   }
 }
 
 function getDatesInRange(start: string, end: string): string[] {
   const dates: string[] = [];
-  const current = new Date(start + 'T00:00:00');
-  const endDate = new Date(end + 'T00:00:00');
+  // Parse as local midnight to avoid DST/UTC shifting
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  const current = new Date(sy, sm - 1, sd);
+  const endDate = new Date(ey, em - 1, ed);
   while (current <= endDate) {
-    dates.push(current.toISOString().slice(0, 10));
+    dates.push(localDateStr(current));
     current.setDate(current.getDate() + 1);
   }
   return dates;
 }
+
 
 function formatDateLabel(dateStr: string, period: PeriodKey): string {
   const d = new Date(dateStr + 'T12:00:00');

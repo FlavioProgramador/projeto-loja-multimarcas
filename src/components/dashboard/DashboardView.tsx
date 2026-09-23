@@ -1,100 +1,338 @@
-import React from 'react';
-import { DollarSign, ShoppingBag, TrendingUp, AlertTriangle, Sparkles, CheckCircle2, ArrowRight, Clock, Plus } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import {
+  DollarSign, ShoppingBag, TrendingUp, AlertTriangle,
+  ArrowRight, Plus, Calendar, Trophy, CreditCard,
+  Package, Hash
+} from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { formatMoeda, hoje, mesAtual } from '../../lib/utils';
+import { formatMoeda, hoje } from '../../lib/utils';
 import { StatCard } from '../ui/StatCard';
 import { StatusBadge } from '../ui/StatusBadge';
 import { RevenueChart } from './RevenueChart';
 import { TopProductsChart } from './TopProductsChart';
 
-// Helpers
-const getLast7Days = () => {
-  const dates = [];
-  const labels = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().slice(0, 10));
-    labels.push(d.toLocaleDateString('pt-BR', { weekday: 'short' }));
-  }
-  return { dates, labels };
+// ─── Date Period Helpers ────────────────────────────────────────────────────────
+
+type PeriodKey = 'hoje' | '7dias' | 'mes' | 'ano';
+
+const PERIOD_LABELS: Record<PeriodKey, string> = {
+  hoje: 'Hoje',
+  '7dias': '7 Dias',
+  mes: 'Este Mês',
+  ano: 'Este Ano'
 };
+
+function getDateRange(period: PeriodKey): { start: string; end: string } {
+  const now = new Date();
+  const end = now.toISOString().slice(0, 10);
+
+  switch (period) {
+    case 'hoje':
+      return { start: end, end };
+    case '7dias': {
+      const d = new Date();
+      d.setDate(d.getDate() - 6);
+      return { start: d.toISOString().slice(0, 10), end };
+    }
+    case 'mes': {
+      return { start: now.toISOString().slice(0, 7) + '-01', end };
+    }
+    case 'ano': {
+      return { start: now.getFullYear() + '-01-01', end };
+    }
+  }
+}
+
+function getDatesInRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(start + 'T00:00:00');
+  const endDate = new Date(end + 'T00:00:00');
+  while (current <= endDate) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+function formatDateLabel(dateStr: string, period: PeriodKey): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  if (period === 'hoje') return 'Hoje';
+  if (period === '7dias') return d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric' });
+  if (period === 'mes') return d.toLocaleDateString('pt-BR', { day: '2-digit' });
+  // ano: group by month label
+  return d.toLocaleDateString('pt-BR', { month: 'short' });
+}
+
+// ─── Product name parsing from movement string ────────────────────────────────
+
+function parseProductEntries(prodString: string): { name: string; qty: number }[] {
+  if (!prodString) return [];
+  return prodString.split(',').map(segment => {
+    const trimmed = segment.trim();
+    // Format: "NomeProduto (Tamanho/Cor) x2"
+    const xMatch = trimmed.match(/^(.+?)\s+x(\d+)$/);
+    if (xMatch) {
+      return { name: xMatch[1].trim(), qty: parseInt(xMatch[2]) || 1 };
+    }
+    return { name: trimmed, qty: 1 };
+  });
+}
+
+function extractBaseProductName(entry: string): string {
+  // "Camisa Polo (M/Azul) x2" -> "Camisa Polo"
+  const parenIdx = entry.indexOf('(');
+  if (parenIdx > 0) return entry.slice(0, parenIdx).trim();
+  const xIdx = entry.lastIndexOf(' x');
+  if (xIdx > 0) return entry.slice(0, xIdx).trim();
+  return entry.trim();
+}
+
+// ─── Normalize payment method ──────────────────────────────────────────────────
+
+function normalizePaymentMethod(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.startsWith('pix')) return 'PIX';
+  if (lower.startsWith('cartão') || lower.startsWith('cartao') || lower.startsWith('crédito') || lower.startsWith('débito') || lower.startsWith('credito') || lower.startsWith('debito')) return 'Cartão';
+  if (lower.startsWith('dinheiro')) return 'Dinheiro';
+  if (lower.startsWith('boleto')) return 'Boleto';
+  return raw.split(' ')[0]; // First word as fallback
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────────
 
 export const DashboardView: React.FC = () => {
   const { transactions, movements, products, notifications } = useStore();
+  const [period, setPeriod] = useState<PeriodKey>('mes');
 
-  const mesAtualStr = mesAtual();
-  const transacoesMes = transactions.filter(t => t.data?.startsWith(mesAtualStr));
-  const totalVendasMes = transacoesMes
-    .filter(t => t.tipo === 'INCOME')
-    .reduce((acc, t) => acc + t.valor, 0);
+  const { start, end } = useMemo(() => getDateRange(period), [period]);
 
-  const totalVendas = transactions
-    .filter(t => t.tipo === 'INCOME')
-    .reduce((acc, t) => acc + t.valor, 0);
+  // ── Filtered data ────────────────────────────────────────────────────────
 
-  const totalSaidas = transactions
-    .filter(t => t.tipo === 'EXPENSE')
-    .reduce((acc, t) => acc + t.valor, 0);
+  const filteredMovements = useMemo(
+    () => movements.filter(m => m.data >= start && m.data <= end),
+    [movements, start, end]
+  );
 
-  const lucro = totalVendas - totalSaidas;
-  const entradasCount = transactions.filter(t => t.tipo === 'INCOME').length || 1;
-  const ticketMedio = totalVendas / entradasCount;
+  const filteredTransactions = useMemo(
+    () => transactions.filter(t => t.data >= start && t.data <= end),
+    [transactions, start, end]
+  );
 
-  const movHoje = movements.filter(m => m.data === hoje());
+  // ── KPI Calculations ────────────────────────────────────────────────────
 
-  // Count low stock skus
-  let lowStockCount = 0;
-  products.forEach(p => {
-    p.skus.forEach(s => {
-      if (s.qtd <= 2) {
-        lowStockCount++;
-      }
+  const kpis = useMemo(() => {
+    const income = filteredTransactions
+      .filter(t => t.tipo === 'INCOME')
+      .reduce((acc, t) => acc + t.valor, 0);
+
+    const expenses = filteredTransactions
+      .filter(t => t.tipo === 'EXPENSE')
+      .reduce((acc, t) => acc + t.valor, 0);
+
+    const salesCount = filteredMovements.length;
+    const ticketMedio = salesCount > 0 ? income / salesCount : 0;
+
+    // PA (Peças por Atendimento)
+    let totalItemsSold = 0;
+    filteredMovements.forEach(m => {
+      const entries = parseProductEntries(m.produtos);
+      entries.forEach(e => { totalItemsSold += e.qty; });
     });
-  });
+    const pa = salesCount > 0 ? totalItemsSold / salesCount : 0;
+
+    // Low stock count
+    let lowStockCount = 0;
+    products.forEach(p => {
+      p.skus.forEach(s => {
+        if (s.qtd <= 2) lowStockCount++;
+      });
+    });
+
+    // Sales today
+    const todayStr = hoje();
+    const salesToday = movements.filter(m => m.data === todayStr).length;
+
+    return { income, expenses, salesCount, ticketMedio, pa, totalItemsSold, lowStockCount, salesToday };
+  }, [filteredTransactions, filteredMovements, products, movements]);
+
+  // ── Revenue chart data ───────────────────────────────────────────────────
+
+  const revenueChartData = useMemo(() => {
+    if (period === 'ano') {
+      // Group by month for the year
+      const monthMap: Record<string, number> = {};
+      const now = new Date();
+      for (let m = 0; m <= now.getMonth(); m++) {
+        const key = `${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`;
+        monthMap[key] = 0;
+      }
+      filteredTransactions
+        .filter(t => t.tipo === 'INCOME')
+        .forEach(t => {
+          const monthKey = t.data.slice(0, 7);
+          if (monthMap[monthKey] !== undefined) {
+            monthMap[monthKey] += t.valor;
+          }
+        });
+      const sortedKeys = Object.keys(monthMap).sort();
+      return {
+        labels: sortedKeys.map(k => {
+          const d = new Date(k + '-15');
+          return d.toLocaleDateString('pt-BR', { month: 'short' });
+        }),
+        data: sortedKeys.map(k => monthMap[k])
+      };
+    }
+
+    const allDates = getDatesInRange(start, end);
+    const dateMap: Record<string, number> = {};
+    allDates.forEach(d => { dateMap[d] = 0; });
+
+    filteredTransactions
+      .filter(t => t.tipo === 'INCOME')
+      .forEach(t => {
+        if (dateMap[t.data] !== undefined) {
+          dateMap[t.data] += t.valor;
+        }
+      });
+
+    // For "mes" with many days, show last 15 max for readability
+    let sortedDates = Object.keys(dateMap).sort();
+    if (period === 'mes' && sortedDates.length > 15) {
+      sortedDates = sortedDates.slice(-15);
+    }
+
+    return {
+      labels: sortedDates.map(d => formatDateLabel(d, period)),
+      data: sortedDates.map(d => dateMap[d])
+    };
+  }, [filteredTransactions, period, start, end]);
+
+  // ── Category distribution (from actual product categories) ───────────────
+
+  const categoryChartData = useMemo(() => {
+    const categoryCount: Record<string, number> = {};
+
+    filteredMovements.forEach(m => {
+      const entries = parseProductEntries(m.produtos);
+      entries.forEach(entry => {
+        const baseName = extractBaseProductName(entry.name);
+        const product = products.find(p =>
+          p.nome.toLowerCase() === baseName.toLowerCase() ||
+          baseName.toLowerCase().includes(p.nome.toLowerCase()) ||
+          p.nome.toLowerCase().includes(baseName.toLowerCase())
+        );
+        const category = product?.categoria?.trim() || 'Sem Categoria';
+        categoryCount[category] = (categoryCount[category] || 0) + entry.qty;
+      });
+    });
+
+    // Sort by value descending
+    const sorted = Object.entries(categoryCount).sort((a, b) => b[1] - a[1]);
+    return {
+      labels: sorted.map(([label]) => label),
+      data: sorted.map(([, value]) => value)
+    };
+  }, [filteredMovements, products]);
+
+  // ── Payment method distribution ──────────────────────────────────────────
+
+  const paymentChartData = useMemo(() => {
+    const paymentMap: Record<string, number> = {};
+
+    filteredMovements.forEach(m => {
+      const method = normalizePaymentMethod(m.formaPagamento);
+      paymentMap[method] = (paymentMap[method] || 0) + m.valor;
+    });
+
+    const sorted = Object.entries(paymentMap).sort((a, b) => b[1] - a[1]);
+    return {
+      labels: sorted.map(([label]) => label),
+      data: sorted.map(([, value]) => value)
+    };
+  }, [filteredMovements]);
+
+  // ── Top 5 Products (Curva ABC) ───────────────────────────────────────────
+
+  const top5Products = useMemo(() => {
+    const productCount: Record<string, number> = {};
+
+    filteredMovements.forEach(m => {
+      const entries = parseProductEntries(m.produtos);
+      entries.forEach(entry => {
+        const baseName = extractBaseProductName(entry.name);
+        productCount[baseName] = (productCount[baseName] || 0) + entry.qty;
+      });
+    });
+
+    return Object.entries(productCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, qty], idx) => ({ rank: idx + 1, name, qty }));
+  }, [filteredMovements]);
+
+  // ── Recent sales for table ───────────────────────────────────────────────
 
   const recentSales = movements.slice(0, 6);
 
-  // --- Real Data for Revenue Chart (Last 7 Days) ---
-  const { dates: last7Dates, labels: last7Labels } = getLast7Days();
-  const revenueData = last7Dates.map(date => {
-    return transactions
-      .filter(t => t.data === date && t.tipo === 'INCOME')
-      .reduce((sum, t) => sum + t.valor, 0);
-  });
-  
-  // Calculate delta between last week and previous week? Simple fallback for now
-  const last7Total = revenueData.reduce((a, b) => a + b, 0);
-  // Just a placeholder delta since we don't have 14 days history easily here, or we can just say "Ativo"
-  const revenueDelta = `R$ ${formatMoeda(last7Total)}`;
+  // Helper to format product column cleanly
+  const formatProductColumn = (prodString: string) => {
+    const items = prodString.split(',').map(s => s.trim());
+    if (items.length === 0) return { primary: 'Venda', extra: 0 };
 
-  // --- Real Data for Top Products by Category ---
-  const categoryCount: Record<string, number> = {};
-  movements.forEach(m => {
-    m.produtos.split(',').forEach(pItem => {
-      const parts = pItem.split('x');
-      const pName = parts[0].trim();
-      const pQtd = parseInt(parts[1]) || 1;
-      
-      const prod = products.find(p => p.nome === pName);
-      const cat = prod?.categoria || 'Outros';
-      
-      categoryCount[cat] = (categoryCount[cat] || 0) + pQtd;
-    });
-  });
-  
-  const categoryLabels = Object.keys(categoryCount);
-  const categoryData = Object.values(categoryCount);
+    const firstName = extractBaseProductName(items[0]);
+    return { primary: firstName, extra: items.length - 1 };
+  };
+
+  // ── Revenue total for delta badge ────────────────────────────────────────
+
+  const revenueDelta = `R$ ${(kpis.income || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="module-fade">
-      {/* Page Title & Actions */}
+      {/* Page Header + Period Filter */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Visão Geral</h1>
           <p className="page-subtitle">Acompanhe os principais indicadores da sua operação varejista em tempo real.</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Period Selector */}
+          <div style={{
+            display: 'flex',
+            background: 'var(--bg-surface-subtle)',
+            borderRadius: 'var(--radius-md)',
+            padding: '3px',
+            gap: '2px',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            {(Object.keys(PERIOD_LABELS) as PeriodKey[]).map(key => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: period === key ? 700 : 500,
+                  color: period === key ? 'var(--primary)' : 'var(--text-secondary)',
+                  background: period === key ? 'var(--bg-surface)' : 'transparent',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: period === key ? 'var(--shadow-sm)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {key === period && <Calendar size={12} />}
+                {PERIOD_LABELS[key]}
+              </button>
+            ))}
+          </div>
+
           <a href="#/pdv" className="btn">
             <Plus size={16} />
             <span>Nova Venda</span>
@@ -102,66 +340,212 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Bento Grid: 4 Top KPI Cards */}
-      <div className="grid-cards">
+      {/* KPI Cards - 5 cards */}
+      <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
         <StatCard
-          label="Faturamento Mensal"
-          value={formatMoeda(totalVendasMes || totalVendas)}
+          label="Faturamento no Período"
+          value={formatMoeda(kpis.income)}
           icon={<DollarSign size={18} />}
           iconBg="var(--badge-blue-bg)"
           iconColor="var(--primary)"
-          delta="+12.5%"
+          delta={`${kpis.salesCount} vendas`}
           deltaType="positive"
-          deltaLabel="vs. mês anterior"
+          deltaLabel={PERIOD_LABELS[period].toLowerCase()}
         />
 
         <StatCard
           label="Vendas Hoje"
-          value={`${movHoje.length} pedidos`}
+          value={`${kpis.salesToday} pedidos`}
           icon={<ShoppingBag size={18} />}
           iconBg="var(--badge-green-bg)"
           iconColor="var(--badge-green)"
-          delta="Fluxo estável"
-          deltaType="positive"
-          deltaLabel="movimentação contínua"
+          delta={kpis.salesToday > 0 ? 'Ativo' : 'Nenhuma'}
+          deltaType={kpis.salesToday > 0 ? 'positive' : 'neutral'}
+          deltaLabel="movimentação do dia"
         />
 
         <StatCard
           label="Ticket Médio"
-          value={formatMoeda(ticketMedio)}
+          value={formatMoeda(kpis.ticketMedio)}
           icon={<TrendingUp size={18} />}
           iconBg="var(--bg-surface-subtle)"
           iconColor="var(--text-secondary)"
-          delta="+4.8%"
+          delta={`${kpis.totalItemsSold} itens`}
           deltaType="positive"
-          deltaLabel="vendas premium"
+          deltaLabel="vendidos no período"
+        />
+
+        <StatCard
+          label="PA (Peças/Atend.)"
+          value={kpis.pa.toFixed(1)}
+          icon={<Package size={18} />}
+          iconBg="var(--badge-blue-bg)"
+          iconColor="var(--primary)"
+          delta={kpis.pa >= 2 ? 'Bom desempenho' : 'Pode melhorar'}
+          deltaType={kpis.pa >= 2 ? 'positive' : 'neutral'}
+          deltaLabel="itens por venda"
         />
 
         <StatCard
           label="Itens em Baixa"
-          value={`${lowStockCount} SKUs`}
+          value={`${kpis.lowStockCount} SKUs`}
           icon={<AlertTriangle size={18} />}
-          iconBg={lowStockCount > 0 ? "var(--badge-red-bg)" : "var(--badge-green-bg)"}
-          iconColor={lowStockCount > 0 ? "var(--badge-red)" : "var(--badge-green)"}
-          delta={lowStockCount > 0 ? "Atenção necessária" : "Estoque seguro"}
-          deltaType={lowStockCount > 0 ? "negative" : "positive"}
-          deltaLabel={lowStockCount > 0 ? "repor estoque" : "todos os SKUs ok"}
+          iconBg={kpis.lowStockCount > 0 ? "var(--badge-red-bg)" : "var(--badge-green-bg)"}
+          iconColor={kpis.lowStockCount > 0 ? "var(--badge-red)" : "var(--badge-green)"}
+          delta={kpis.lowStockCount > 0 ? "Atenção necessária" : "Estoque seguro"}
+          deltaType={kpis.lowStockCount > 0 ? "negative" : "positive"}
+          deltaLabel={kpis.lowStockCount > 0 ? "repor estoque" : "todos os SKUs ok"}
         />
       </div>
 
-      {/* Chart Row */}
+      {/* Chart Row: Revenue + Category */}
       <div className="chart-row">
-        <RevenueChart labels={last7Labels} data={revenueData} delta={revenueDelta} />
-        <TopProductsChart labels={categoryLabels} data={categoryData} />
+        <RevenueChart
+          labels={revenueChartData.labels}
+          data={revenueChartData.data}
+          delta={revenueDelta}
+          title={`Faturamento Diário — ${PERIOD_LABELS[period]}`}
+          subtitle="Receita por dia no período selecionado"
+        />
+        <TopProductsChart
+          labels={categoryChartData.labels}
+          data={categoryChartData.data}
+          title="Distribuição por Categoria"
+          subtitle="Volume vendido por categoria real"
+        />
       </div>
 
-      {/* Two Column Section */}
+      {/* Second Row: Payment Chart + Top 5 */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        <TopProductsChart
+          labels={paymentChartData.labels}
+          data={paymentChartData.data}
+          title="Faturamento por Forma de Pagamento"
+          subtitle="Distribuição do valor recebido"
+          colors={['#10b981', '#2563eb', '#f59e0b', '#8b5cf6', '#ef4444']}
+        />
+
+        {/* Top 5 Card */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '280px', overflow: 'hidden' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '12px',
+            paddingBottom: '10px',
+            borderBottom: '1px solid var(--border-subtle)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+                color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Trophy size={14} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Top 5 Produtos
+                </h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Mais vendidos — {PERIOD_LABELS[period]}
+                </p>
+              </div>
+            </div>
+            <span className="badge-status neutral" style={{ fontSize: '10px' }}>Curva ABC</span>
+          </div>
+
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0' }}>
+            {top5Products.length === 0 ? (
+              <div style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-muted)', fontSize: '12px'
+              }}>
+                Nenhuma venda no período selecionado.
+              </div>
+            ) : (
+              top5Products.map((item, idx) => {
+                const maxQty = top5Products[0]?.qty || 1;
+                const barWidth = Math.max(8, (item.qty / maxQty) * 100);
+                const medals = ['🥇', '🥈', '🥉'];
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 0',
+                      borderBottom: idx < top5Products.length - 1 ? '1px solid var(--border-subtle)' : 'none'
+                    }}
+                  >
+                    <span style={{
+                      fontSize: idx < 3 ? '16px' : '12px',
+                      width: '24px',
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      color: idx >= 3 ? 'var(--text-muted)' : undefined
+                    }}>
+                      {idx < 3 ? medals[idx] : `#${item.rank}`}
+                    </span>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {item.name}
+                      </div>
+                      <div style={{
+                        height: '4px',
+                        borderRadius: '2px',
+                        background: 'var(--bg-surface-subtle)',
+                        marginTop: '4px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${barWidth}%`,
+                          borderRadius: '2px',
+                          background: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#cd7f32' : 'var(--primary)',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    </div>
+
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--text-secondary)',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.qty} und
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Section: Sales Table + Alerts */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-          gap: '20px',
-          marginTop: '20px'
+          gap: '20px'
         }}
       >
         {/* Recent Sales Table */}
@@ -203,31 +587,52 @@ export const DashboardView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                recentSales.map(m => (
-                  <tr key={m.id} className="clickable-row">
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.produtos}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                        {m.vendaId} • {m.formaPagamento}
-                      </div>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{m.comprador || 'Consumidor Final'}</td>
-                    <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                      {formatMoeda(m.valor)}
-                    </td>
-                    <td>
-                      <StatusBadge status="Pago" />
-                    </td>
-                  </tr>
-                ))
+                recentSales.map(m => {
+                  const { primary, extra } = formatProductColumn(m.produtos);
+                  return (
+                    <tr key={m.id} className="clickable-row">
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                            {primary}
+                          </span>
+                          {extra > 0 && (
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              color: 'var(--primary)',
+                              background: 'var(--badge-blue-bg)',
+                              padding: '2px 7px',
+                              borderRadius: '10px',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0
+                            }}>
+                              +{extra} {extra === 1 ? 'item' : 'itens'}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {m.vendaId} • {m.formaPagamento}
+                        </div>
+                      </td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{m.comprador || 'Consumidor Final'}</td>
+                      <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                        {formatMoeda(m.valor)}
+                      </td>
+                      <td>
+                        <StatusBadge status="Pago" />
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Right Sidebar Column */}
+        {/* Right Sidebar: Alerts + CTA */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Smart Insights Card */}
+          {/* Alerts Card */}
           <div className="card" style={{ flex: 1 }}>
             <div
               style={{
@@ -240,19 +645,23 @@ export const DashboardView: React.FC = () => {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Sparkles size={16} />
+                <div style={{
+                  width: 28, height: 28, borderRadius: 'var(--radius-md)',
+                  background: 'var(--badge-red-bg)', color: 'var(--badge-red)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <AlertTriangle size={16} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Smart Insights</h3>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Análise automática da operação</p>
+                  <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Alertas de Operação</h3>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Estoque baixo e vencimentos</p>
                 </div>
               </div>
-              <span className="badge-status neutral">Tempo Real</span>
+              <span className="badge-status neutral">{notifications.length > 0 ? `${notifications.length} alertas` : 'OK'}</span>
             </div>
 
             <div>
-              {notifications.slice(0, 3).map((n, idx) => (
+              {notifications.slice(0, 4).map((n, idx) => (
                 <div
                   key={idx}
                   style={{
@@ -280,13 +689,13 @@ export const DashboardView: React.FC = () => {
                     gap: '8px'
                   }}
                 >
-                  <CheckCircle2 size={16} /> Todos os parâmetros operacionais estão balanceados.
+                  <Hash size={14} /> Todos os parâmetros operacionais estão balanceados.
                 </div>
               )}
             </div>
           </div>
 
-          {/* Automation Feature Card */}
+          {/* CTA Card */}
           <div className="card" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', color: '#ffffff', border: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
               <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '4px' }}>
@@ -294,13 +703,13 @@ export const DashboardView: React.FC = () => {
               </span>
             </div>
             <h4 style={{ fontSize: '15px', fontWeight: 700, lineHeight: 1.3, marginBottom: '6px' }}>
-              Automações Preditivas Ativas
+              Análise Completa de Desempenho
             </h4>
             <p style={{ fontSize: '12px', opacity: 0.9, marginBottom: '14px', lineHeight: 1.4 }}>
-              Alertas inteligentes para reposição de estoque, fluxo de caixa e fechamento de turno com total precisão.
+              Acompanhe Curva ABC, ticket médio e PA em tempo real. Alertas inteligentes para reposição de estoque e fluxo de caixa.
             </p>
             <a
-              href="#/automacoes"
+              href="#/relatorios"
               className="btn btn-sm"
               style={{
                 backgroundColor: '#ffffff',
@@ -309,7 +718,7 @@ export const DashboardView: React.FC = () => {
                 border: 'none'
               }}
             >
-              Configurar Automações <ArrowRight size={13} />
+              Ver Relatórios <ArrowRight size={13} />
             </a>
           </div>
         </div>

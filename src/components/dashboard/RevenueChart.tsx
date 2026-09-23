@@ -8,9 +8,17 @@ export interface RevenueChartProps {
   labels: string[];
   data: number[];
   delta?: string;
+  title?: string;
+  subtitle?: string;
 }
 
-export const RevenueChart: React.FC<RevenueChartProps> = ({ labels, data, delta = "+0.0%" }) => {
+export const RevenueChart: React.FC<RevenueChartProps> = ({
+  labels,
+  data,
+  delta = "+0.0%",
+  title = "Faturamento Diário",
+  subtitle = "Desempenho no período selecionado"
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstance = useRef<Chart | null>(null);
   const { theme } = useTheme();
@@ -32,11 +40,11 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({ labels, data, delta 
     chartInstance.current = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: labels.length ? labels : ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+        labels: labels.length ? labels : ['Sem dados'],
         datasets: [
           {
             label: 'Faturamento',
-            data: data.length ? data : [0, 0, 0, 0, 0, 0, 0],
+            data: data.length ? data : [0],
             backgroundColor: '#2563eb',
             hoverBackgroundColor: '#1d4ed8',
             borderRadius: 6
@@ -93,14 +101,14 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({ labels, data, delta 
         chartInstance.current.destroy();
       }
     };
-  }, [theme]);
+  }, [theme, labels, data]);
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '280px', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <div>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Faturamento Diário (Este Mês)</h3>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Desempenho ao longo do mês</p>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{subtitle}</p>
         </div>
         <span className={`delta-badge ${delta.startsWith('+') ? 'positive' : 'negative'}`}>{delta}</span>
       </div>

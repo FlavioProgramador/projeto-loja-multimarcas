@@ -7,9 +7,23 @@ Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 export interface TopProductsChartProps {
   labels: string[];
   data: number[];
+  title?: string;
+  subtitle?: string;
+  colors?: string[];
 }
 
-export const TopProductsChart: React.FC<TopProductsChartProps> = ({ labels, data }) => {
+const DEFAULT_COLORS = [
+  '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#06b6d4', '#ec4899', '#64748b', '#84cc16', '#f97316'
+];
+
+export const TopProductsChart: React.FC<TopProductsChartProps> = ({
+  labels,
+  data,
+  title = 'Distribuição por Categoria',
+  subtitle = 'Proporção de volume vendido',
+  colors = DEFAULT_COLORS
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstance = useRef<Chart | null>(null);
   const { theme } = useTheme();
@@ -30,11 +44,11 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({ labels, data
     chartInstance.current = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: labels.length ? labels : ['Vestuário', 'Acessórios', 'Moda Praia', 'Outros'],
+        labels: labels.length ? labels : ['Sem dados'],
         datasets: [
           {
-            data: data.length ? data : [0, 0, 0, 0],
-            backgroundColor: ['#2563eb', '#10b981', '#64748b', '#94a3b8'],
+            data: data.length ? data : [1],
+            backgroundColor: colors.slice(0, Math.max(labels.length, 1)),
             borderWidth: 2,
             borderColor: isDark ? '#151e32' : '#ffffff'
           }
@@ -76,13 +90,13 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({ labels, data
         chartInstance.current.destroy();
       }
     };
-  }, [theme]);
+  }, [theme, labels, data, colors]);
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '280px', overflow: 'hidden' }}>
       <div style={{ marginBottom: '8px' }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Distribuição por Categoria</h3>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Proporção de volume vendido</p>
+        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</h3>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{subtitle}</p>
       </div>
       <div style={{ position: 'relative', height: '195px', width: '100%', minHeight: '195px', maxHeight: '195px' }}>
         <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
@@ -90,3 +104,4 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({ labels, data
     </div>
   );
 };
+

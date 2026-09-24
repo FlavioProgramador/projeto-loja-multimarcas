@@ -61,11 +61,11 @@ export const SalesService = {
         saleNumber: result.sale_number,
         saleId: result.sale_id
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Exceção ao finalizar venda:', err);
       return {
         success: false,
-        message: err.message || 'Erro inesperado ao finalizar venda.',
+        message: err instanceof Error ? err.message : 'Erro inesperado ao finalizar venda.',
         totalFinal: 0
       };
     }

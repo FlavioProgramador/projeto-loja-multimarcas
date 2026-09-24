@@ -170,7 +170,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ProductsService.getAll(activeStoreId || undefined),
         FinanceService.getTransactions(),
         FinanceService.getFixedExpenses(),
-        SalesService.getMovements(),
+        SalesService.getMovements(activeStoreId || undefined),
         CustomersService.getAll(),
         SuppliersService.getAll(),
         storeService.getUserStores().catch(() => [])
@@ -206,7 +206,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeStoreId]);
 
   useEffect(() => {
     refreshData();

@@ -11,6 +11,7 @@ export const SalesService = {
     installments: number;
     discountValue: number;
     discountPercent: number;
+    idempotencyKey: string;
   }): Promise<{ success: boolean; message: string; totalFinal: number; saleNumber?: string; saleId?: string }> {
     if (!isSupabaseConfigured) {
       return {
@@ -52,10 +53,10 @@ export const SalesService = {
         };
       }
 
-      const result = data as any;
+      const result = data as { success?: boolean; message?: string; total?: number; sale_number?: string; sale_id?: string };
       return {
-        success: true,
-        message: 'Venda realizada com sucesso!',
+        success: result.success !== false,
+        message: result.message || 'Venda realizada com sucesso!',
         totalFinal: Number(result.total) || 0,
         saleNumber: result.sale_number,
         saleId: result.sale_id

@@ -36,7 +36,8 @@ serve(async (req) => {
       p_customer_cpf: customerCpf,
       p_items: cartItems,
       p_discount_value: discountValue,
-      p_discount_percent: discountPercent
+      p_discount_percent: discountPercent,
+      p_idempotency_key: crypto.randomUUID()
     });
 
     if (saleError) {
@@ -46,6 +47,7 @@ serve(async (req) => {
     if (!saleResult || !saleResult.success) throw new Error('Falha ao criar venda pendente');
 
     const { sale_id, sale_number, total } = saleResult;
+    if (!sale_id) throw new Error('A venda pendente não retornou um identificador válido.');
 
     // 2. Call Mercado Pago API to generate PIX
     const idempotencyKey = crypto.randomUUID();
@@ -88,7 +90,11 @@ serve(async (req) => {
     if (!mpResponse.ok) {
       console.error('Mercado Pago Error:', mpData);
       
-      // Se falhou no MP, idealmente cancelaríamos a venda no DB, mas para simplificar vamos apenas retornar erro
+      try {
+        await supabase.rpc('cancel_mp_pix_sale', { p_sale_id: sale_id });
+      } catch (cancelError) {
+        console.error('Falha ao cancelar venda pendente após erro do Mercado Pago:', cancelError);
+      }
       throw new Error(`Erro Mercado Pago: ${mpData.message || mpData.error}`);
     }
 

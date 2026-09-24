@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
 };
 
 serve(async (req) => {
@@ -17,22 +17,21 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const mpAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
 
-    if (!mpAccessToken) {
-      throw new Error('MERCADOPAGO_ACCESS_TOKEN is missing in edge function env vars');
-    }
+    if (!mpAccessToken) throw new Error('MERCADOPAGO_ACCESS_TOKEN is missing in edge function env vars');
+    if (!supabaseServiceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY is missing in edge function env vars');
 
-    // Initialize Supabase client with the user's Auth token from the request
     const authHeader = req.headers.get('Authorization');
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader || '' } }
     });
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
     const { storeId, cartItems, customerId, customerName, customerCpf, discountValue, discountPercent } = body;
     const requestedIdempotencyKey = req.headers.get('x-idempotency-key') || body.idempotencyKey;
-    const idempotencyKey = requestedIdempotencyKey?.trim() || crypto.randomUUID();
+    const idempotencyKey = typeof requestedIdempotencyKey === 'string' ? requestedIdempotencyKey.trim() : '';
+    if (!idempotencyKey) throw new Error('A chave de idempotência é obrigatória para criar um PIX.');
 
-    // 1. Call RPC to create the pending sale
     const { data: saleResult, error: saleError } = await supabase.rpc('create_mp_pix_sale', {
       p_store_id: storeId,
       p_customer_id: customerId,
@@ -41,29 +40,22 @@ serve(async (req) => {
       p_items: cartItems,
       p_discount_value: discountValue,
       p_discount_percent: discountPercent,
-      p_idempotency_key: crypto.randomUUID()
+      p_idempotency_key: idempotencyKey
     });
 
-    if (saleError) {
-      console.error('RPC Error:', saleError);
-      throw saleError;
-    }
+    if (saleError) throw saleError;
     if (!saleResult || !saleResult.success) throw new Error('Falha ao criar venda pendente');
 
     const { sale_id, sale_number, total } = saleResult;
     if (!sale_id) throw new Error('A venda pendente não retornou um identificador válido.');
 
-    // 2. Call Mercado Pago API to generate PIX
     const providerIdempotencyKey = `pix-${idempotencyKey}`;
     const notificationUrl = `${supabaseUrl}/functions/v1/mp-webhook`;
 
-    // Only set CPF if it has 11 digits
     let identification = {};
     if (customerCpf) {
       const cleanCpf = customerCpf.replace(/\D/g, '');
-      if (cleanCpf.length === 11) {
-        identification = { type: 'CPF', number: cleanCpf };
-      }
+      if (cleanCpf.length === 11) identification = { type: 'CPF', number: cleanCpf };
     }
 
     const mpPayload = {
@@ -71,11 +63,11 @@ serve(async (req) => {
       description: `Venda ${sale_number} - Vestra ERP`,
       payment_method_id: 'pix',
       payer: {
-        email: 'financeiro@vestra.com.br', // Fallback email
+        email: 'financeiro@vestra.com.br',
         first_name: customerName || 'Cliente',
         ...(Object.keys(identification).length > 0 ? { identification } : {})
       },
-      external_reference: sale_id, // Store our internal sale ID
+      external_reference: sale_id,
       notification_url: notificationUrl
     };
 
@@ -88,46 +80,41 @@ serve(async (req) => {
       },
       body: JSON.stringify(mpPayload)
     });
-
     const mpData = await mpResponse.json();
 
     if (!mpResponse.ok) {
       console.error('Mercado Pago Error:', mpData);
-      
-      try {
-        const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-        await serviceSupabase.rpc('cancel_mp_pix_sale', { p_sale_id: sale_id });
-      } catch (cancelError) {
-        console.error('Falha ao cancelar venda pendente após erro do Mercado Pago:', cancelError);
+      const { data: cancelResult, error: cancelRpcError } = await serviceSupabase.rpc('cancel_mp_pix_sale', { p_sale_id: sale_id });
+      if (cancelRpcError || cancelResult?.success !== true) {
+        console.error('Falha ao cancelar venda pendente após erro do Mercado Pago:', cancelRpcError || cancelResult);
+        throw new Error('Mercado Pago recusou o pagamento e o rollback da venda falhou.');
       }
       throw new Error(`Erro Mercado Pago: ${mpData.message || mpData.error}`);
     }
 
-    // 3. Update payment with MP provider ID
-    const { error: paymentUpdateError } = await supabase
+    const { error: paymentUpdateError } = await serviceSupabase
       .from('payments')
-      .update({ provider: 'MERCADO_PAGO', provider_transaction_id: mpData.id.toString() })
-      .eq('sale_id', sale_id);
+      .update({ provider: 'MERCADO_PAGO', provider_transaction_id: String(mpData.id) })
+      .eq('sale_id', sale_id)
+      .eq('method', 'PIX');
 
     if (paymentUpdateError) {
       console.error('Falha ao vincular o pagamento do Mercado Pago à venda:', paymentUpdateError);
       throw new Error('Pagamento criado no Mercado Pago, mas não foi possível atualizar a venda.');
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        sale_id,
-        sale_number,
-        qr_code_base64: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-        qr_code: mpData.point_of_interaction?.transaction_data?.qr_code,
-        mp_payment_id: mpData.id
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-  } catch (error: any) {
+    return new Response(JSON.stringify({
+      success: true,
+      sale_id,
+      sale_number,
+      qr_code_base64: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
+      qr_code: mpData.point_of_interaction?.transaction_data?.qr_code,
+      mp_payment_id: mpData.id
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erro inesperado ao criar PIX.';
     console.error(error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });

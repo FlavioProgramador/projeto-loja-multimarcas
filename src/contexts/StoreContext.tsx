@@ -167,7 +167,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         remoteSuppliers,
         remoteStores
       ] = await Promise.all([
-        ProductsService.getAll(),
+        ProductsService.getAll(activeStoreId || undefined),
         FinanceService.getTransactions(),
         FinanceService.getFixedExpenses(),
         SalesService.getMovements(),

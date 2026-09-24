@@ -257,7 +257,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await ProductsService.create(prodData);
         await refreshData();
       } catch (err) {
+        setProducts(prev => prev.filter(product => product.id !== newId));
         console.error('Erro ao salvar produto no Supabase:', err);
+        throw err;
       }
     }
   };
@@ -272,7 +274,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           await ProductsService.update(targetProd.uuid, updated);
           await refreshData();
         } catch (err) {
+          setProducts(prev => prev.map(product => (product.id === id ? targetProd : product)));
           console.error('Erro ao atualizar produto no Supabase:', err);
+          throw err;
         }
       }
     }
@@ -287,7 +291,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await ProductsService.remove(targetProd.uuid);
         await refreshData();
       } catch (err) {
+        setProducts(prev => [...prev, targetProd]);
         console.error('Erro ao remover produto no Supabase:', err);
+        throw err;
       }
     }
   };
@@ -317,6 +323,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return;
       } catch (err) {
         console.error('Erro ao registrar entrada de estoque no Supabase:', err);
+        throw err;
       }
     }
 

@@ -40,13 +40,22 @@ export const InventoryService = {
     if (!isSupabaseConfigured) return false;
 
     try {
+      const quantidade = Number(params.qtd);
+      const custoUnitario = Number(params.custoUnitario);
+      if (!Number.isInteger(quantidade) || quantidade <= 0) {
+        throw new Error('A quantidade de entrada deve ser um número inteiro maior que zero.');
+      }
+      if (!Number.isFinite(custoUnitario) || custoUnitario < 0) {
+        throw new Error('O custo unitário deve ser um valor válido e não negativo.');
+      }
+
       // 1. Procurar se o produto já existe
       const { data: existingProduct } = await supabase
         .from('products')
         .select(`
           id,
           name,
-          product_variants ( id, size, color, stock_quantity )
+          product_variants ( id, size, color, is_active )
         `)
         .ilike('name', params.productName.trim())
         .maybeSingle();
@@ -60,7 +69,6 @@ export const InventoryService = {
         if (params.skuIndex >= 0 && params.skuIndex < variants.length) {
           const matchedVariant = variants[params.skuIndex];
           targetVariantId = matchedVariant.id;
-          currentStock = matchedVariant.stock_quantity;
         } else {
           // Criar nova variante no produto existente
           const newSize = params.newSize || 'Único';
@@ -74,18 +82,17 @@ export const InventoryService = {
               sku: generatedSku,
               size: newSize,
               color: newColor,
-              stock_quantity: 0
+              is_active: true
             })
             .select()
             .single();
 
           if (varError) throw varError;
           targetVariantId = newVariant.id;
-          currentStock = 0;
         }
       } else {
         // Criar novo produto com Brand e Categoria
-        let brandId = null;
+        let brandId: string | null = null;
         if (params.brand) {
           const { data: b } = await supabase
             .from('brands')
@@ -99,7 +106,7 @@ export const InventoryService = {
           }
         }
 
-        let categoryId = null;
+        let categoryId: string | null = null;
         if (params.category) {
           const { data: c } = await supabase
             .from('categories')
@@ -119,8 +126,9 @@ export const InventoryService = {
             name: params.productName.trim(),
             brand_id: brandId,
             category_id: categoryId,
-            sale_price: params.price || 0,
-            cost_price: params.custoUnitario || 0
+            sale_price: Math.max(0, Number(params.price) || 0),
+            cost_price: Math.max(0, Number(params.custoUnitario) || 0),
+            is_active: true
           })
           .select()
           .single();
@@ -138,7 +146,7 @@ export const InventoryService = {
             sku: generatedSku,
             size: newSize,
             color: newColor,
-            stock_quantity: 0
+            is_active: true
           })
           .select()
           .single();

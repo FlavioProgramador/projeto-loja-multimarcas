@@ -1,6 +1,18 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { InventoryMovementRow } from '../types/database';
 
+interface ExistingVariant {
+  id: string;
+  size: string;
+  color: string;
+  is_active: boolean;
+}
+
+interface ExistingProduct {
+  id: string;
+  product_variants: ExistingVariant[] | null;
+}
+
 export const InventoryService = {
   async getMovements(storeId?: string): Promise<InventoryMovementRow[]> {
     if (!isSupabaseConfigured || !storeId) return [];

@@ -400,6 +400,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       const hasVariantIds = cartItems.every(item => item.variantId);
       if (hasVariantIds) {
+        const idempotencyKey = crypto.randomUUID();
         const rpcResult = await SalesService.completeSale({
           storeId: activeStoreId,
           cartItems,
@@ -408,7 +409,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           paymentMethod,
           installments,
           discountValue: discountValue + creditUsed,
-          discountPercent
+          discountPercent,
+          idempotencyKey
         });
 
         if (rpcResult.success) {
@@ -439,6 +441,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
         }
       }
+    }
+
+    // Operações críticas não podem cair silenciosamente para o navegador quando o backend está configurado.
+    // O fallback local continua disponível apenas para o modo explicitamente offline/local.
+    if (isSupabaseConfigured) {
+      return {
+        success: false,
+        message: 'Não foi possível concluir a venda no servidor. A operação não foi registrada localmente.',
+        totalFinal: 0
+      };
     }
 
     // Processamento Local / Fallback

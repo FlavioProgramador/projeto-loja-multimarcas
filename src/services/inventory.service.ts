@@ -2,8 +2,9 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { InventoryMovementRow } from '../types/database';
 
 export const InventoryService = {
-  async getMovements(): Promise<InventoryMovementRow[]> {
-    if (!isSupabaseConfigured) return [];
+  async getMovements(storeId?: string): Promise<InventoryMovementRow[]> {
+    if (!isSupabaseConfigured || !storeId) return [];
+
     const { data, error } = await supabase
       .from('inventory_movements')
       .select(`
@@ -16,12 +17,14 @@ export const InventoryService = {
           products ( id, name )
         )
       `)
+      .eq('store_id', storeId)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao buscar movimentações de estoque:', error);
       return [];
     }
+
     return (data || []) as InventoryMovementRow[];
   },
 
@@ -64,7 +67,7 @@ export const InventoryService = {
       let currentStock = 0;
 
       if (existingProduct) {
-        const variants = (existingProduct as any).product_variants || [];
+        const variants = ((existingProduct as unknown as ExistingProduct).product_variants || []);
         
         if (params.skuIndex >= 0 && params.skuIndex < variants.length) {
           const matchedVariant = variants[params.skuIndex];

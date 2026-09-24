@@ -33,7 +33,7 @@ export const SalesService = {
       }));
 
       // 2. Chamar a PostgreSQL Function complete_sale atomicamente
-      const { data, error } = await supabase.rpc('complete_sale', {
+      let query = supabase.rpc('complete_sale', {
         p_store_id: params.storeId,
         p_customer_name: params.buyerName.trim() || 'Cliente não identificado',
         p_customer_cpf: params.cpf.trim() || 'Não informado',
@@ -71,7 +71,7 @@ export const SalesService = {
     }
   },
 
-  async getMovements(): Promise<SaleMovement[]> {
+  async getMovements(storeId?: string): Promise<SaleMovement[]> {
     if (!isSupabaseConfigured) return [];
     
     const { data, error } = await supabase
@@ -89,12 +89,17 @@ export const SalesService = {
       .eq('status', 'COMPLETED')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Erro ao buscar histórico de vendas:', error);
+    if (storeId) {
+      query = query.eq('store_id', storeId);
+    }
+
+    const { data: filteredData, error: filteredError } = await query;
+    if (filteredError) {
+      console.error('Erro ao buscar histórico de vendas:', filteredError);
       return [];
     }
 
-    return (data || []).map((s: any, index: number) => {
+    return (filteredData || []).map (data || []).map((s: any, index: number) => {
       const payment = s.payments?.[0];
       const paymentStr = payment
         ? `${payment.method}${payment.installments > 1 ? ` ${payment.installments}x` : ''}`

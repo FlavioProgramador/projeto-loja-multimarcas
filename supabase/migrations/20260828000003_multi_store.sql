@@ -878,13 +878,15 @@ DECLARE
   v_item RECORD;
   v_is_service_role BOOLEAN;
 BEGIN
-  v_is_service_role := current_setting('request.jwt.claims', true)::json->>'role' = 'service_role';
+  v_is_service_role :=
+    current_setting('request.jwt.claims', true)::json->>'role' = 'service_role';
 
-  IF auth.uid() IS NULL AND NOT v_is_service_role THEN
+  IF NOT v_is_service_role AND auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Não autorizado.';
   END IF;
 
-  SELECT * INTO v_sale
+  SELECT *
+    INTO v_sale
   FROM public.sales
   WHERE id = p_sale_id
   FOR UPDATE;
@@ -900,16 +902,32 @@ BEGIN
   END IF;
 
   IF v_sale.status = 'CANCELLED' THEN
-    RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Venda já cancelada (idempotente).');
+    RETURN jsonb_build_object(
+      'success', true,
+      'sale_id', p_sale_id,
+      'message', 'Venda já cancelada (idempotente).'
+    );
+  END IF;
+
+  IF v_sale.status <> 'PENDING' THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'sale_id', p_sale_id,
+      'message', 'Somente vendas PIX pendentes podem ser canceladas por esta operação.'
+    );
   END IF;
 
   FOR v_item IN
-    SELECT si.product_variant_id, si.quantity, inv.quantity AS stock_quantity
+    SELECT
+      si.product_variant_id,
+      si.quantity,
+      inv.quantity AS stock_quantity
     FROM public.sale_items si
     JOIN public.store_inventory inv
       ON inv.product_variant_id = si.product_variant_id
      AND inv.store_id = v_sale.store_id
     WHERE si.sale_id = p_sale_id
+    FOR UPDATE OF inv
   LOOP
     UPDATE public.store_inventory
     SET quantity = quantity + v_item.quantity
@@ -917,8 +935,16 @@ BEGIN
       AND product_variant_id = v_item.product_variant_id;
 
     INSERT INTO public.inventory_movements (
-      store_id, product_variant_id, type, quantity, quantity_before,
-      quantity_after, reference_type, reference_id, user_id, notes
+      store_id,
+      product_variant_id,
+      type,
+      quantity,
+      quantity_before,
+      quantity_after,
+      reference_type,
+      reference_id,
+      user_id,
+      notes
     )
     VALUES (
       v_sale.store_id,
@@ -934,29 +960,20 @@ BEGIN
     );
   END LOOP;
 
-  UPDATE public.sales SET status = 'CANCELLED' WHERE id = p_sale_id;
-  UPDATE public.payments SET status = 'CANCELLED' WHERE sale_id = p_sale_id;
+  UPDATE public.sales
+  SET status = 'CANCELLED'
+  WHERE id = p_sale_id;
 
-  IF v_sale.status = 'COMPLETED'
-     AND NOT EXISTS (
-       SELECT 1 FROM public.financial_transactions
-       WHERE reference_type = 'SALE'
-         AND reference_id = p_sale_id
-         AND type = 'EXPENSE'
-     ) THEN
-    INSERT INTO public.financial_transactions (
-      store_id, type, category, description, amount, status, reference_type, reference_id
-    )
-    VALUES (
-      v_sale.store_id, 'EXPENSE', 'Estornos', 'Estorno PIX cancelado',
-      v_sale.total, 'PAID', 'SALE', p_sale_id
-    );
-  END IF;
+  UPDATE public.payments
+  SET status = 'CANCELLED'
+  WHERE sale_id = p_sale_id
+    AND method = 'PIX'
+    AND status <> 'CANCELLED';
 
   RETURN jsonb_build_object(
     'success', true,
     'sale_id', p_sale_id,
-    'message', 'Venda cancelada e estoque restaurado.'
+    'message', 'Venda PIX cancelada e estoque restaurado.'
   );
 END;
 $$;

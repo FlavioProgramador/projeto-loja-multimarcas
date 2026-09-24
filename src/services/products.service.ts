@@ -1,12 +1,16 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
-import { ProductRow, ProductVariantRow } from '../types/database';
+import { ProductRow } from '../types/database';
 import { Product, ProductSku } from '../types';
 
 export const ProductsService = {
-  async getAll(): Promise<Product[]> {
+  async getAll(storeId?: string): Promise<Product[]> {
     if (!isSupabaseConfigured) return [];
-    
-    const { data, error } = await supabase
+
+    const variantSelect = storeId
+      ? 'id, sku, barcode, size, color, is_active, store_inventory!inner(quantity)'
+      : 'id, sku, barcode, size, color, is_active, stock_quantity';
+
+    let query = supabase
       .from('products')
       .select(`
         id,
@@ -19,30 +23,37 @@ export const ProductsService = {
         image_url,
         brands ( id, name ),
         categories ( id, name ),
-        product_variants ( id, sku, barcode, size, color, stock_quantity, is_active )
+        product_variants ( ${variantSelect} )
       `)
       .eq('is_active', true)
       .order('name', { ascending: true });
+
+    if (storeId) {
+      query = query.eq('product_variants.store_inventory.store_id', storeId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Erro ao buscar produtos:', error);
       return [];
     }
 
-    // Mapear para a interface de domínio do frontend
     return (data || []).map((p: any, index: number) => {
-      const activeVariants = (p.product_variants || []).filter((v: any) => v.is_active !== false);
-      const skus: ProductSku[] = activeVariants.map((v: any) => ({
+      const variants = (p.product_variants || []).filter((v: any) => v.is_active !== false);
+      const skus: ProductSku[] = variants.map((v: any) => ({
         id: v.id,
         sku: v.sku,
         tamanho: v.size,
         cor: v.color,
-        qtd: v.stock_quantity
+        qtd: storeId
+          ? Number(v.store_inventory?.[0]?.quantity ?? 0)
+          : Number(v.stock_quantity ?? 0)
       }));
 
       return {
-        id: index + 1, // id numérico para compatibilidade com os componentes
-        uuid: p.id,    // uuid real do banco de dados
+        id: index + 1,
+        uuid: p.id,
         nome: p.name,
         marca: p.brands?.name || 'Genérica',
         categoria: p.categories?.name || 'Geral',

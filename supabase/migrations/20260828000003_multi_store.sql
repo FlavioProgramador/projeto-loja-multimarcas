@@ -489,7 +489,7 @@ $$;
 
 -- REGISTER_STOCK_ENTRY
 CREATE OR REPLACE FUNCTION public.register_stock_entry(
-  p_store_id UUID, -- NOVO
+  p_store_id UUID,
   p_variant_id UUID DEFAULT NULL,
   p_quantity INTEGER DEFAULT NULL,
   p_unit_cost NUMERIC DEFAULT NULL,
@@ -498,6 +498,7 @@ CREATE OR REPLACE FUNCTION public.register_stock_entry(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_current_stock INTEGER;
@@ -505,32 +506,92 @@ DECLARE
   v_total_expense NUMERIC(12,2);
   v_user_role TEXT;
 BEGIN
-  v_user_role := public.get_user_store_role(p_store_id);
-  IF v_user_role NOT IN ('ADMIN', 'MANAGER') THEN
-    RAISE EXCEPTION 'Permissão negada para dar entrada de estoque nesta loja';
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Não autorizado.';
   END IF;
 
-  -- Lock Pessimista
-  SELECT quantity INTO v_current_stock FROM public.store_inventory WHERE store_id = p_store_id AND product_variant_id = p_variant_id FOR UPDATE;
+  v_user_role := public.get_user_store_role(p_store_id);
+  IF v_user_role NOT IN ('ADMIN', 'MANAGER') THEN
+    RAISE EXCEPTION 'Permissão negada para dar entrada de estoque nesta loja.';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.stores WHERE id = p_store_id AND is_active = true) THEN
+    RAISE EXCEPTION 'Loja inválida ou inativa.';
+  END IF;
+
+  IF p_variant_id IS NULL THEN
+    RAISE EXCEPTION 'Variação do produto é obrigatória.';
+  END IF;
+
+  IF p_quantity IS NULL OR p_quantity <= 0 THEN
+    RAISE EXCEPTION 'Quantidade deve ser maior que zero.';
+  END IF;
+
+  IF p_unit_cost IS NULL OR p_unit_cost < 0 OR NOT isfinite(p_unit_cost) THEN
+    RAISE EXCEPTION 'Custo unitário inválido.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.product_variants pv
+    JOIN public.products p ON p.id = pv.product_id
+    WHERE pv.id = p_variant_id AND pv.is_active = true AND p.is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Produto ou variação inválida.';
+  END IF;
+
+  SELECT quantity
+    INTO v_current_stock
+  FROM public.store_inventory
+  WHERE store_id = p_store_id AND product_variant_id = p_variant_id
+  FOR UPDATE;
 
   IF NOT FOUND THEN
-    -- Se não existir registro de inventário para a loja e produto, inicializar com 0 e travar
-    INSERT INTO public.store_inventory (store_id, product_variant_id, quantity) VALUES (p_store_id, p_variant_id, 0) RETURNING quantity INTO v_current_stock;
+    INSERT INTO public.store_inventory (store_id, product_variant_id, quantity)
+    VALUES (p_store_id, p_variant_id, 0)
+    RETURNING quantity INTO v_current_stock;
   END IF;
 
   v_new_stock := v_current_stock + p_quantity;
-  UPDATE public.store_inventory SET quantity = v_new_stock WHERE store_id = p_store_id AND product_variant_id = p_variant_id;
 
-  INSERT INTO public.inventory_movements (store_id, product_variant_id, type, quantity, quantity_before, quantity_after, notes, user_id) 
-  VALUES (p_store_id, p_variant_id, 'ENTRY', p_quantity, v_current_stock, v_new_stock, 'Entrada de estoque: ' || p_product_name, auth.uid());
+  UPDATE public.store_inventory
+  SET quantity = v_new_stock
+  WHERE store_id = p_store_id AND product_variant_id = p_variant_id;
 
-  v_total_expense := p_quantity * p_unit_cost;
+  INSERT INTO public.inventory_movements (
+    store_id, product_variant_id, type, quantity,
+    quantity_before, quantity_after,
+    reference_type, user_id, notes
+  )
+  VALUES (
+    p_store_id, p_variant_id, 'ENTRY', p_quantity,
+    v_current_stock, v_new_stock,
+    'PURCHASE', auth.uid(),
+    'Entrada de estoque: ' || COALESCE(p_product_name, '')
+  );
+
+  v_total_expense := ROUND(p_quantity * p_unit_cost, 2);
+
   IF v_total_expense > 0 THEN
-    INSERT INTO public.financial_transactions (store_id, type, category, description, amount, status, paid_at) 
-    VALUES (p_store_id, 'EXPENSE', 'Estoque / Compras', 'Entrada: ' || p_product_name, v_total_expense, 'PAID', NOW());
+    INSERT INTO public.financial_transactions (
+      store_id, type, category, description,
+      amount, status, reference_type, paid_at
+    )
+    VALUES (
+      p_store_id,
+      'EXPENSE',
+      'Estoque / Compras',
+      'Entrada: ' || COALESCE(p_product_name, ''),
+      v_total_expense,
+      'PAID',
+      'STOCK_ENTRY',
+      NOW()
+    );
   END IF;
 
-  RETURN jsonb_build_object('success', true);
+  RETURN jsonb_build_object(
+    'success', true,
+    'quantity', v_new_stock
+  );
 END;
 $$;
 

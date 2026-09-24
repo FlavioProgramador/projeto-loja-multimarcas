@@ -20,6 +20,34 @@ interface SaleListRow {
   sale_items?: Array<{ product_name: string; variant_description: string; quantity: number }>;
 }
 
+const pendingCheckoutKeys = new Map<string, string>();
+
+function getCheckoutSignature(params: {
+  storeId: string;
+  cartItems: CartItem[];
+  buyerName: string;
+  cpf: string;
+  paymentMethod: string;
+  installments: number;
+  discountValue: number;
+  discountPercent: number;
+}): string {
+  return JSON.stringify({
+    storeId: params.storeId,
+    buyerName: params.buyerName.trim(),
+    cpf: params.cpf.trim(),
+    paymentMethod: params.paymentMethod,
+    installments: params.installments || 1,
+    discountValue: params.discountValue || 0,
+    discountPercent: params.discountPercent || 0,
+    cartItems: params.cartItems.map(item => ({
+      variantId: item.variantId,
+      qtd: item.qtd,
+      preco: item.preco
+    }))
+  });
+}
+
 export const SalesService = {
   async completeSale(params: {
     storeId: string;
@@ -36,6 +64,10 @@ export const SalesService = {
       return { success: false, message: 'Supabase não configurado. Modo local ativo.', totalFinal: 0 };
     }
 
+    const signature = getCheckoutSignature(params);
+    const effectiveIdempotencyKey = pendingCheckoutKeys.get(signature) || params.idempotencyKey || crypto.randomUUID();
+    pendingCheckoutKeys.set(signature, effectiveIdempotencyKey);
+
     try {
       const rpcItems = params.cartItems.map(item => ({
         variant_id: item.variantId || '',
@@ -47,6 +79,7 @@ export const SalesService = {
       }));
 
       if (rpcItems.some(item => !item.variant_id)) {
+        pendingCheckoutKeys.delete(signature);
         return { success: false, message: 'Há item sem identificador de variação válido.', totalFinal: 0 };
       }
 
@@ -59,7 +92,7 @@ export const SalesService = {
         p_installments: params.installments || 1,
         p_discount_value: params.discountValue || 0,
         p_discount_percent: params.discountPercent || 0,
-        p_idempotency_key: params.idempotencyKey
+        p_idempotency_key: effectiveIdempotencyKey
       });
 
       if (error) {
@@ -68,6 +101,7 @@ export const SalesService = {
       }
 
       const result = data as CompleteSaleRpcResult;
+      if (result.success !== false) pendingCheckoutKeys.delete(signature);
       return {
         success: result.success !== false,
         message: result.message || 'Venda realizada com sucesso!',
@@ -103,9 +137,7 @@ export const SalesService = {
       .eq('status', 'COMPLETED')
       .order('created_at', { ascending: false });
 
-    if (storeId) {
-      query = query.eq('store_id', storeId);
-    }
+    if (storeId) query = query.eq('store_id', storeId);
 
     const { data, error } = await query;
     if (error) {
@@ -118,7 +150,6 @@ export const SalesService = {
       const paymentStr = payment
         ? `${payment.method}${payment.installments > 1 ? ` ${payment.installments}x` : ''}`
         : 'PIX';
-
       const itemsStr = (s.sale_items || [])
         .map(i => `${i.product_name} (${i.variant_description}) x${i.quantity}`)
         .join(', ');

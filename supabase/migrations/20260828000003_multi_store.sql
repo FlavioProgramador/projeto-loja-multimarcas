@@ -609,9 +609,10 @@ CREATE OR REPLACE FUNCTION public.create_mp_pix_sale(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_user_id UUID;
+  v_user_id UUID := auth.uid();
   v_sale_id UUID;
   v_sale_number TEXT;
   v_subtotal NUMERIC(12,2) := 0;
@@ -619,104 +620,249 @@ DECLARE
   v_final_total NUMERIC(12,2) := 0;
   v_item RECORD;
   v_inventory RECORD;
-  v_item_total NUMERIC(12,2);
   v_real_price NUMERIC(12,2);
+  v_item_total NUMERIC(12,2);
   v_resolved_customer_id UUID := p_customer_id;
 BEGIN
-  v_user_id := auth.uid();
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'Não autorizado.'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.stores WHERE id = p_store_id AND is_active = true) THEN
+    RAISE EXCEPTION 'Loja inválida ou inativa.';
+  END IF;
   IF NOT public.has_store_access(p_store_id) THEN RAISE EXCEPTION 'Acesso negado à loja.'; END IF;
 
-  IF p_idempotency_key IS NOT NULL THEN
-    SELECT sale_id INTO v_sale_id FROM public.sale_idempotency WHERE idempotency_key = p_idempotency_key;
-    IF FOUND THEN RETURN jsonb_build_object('success', true, 'sale_id', v_sale_id, 'message', 'Idempotente'); END IF;
-  END IF;
-
-  IF jsonb_array_length(p_items) = 0 THEN RAISE EXCEPTION 'Carrinho vazio.'; END IF;
-
-  IF v_resolved_customer_id IS NULL AND p_customer_cpf IS NOT NULL AND p_customer_cpf NOT IN ('', 'Não informado') THEN
-    SELECT id INTO v_resolved_customer_id FROM public.customers WHERE cpf = p_customer_cpf LIMIT 1;
-    IF v_resolved_customer_id IS NULL AND p_customer_name IS NOT NULL AND p_customer_name != 'Cliente não identificado' THEN
-      INSERT INTO public.customers (name, cpf) VALUES (p_customer_name, p_customer_cpf) RETURNING id INTO v_resolved_customer_id;
+  IF p_idempotency_key IS NOT NULL AND btrim(p_idempotency_key) <> '' THEN
+    SELECT sale_id INTO v_sale_id FROM public.sale_idempotency
+    WHERE idempotency_key = p_idempotency_key
+    FOR SHARE;
+    IF FOUND THEN
+      RETURN jsonb_build_object('success', true, 'sale_id', v_sale_id, 'message', 'Venda PIX já criada (idempotência).');
     END IF;
   END IF;
 
-  FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS (variant_id UUID, quantity INT, unit_price NUMERIC, product_name TEXT) LOOP
-    IF v_item.quantity <= 0 THEN RAISE EXCEPTION 'Quantidade inválida.'; END IF;
-    SELECT id, quantity INTO v_inventory FROM public.store_inventory WHERE store_id = p_store_id AND product_variant_id = v_item.variant_id FOR UPDATE;
-    IF NOT FOUND THEN RAISE EXCEPTION 'Produto não possui estoque.'; END IF;
-    IF v_inventory.quantity < v_item.quantity THEN RAISE EXCEPTION 'Estoque insuficiente.'; END IF;
-    
-    SELECT p.sale_price INTO v_real_price 
-    FROM public.product_variants pv 
-    JOIN public.products p ON p.id = pv.product_id 
-    WHERE pv.id = v_item.variant_id;
-    IF v_real_price IS NULL THEN RAISE EXCEPTION 'Preço não encontrado.'; END IF;
+  IF jsonb_array_length(p_items) = 0 THEN RAISE EXCEPTION 'Carrinho vazio.'; END IF;
+  IF COALESCE(p_discount_value, 0) < 0
+     OR COALESCE(p_discount_percent, 0) < 0
+     OR COALESCE(p_discount_percent, 0) > 100 THEN
+    RAISE EXCEPTION 'Desconto inválido.';
+  END IF;
 
+  IF v_resolved_customer_id IS NULL
+     AND p_customer_cpf IS NOT NULL
+     AND p_customer_cpf NOT IN ('', 'Não informado') THEN
+    SELECT id INTO v_resolved_customer_id
+    FROM public.customers
+    WHERE cpf = trim(p_customer_cpf)
+    LIMIT 1;
+
+    IF v_resolved_customer_id IS NULL
+       AND p_customer_name IS NOT NULL
+       AND p_customer_name <> 'Cliente não identificado' THEN
+      INSERT INTO public.customers (name, cpf)
+      VALUES (trim(p_customer_name), trim(p_customer_cpf))
+      RETURNING id INTO v_resolved_customer_id;
+    END IF;
+  END IF;
+
+  FOR v_item IN
+    SELECT * FROM jsonb_to_recordset(p_items) AS (
+      variant_id UUID, quantity INT, unit_price NUMERIC, product_name TEXT, variant_description TEXT
+    )
+  LOOP
+    IF v_item.variant_id IS NULL OR v_item.quantity IS NULL OR v_item.quantity <= 0 THEN
+      RAISE EXCEPTION 'Item de venda inválido.';
+    END IF;
+
+    SELECT si.id, si.quantity
+      INTO v_inventory
+    FROM public.store_inventory si
+    JOIN public.product_variants pv ON pv.id = si.product_variant_id
+    JOIN public.products p ON p.id = pv.product_id
+    WHERE si.store_id = p_store_id
+      AND si.product_variant_id = v_item.variant_id
+      AND pv.is_active = true
+      AND p.is_active = true
+    FOR UPDATE;
+
+    IF NOT FOUND THEN RAISE EXCEPTION 'Produto não está disponível nesta loja.'; END IF;
+    IF v_inventory.quantity < v_item.quantity THEN RAISE EXCEPTION 'Estoque insuficiente.'; END IF;
+
+    SELECT p.sale_price INTO v_real_price
+    FROM public.product_variants pv
+    JOIN public.products p ON p.id = pv.product_id
+    WHERE pv.id = v_item.variant_id
+      AND pv.is_active = true
+      AND p.is_active = true;
+
+    IF v_real_price IS NULL OR v_real_price < 0 THEN RAISE EXCEPTION 'Preço do produto inválido.'; END IF;
     v_subtotal := v_subtotal + (v_real_price * v_item.quantity);
   END LOOP;
 
-  v_total_discount := COALESCE(p_discount_value, 0) + (v_subtotal * (COALESCE(p_discount_percent, 0) / 100.0));
-  v_final_total := GREATEST(0, v_subtotal - v_total_discount);
+  v_total_discount := LEAST(
+    v_subtotal,
+    COALESCE(p_discount_value, 0)
+      + (v_subtotal * COALESCE(p_discount_percent, 0) / 100.0)
+  );
+  v_final_total := ROUND(GREATEST(0, v_subtotal - v_total_discount), 2);
   v_sale_number := 'PDV #' || nextval('sale_number_seq')::TEXT;
 
-  INSERT INTO public.sales (store_id, sale_number, customer_id, user_id, customer_name, customer_cpf, subtotal, discount, total, status) 
-  VALUES (p_store_id, v_sale_number, v_resolved_customer_id, v_user_id, COALESCE(p_customer_name, 'Não inf.'), COALESCE(p_customer_cpf, 'Não inf.'), v_subtotal, v_total_discount, v_final_total, 'PENDING') 
+  INSERT INTO public.sales (
+    store_id, sale_number, customer_id, user_id, customer_name, customer_cpf,
+    subtotal, discount, total, status
+  )
+  VALUES (
+    p_store_id,
+    v_sale_number,
+    v_resolved_customer_id,
+    v_user_id,
+    COALESCE(NULLIF(trim(p_customer_name), ''), 'Cliente não identificado'),
+    COALESCE(NULLIF(trim(p_customer_cpf), ''), 'Não informado'),
+    ROUND(v_subtotal, 2),
+    ROUND(v_total_discount, 2),
+    v_final_total,
+    'PENDING'
+  )
   RETURNING id INTO v_sale_id;
 
-  IF p_idempotency_key IS NOT NULL THEN INSERT INTO public.sale_idempotency (idempotency_key, sale_id) VALUES (p_idempotency_key, v_sale_id); END IF;
+  BEGIN
+    IF p_idempotency_key IS NOT NULL AND btrim(p_idempotency_key) <> '' THEN
+      INSERT INTO public.sale_idempotency (idempotency_key, sale_id)
+      VALUES (p_idempotency_key, v_sale_id);
+    END IF;
+  EXCEPTION
+    WHEN unique_violation THEN
+      SELECT sale_id INTO v_sale_id
+      FROM public.sale_idempotency
+      WHERE idempotency_key = p_idempotency_key
+      FOR SHARE;
+      RETURN jsonb_build_object('success', true, 'sale_id', v_sale_id, 'message', 'Venda PIX já criada (idempotência).');
+  END;
 
-  FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS (variant_id UUID, quantity INT, unit_price NUMERIC, product_name TEXT, variant_description TEXT) LOOP
-    SELECT p.sale_price INTO v_real_price 
-    FROM public.product_variants pv 
-    JOIN public.products p ON p.id = pv.product_id 
+  FOR v_item IN
+    SELECT * FROM jsonb_to_recordset(p_items) AS (
+      variant_id UUID, quantity INT, unit_price NUMERIC, product_name TEXT, variant_description TEXT
+    )
+  LOOP
+    SELECT p.sale_price INTO v_real_price
+    FROM public.product_variants pv
+    JOIN public.products p ON p.id = pv.product_id
+    WHERE pv.id = v_item.variant_id
+      AND pv.is_active = true
+      AND p.is_active = true;
+
+    v_item_total := ROUND(v_real_price * v_item.quantity, 2);
+
+    INSERT INTO public.sale_items (
+      sale_id, product_id, product_variant_id, product_name, variant_description,
+      quantity, unit_price, total
+    )
+    SELECT
+      v_sale_id, pv.product_id, v_item.variant_id,
+      COALESCE(v_item.product_name, p.name),
+      COALESCE(v_item.variant_description, pv.size || ' / ' || pv.color),
+      v_item.quantity, v_real_price, v_item_total
+    FROM public.product_variants pv
+    JOIN public.products p ON p.id = pv.product_id
     WHERE pv.id = v_item.variant_id;
 
-    v_item_total := v_real_price * v_item.quantity;
-    INSERT INTO public.sale_items (sale_id, product_variant_id, product_name, variant_description, quantity, unit_price, total) 
-    VALUES (v_sale_id, v_item.variant_id, v_item.product_name, COALESCE(v_item.variant_description, 'Padrão'), v_item.quantity, v_real_price, v_item_total);
-    
-    UPDATE public.store_inventory SET quantity = quantity - v_item.quantity WHERE store_id = p_store_id AND product_variant_id = v_item.variant_id;
-    
-    INSERT INTO public.inventory_movements (store_id, product_variant_id, type, quantity, quantity_before, quantity_after, reference_type, reference_id, user_id, notes) 
-    VALUES (p_store_id, v_item.variant_id, 'SALE', v_item.quantity, 
-            (SELECT quantity + v_item.quantity FROM public.store_inventory WHERE store_id = p_store_id AND product_variant_id = v_item.variant_id),
-            (SELECT quantity FROM public.store_inventory WHERE store_id = p_store_id AND product_variant_id = v_item.variant_id),
-            'SALE', v_sale_id, v_user_id, 'Venda PENDING ' || v_sale_number);
+    UPDATE public.store_inventory
+    SET quantity = quantity - v_item.quantity
+    WHERE store_id = p_store_id
+      AND product_variant_id = v_item.variant_id;
+
+    INSERT INTO public.inventory_movements (
+      store_id, product_variant_id, type, quantity, quantity_before,
+      quantity_after, reference_type, reference_id, user_id, notes
+    )
+    SELECT
+      p_store_id, v_item.variant_id, 'SALE', v_item.quantity,
+      si.quantity + v_item.quantity, si.quantity,
+      'SALE', v_sale_id, v_user_id, 'Venda PIX PENDING ' || v_sale_number
+    FROM public.store_inventory si
+    WHERE si.store_id = p_store_id
+      AND si.product_variant_id = v_item.variant_id;
   END LOOP;
 
-  INSERT INTO public.payments (sale_id, method, amount, status, installments) VALUES (v_sale_id, 'PIX', v_final_total, 'PENDING', 1);
-  -- Não gera financeiro INCOME ainda, só na aprovação.
+  INSERT INTO public.payments (sale_id, method, amount, status, installments)
+  VALUES (v_sale_id, 'PIX', v_final_total, 'PENDING', 1);
 
-  RETURN jsonb_build_object('success', true, 'sale_id', v_sale_id, 'total', v_final_total);
+  RETURN jsonb_build_object(
+    'success', true,
+    'sale_id', v_sale_id,
+    'sale_number', v_sale_number,
+    'total', v_final_total
+  );
 END;
 $$;
 
 -- APPROVE_MP_PIX_SALE
-CREATE OR REPLACE FUNCTION public.approve_mp_pix_sale(p_sale_id UUID DEFAULT NULL, p_provider_transaction_id TEXT DEFAULT NULL)
+CREATE OR REPLACE FUNCTION public.approve_mp_pix_sale(
+  p_sale_id UUID DEFAULT NULL,
+  p_provider_transaction_id TEXT DEFAULT NULL
+)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_sale RECORD;
+  v_payment RECORD;
 BEGIN
-  IF current_setting('request.jwt.claims', true)::json->>'role' != 'service_role' THEN
+  IF current_setting('request.jwt.claims', true)::json->>'role' <> 'service_role' THEN
     RAISE EXCEPTION 'Não autorizado. Apenas service_role pode aprovar.';
   END IF;
 
-  SELECT * INTO v_sale FROM public.sales WHERE id = p_sale_id FOR UPDATE;
-  IF NOT FOUND THEN RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada'); END IF;
-  
-  IF v_sale.status = 'COMPLETED' THEN RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Idempotente (já aprovada)'); END IF;
-  IF v_sale.status = 'CANCELLED' THEN RETURN jsonb_build_object('success', false, 'message', 'Venda cancelada'); END IF;
+  SELECT * INTO v_sale
+  FROM public.sales
+  WHERE id = p_sale_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada');
+  END IF;
+
+  IF v_sale.status = 'COMPLETED' THEN
+    RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Idempotente: venda já aprovada.');
+  END IF;
+
+  IF v_sale.status = 'CANCELLED' THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Venda cancelada.');
+  END IF;
+
+  SELECT * INTO v_payment
+  FROM public.payments
+  WHERE sale_id = p_sale_id AND method = 'PIX'
+  ORDER BY created_at DESC
+  LIMIT 1
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_payment.status = 'APPROVED' THEN
+    IF v_payment.status = 'APPROVED' THEN
+      RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Pagamento já aprovado.');
+    END IF;
+    RETURN jsonb_build_object('success', false, 'message', 'Pagamento PIX não encontrado.');
+  END IF;
 
   UPDATE public.sales SET status = 'COMPLETED', completed_at = NOW() WHERE id = p_sale_id;
-  UPDATE public.payments SET status = 'APPROVED', provider_transaction_id = p_provider_transaction_id WHERE sale_id = p_sale_id;
-  INSERT INTO public.financial_transactions (store_id, type, category, description, amount, status, reference_type, reference_id, paid_at) 
-  VALUES (v_sale.store_id, 'INCOME', 'Vendas PDV', 'Venda PIX ' || v_sale.sale_number, v_sale.total, 'PAID', 'SALE', p_sale_id, NOW());
+  UPDATE public.payments
+  SET status = 'APPROVED', provider = 'MERCADO_PAGO', provider_transaction_id = p_provider_transaction_id
+  WHERE id = v_payment.id;
 
-  RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id);
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.financial_transactions
+    WHERE reference_type = 'SALE' AND reference_id = p_sale_id
+  ) THEN
+    INSERT INTO public.financial_transactions (
+      store_id, type, category, description, amount, status, reference_type, reference_id, paid_at
+    )
+    VALUES (
+      v_sale.store_id, 'INCOME', 'Vendas PDV', 'Venda PIX ' || v_sale.sale_number,
+      v_sale.total, 'PAID', 'SALE', p_sale_id, NOW()
+    );
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Venda PIX aprovada.');
 END;
 $$;
 
@@ -725,200 +871,94 @@ CREATE OR REPLACE FUNCTION public.cancel_mp_pix_sale(p_sale_id UUID DEFAULT NULL
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_sale RECORD;
   v_item RECORD;
+  v_is_service_role BOOLEAN;
 BEGIN
-  IF auth.uid() IS NULL AND current_setting('request.jwt.claims', true)::json->>'role' != 'service_role' THEN
+  v_is_service_role := current_setting('request.jwt.claims', true)::json->>'role' = 'service_role';
+
+  IF auth.uid() IS NULL AND NOT v_is_service_role THEN
     RAISE EXCEPTION 'Não autorizado.';
   END IF;
 
-  SELECT * INTO v_sale FROM public.sales WHERE id = p_sale_id FOR UPDATE;
-  IF NOT FOUND THEN RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada'); END IF;
+  SELECT * INTO v_sale
+  FROM public.sales
+  WHERE id = p_sale_id
+  FOR UPDATE;
 
-  IF current_setting('request.jwt.claims', true)::json->>'role' != 'service_role' AND (v_sale.user_id IS NULL OR v_sale.user_id != auth.uid()) AND public.get_user_store_role(v_sale.store_id) NOT IN ('ADMIN', 'MANAGER') THEN
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Venda não encontrada');
+  END IF;
+
+  IF NOT v_is_service_role
+     AND (v_sale.user_id IS NULL OR v_sale.user_id <> auth.uid())
+     AND public.get_user_store_role(v_sale.store_id) NOT IN ('ADMIN', 'MANAGER') THEN
     RETURN jsonb_build_object('success', false, 'message', 'Permissão negada');
   END IF;
 
-  IF v_sale.status = 'CANCELLED' THEN RETURN jsonb_build_object('success', true, 'message', 'Venda já cancelada (idempotente)'); END IF;
+  IF v_sale.status = 'CANCELLED' THEN
+    RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Venda já cancelada (idempotente).');
+  END IF;
 
-  FOR v_item IN SELECT si.product_variant_id, si.quantity, inv.quantity AS stock_quantity FROM public.sale_items si
-    JOIN public.store_inventory inv ON inv.product_variant_id = si.product_variant_id AND inv.store_id = v_sale.store_id
+  FOR v_item IN
+    SELECT si.product_variant_id, si.quantity, inv.quantity AS stock_quantity
+    FROM public.sale_items si
+    JOIN public.store_inventory inv
+      ON inv.product_variant_id = si.product_variant_id
+     AND inv.store_id = v_sale.store_id
     WHERE si.sale_id = p_sale_id
   LOOP
-    UPDATE public.store_inventory SET quantity = quantity + v_item.quantity WHERE store_id = v_sale.store_id AND product_variant_id = v_item.product_variant_id;
-    INSERT INTO public.inventory_movements (store_id, product_variant_id, type, quantity, quantity_before, quantity_after, reference_type, reference_id, notes) 
-    VALUES (v_sale.store_id, v_item.product_variant_id, 'CANCELLATION', v_item.quantity, v_item.stock_quantity, v_item.stock_quantity + v_item.quantity, 'SALE', p_sale_id, 'Estorno cancelado');
+    UPDATE public.store_inventory
+    SET quantity = quantity + v_item.quantity
+    WHERE store_id = v_sale.store_id
+      AND product_variant_id = v_item.product_variant_id;
+
+    INSERT INTO public.inventory_movements (
+      store_id, product_variant_id, type, quantity, quantity_before,
+      quantity_after, reference_type, reference_id, user_id, notes
+    )
+    VALUES (
+      v_sale.store_id,
+      v_item.product_variant_id,
+      'CANCELLATION',
+      v_item.quantity,
+      v_item.stock_quantity,
+      v_item.stock_quantity + v_item.quantity,
+      'SALE',
+      p_sale_id,
+      auth.uid(),
+      'Cancelamento PIX'
+    );
   END LOOP;
 
   UPDATE public.sales SET status = 'CANCELLED' WHERE id = p_sale_id;
   UPDATE public.payments SET status = 'CANCELLED' WHERE sale_id = p_sale_id;
-  
-  -- Estornar financeiro apenas se a venda estava COMPLETED (já havia gerado INCOME)
-  IF v_sale.status = 'COMPLETED' THEN
-    INSERT INTO public.financial_transactions (store_id, type, category, description, amount, status, reference_type, reference_id)
-    SELECT store_id, 'EXPENSE', 'Estornos', 'Estorno PIX cancelado', total, 'PAID', 'SALE', p_sale_id FROM public.sales WHERE id = p_sale_id;
+
+  IF v_sale.status = 'COMPLETED'
+     AND NOT EXISTS (
+       SELECT 1 FROM public.financial_transactions
+       WHERE reference_type = 'SALE'
+         AND reference_id = p_sale_id
+         AND type = 'EXPENSE'
+     ) THEN
+    INSERT INTO public.financial_transactions (
+      store_id, type, category, description, amount, status, reference_type, reference_id
+    )
+    VALUES (
+      v_sale.store_id, 'EXPENSE', 'Estornos', 'Estorno PIX cancelado',
+      v_sale.total, 'PAID', 'SALE', p_sale_id
+    );
   END IF;
 
-  RETURN jsonb_build_object('success', true, 'sale_id', p_sale_id, 'message', 'Venda cancelada e estoque restaurado');
+  RETURN jsonb_build_object(
+    'success', true,
+    'sale_id', p_sale_id,
+    'message', 'Venda cancelada e estoque restaurado.'
+  );
 END;
 $$;
 
--- ============================================================================
--- 5. SEGURANÇA E AUTHENTICATION (Correção Crítica de Cadastro)
--- ============================================================================
 
--- Remover a leitura do role diretamente dos metadados (prevenindo privilege escalation no cadastro)
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, full_name, email, role)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1)),
-    NEW.email,
-    'EMPLOYEE' -- Força EMPLOYEE no cadastro independente do metadata enviado
-  )
-  ON CONFLICT (id) DO UPDATE
-  SET full_name = EXCLUDED.full_name,
-      email = EXCLUDED.email;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ============================================================================
--- 6. HARDENING SECURITY DEFINER (Search Path e Permissões)
--- ============================================================================
-
--- Adicionando SET search_path = public para evitar ataques de resolução de nomes
-ALTER FUNCTION public.handle_new_user() SET search_path = public;
-ALTER FUNCTION public.complete_sale(UUID, UUID, TEXT, TEXT, JSONB, TEXT, INT, NUMERIC, NUMERIC, TEXT) SET search_path = public;
-ALTER FUNCTION public.register_stock_entry(UUID, UUID, INTEGER, NUMERIC, TEXT) SET search_path = public;
-ALTER FUNCTION public.create_mp_pix_sale(UUID, UUID, TEXT, TEXT, JSONB, NUMERIC, NUMERIC, TEXT) SET search_path = public;
-ALTER FUNCTION public.approve_mp_pix_sale(UUID, TEXT) SET search_path = public;
-ALTER FUNCTION public.cancel_mp_pix_sale(UUID) SET search_path = public;
-ALTER FUNCTION public.current_user_role() SET search_path = public;
-ALTER FUNCTION public.protect_profile_role() SET search_path = public;
-
--- Revogar acesso público geral para todas as RPCs sensíveis
-REVOKE EXECUTE ON FUNCTION public.complete_sale(UUID, UUID, TEXT, TEXT, JSONB, TEXT, INT, NUMERIC, NUMERIC, TEXT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.register_stock_entry(UUID, UUID, INTEGER, NUMERIC, TEXT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.cancel_mp_pix_sale(UUID) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.manage_product(UUID, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) FROM PUBLIC;
-
--- Conceder execução apenas para usuários autenticados
-GRANT EXECUTE ON FUNCTION public.complete_sale(UUID, UUID, TEXT, TEXT, JSONB, TEXT, INT, NUMERIC, NUMERIC, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.register_stock_entry(UUID, UUID, INTEGER, NUMERIC, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.manage_product(UUID, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) TO authenticated;
-
--- Importante: Webhooks podem usar service_role, que automaticamente tem acesso, mas explicitly we allow it just in case:
-GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale(UUID) TO service_role;
-ALTER FUNCTION public.create_mp_pix_sale(UUID, UUID, TEXT, TEXT, JSONB, NUMERIC, NUMERIC, TEXT) SET search_path = public;
-ALTER FUNCTION public.approve_mp_pix_sale(UUID, TEXT) SET search_path = public;
-
-REVOKE EXECUTE ON FUNCTION public.create_mp_pix_sale(UUID, UUID, TEXT, TEXT, JSONB, NUMERIC, NUMERIC, TEXT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.approve_mp_pix_sale(UUID, TEXT) FROM PUBLIC;
-
-GRANT EXECUTE ON FUNCTION public.create_mp_pix_sale(UUID, UUID, TEXT, TEXT, JSONB, NUMERIC, NUMERIC, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.approve_mp_pix_sale(UUID, TEXT) TO service_role;
--- Webhooks may be authenticated or service_role depending on the setup. The code inside approve_mp_pix_sale enforces service_role via claims anyway.
-
--- 7. REESCRITA DE MANAGE_PRODUCT (P7 - Auditoria)
--- Garantir validação estrita de Auth/Role interna.
-CREATE OR REPLACE FUNCTION public.manage_product(
-  p_product_id UUID,
-  p_name TEXT,
-  p_brand_name TEXT,
-  p_category_name TEXT,
-  p_sale_price NUMERIC,
-  p_cost_price NUMERIC,
-  p_variants JSONB
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_brand_id UUID;
-  v_category_id UUID;
-  v_product_id UUID;
-  v_variant RECORD;
-  v_variant_ids UUID[] := '{}';
-  v_generated_sku TEXT;
-  v_idx INT := 1;
-  v_user_id UUID;
-  v_has_permission BOOLEAN := false;
-BEGIN
-  -- Segurança Básica Estrita
-  v_user_id := auth.uid();
-  IF v_user_id IS NULL THEN RAISE EXCEPTION 'Não autorizado (Não autenticado).'; END IF;
-
-  -- Validação de Permissão Administrativa (Global Admin ou Manager de alguma loja)
-  IF public.current_user_role() IN ('ADMIN', 'MANAGER') THEN
-    v_has_permission := true;
-  ELSE
-    SELECT EXISTS (
-      SELECT 1 FROM public.user_store_access 
-      WHERE user_id = v_user_id AND role IN ('ADMIN', 'MANAGER') AND is_active = true
-    ) INTO v_has_permission;
-  END IF;
-
-  IF NOT v_has_permission THEN
-    RAISE EXCEPTION 'Permissão negada. Apenas administradores ou gerentes podem gerenciar produtos globais.';
-  END IF;
-
-  IF p_brand_name IS NOT NULL AND trim(p_brand_name) != '' THEN
-    SELECT id INTO v_brand_id FROM public.brands WHERE name ILIKE trim(p_brand_name) LIMIT 1;
-    IF v_brand_id IS NULL THEN INSERT INTO public.brands (name) VALUES (trim(p_brand_name)) RETURNING id INTO v_brand_id; END IF;
-  END IF;
-
-  IF p_category_name IS NOT NULL AND trim(p_category_name) != '' THEN
-    SELECT id INTO v_category_id FROM public.categories WHERE name ILIKE trim(p_category_name) LIMIT 1;
-    IF v_category_id IS NULL THEN INSERT INTO public.categories (name) VALUES (trim(p_category_name)) RETURNING id INTO v_category_id; END IF;
-  END IF;
-
-  IF p_product_id IS NOT NULL THEN
-    v_product_id := p_product_id;
-    UPDATE public.products SET name = p_name, brand_id = v_brand_id, category_id = v_category_id, sale_price = p_sale_price, cost_price = p_cost_price 
-    WHERE id = v_product_id;
-  ELSE
-    INSERT INTO public.products (name, brand_id, category_id, sale_price, cost_price) 
-    VALUES (p_name, v_brand_id, v_category_id, p_sale_price, p_cost_price) RETURNING id INTO v_product_id;
-  END IF;
-
-  FOR v_variant IN SELECT * FROM jsonb_to_recordset(p_variants) AS (id UUID, size TEXT, color TEXT, barcode TEXT) LOOP
-    v_generated_sku := upper(regexp_replace(p_name, '\s+', '', 'g')) || '-' || upper(COALESCE(v_variant.color, 'P')) || '-' || upper(COALESCE(v_variant.size, 'U')) || '-' || LPAD(v_idx::TEXT, 3, '0');
-    v_idx := v_idx + 1;
-
-    IF v_variant.id IS NOT NULL THEN
-      UPDATE public.product_variants SET barcode = NULLIF(trim(v_variant.barcode), ''), size = COALESCE(v_variant.size, 'Único'), color = COALESCE(v_variant.color, 'Padrão'), is_active = true WHERE id = v_variant.id;
-      v_variant_ids := array_append(v_variant_ids, v_variant.id);
-    ELSE
-      INSERT INTO public.product_variants (product_id, sku, barcode, size, color, is_active) 
-      VALUES (v_product_id, trim(v_generated_sku), NULLIF(trim(v_variant.barcode), ''), COALESCE(v_variant.size, 'Único'), COALESCE(v_variant.color, 'Padrão'), true) 
-      RETURNING id INTO v_variant.id;
-      v_variant_ids := array_append(v_variant_ids, v_variant.id);
-      
-      -- Para novos produtos, eles começam com quantidade 0 na loja principal automaticamente via trigger se necessário, 
-      -- mas o frontend usará register_stock_entry para adicionar estoque real depois.
-    END IF;
-  END LOOP;
-
-  UPDATE public.product_variants SET is_active = false WHERE product_id = v_product_id AND NOT (id = ANY(v_variant_ids));
-  RETURN jsonb_build_object('success', true, 'product_id', v_product_id);
-END;
-$$;
-REVOKE EXECUTE ON FUNCTION public.manage_product(UUID, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.manage_product(UUID, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, JSONB) TO authenticated;
--- ============================================================================
-CREATE INDEX IF NOT EXISTS idx_sales_store_created_at ON public.sales (store_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sales_status ON public.sales (status);
-CREATE INDEX IF NOT EXISTS idx_inventory_movements_store_variant ON public.inventory_movements (store_id, product_variant_id);
-CREATE INDEX IF NOT EXISTS idx_financial_transactions_store_date ON public.financial_transactions (store_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON public.sale_items (sale_id);
-CREATE INDEX IF NOT EXISTS idx_payments_sale_id ON public.payments (sale_id);
-CREATE INDEX IF NOT EXISTS idx_user_store_access_user_id ON public.user_store_access (user_id);
-CREATE INDEX IF NOT EXISTS idx_sale_idempotency_key ON public.sale_idempotency (idempotency_key);

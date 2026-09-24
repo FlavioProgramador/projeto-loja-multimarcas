@@ -1,6 +1,25 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { CartItem, SaleMovement } from '../types';
 
+interface CompleteSaleRpcResult {
+  success?: boolean;
+  message?: string;
+  total?: number;
+  sale_number?: string;
+  sale_id?: string;
+}
+
+interface SaleListRow {
+  id: string;
+  sale_number: string;
+  customer_name: string | null;
+  customer_cpf: string | null;
+  total: number | string;
+  created_at: string;
+  payments?: Array<{ method: string; installments: number }>;
+  sale_items?: Array<{ product_name: string; variant_description: string; quantity: number }>;
+}
+
 export const SalesService = {
   async completeSale(params: {
     storeId: string;
@@ -14,26 +33,24 @@ export const SalesService = {
     idempotencyKey: string;
   }): Promise<{ success: boolean; message: string; totalFinal: number; saleNumber?: string; saleId?: string }> {
     if (!isSupabaseConfigured) {
-      return {
-        success: false,
-        message: 'Supabase não configurado. Modo local ativo.',
-        totalFinal: 0
-      };
+      return { success: false, message: 'Supabase não configurado. Modo local ativo.', totalFinal: 0 };
     }
 
     try {
-      // 1. Preparar itens para o payload da RPC
       const rpcItems = params.cartItems.map(item => ({
-        variant_id: (item as any).variantId || (item as any).id,
-        product_id: (item as any).productUuid || null,
+        variant_id: item.variantId || '',
+        product_id: item.productUuid || null,
         product_name: item.nome,
         variant_description: `${item.tamanho} / ${item.cor}`,
         quantity: item.qtd,
         unit_price: item.preco
       }));
 
-      // 2. Chamar a PostgreSQL Function complete_sale atomicamente
-      let query = supabase.rpc('complete_sale', {
+      if (rpcItems.some(item => !item.variant_id)) {
+        return { success: false, message: 'Há item sem identificador de variação válido.', totalFinal: 0 };
+      }
+
+      const { data, error } = await supabase.rpc('complete_sale', {
         p_store_id: params.storeId,
         p_customer_name: params.buyerName.trim() || 'Cliente não identificado',
         p_customer_cpf: params.cpf.trim() || 'Não informado',
@@ -41,19 +58,16 @@ export const SalesService = {
         p_payment_method: params.paymentMethod,
         p_installments: params.installments || 1,
         p_discount_value: params.discountValue || 0,
-        p_discount_percent: params.discountPercent || 0
+        p_discount_percent: params.discountPercent || 0,
+        p_idempotency_key: params.idempotencyKey
       });
 
       if (error) {
         console.error('Erro na RPC complete_sale:', error);
-        return {
-          success: false,
-          message: error.message || 'Falha ao processar venda no banco de dados.',
-          totalFinal: 0
-        };
+        return { success: false, message: error.message || 'Falha ao processar venda no banco de dados.', totalFinal: 0 };
       }
 
-      const result = data as { success?: boolean; message?: string; total?: number; sale_number?: string; sale_id?: string };
+      const result = data as CompleteSaleRpcResult;
       return {
         success: result.success !== false,
         message: result.message || 'Venda realizada com sucesso!',
@@ -73,8 +87,8 @@ export const SalesService = {
 
   async getMovements(storeId?: string): Promise<SaleMovement[]> {
     if (!isSupabaseConfigured) return [];
-    
-    const { data, error } = await supabase
+
+    let query = supabase
       .from('sales')
       .select(`
         id,
@@ -93,26 +107,26 @@ export const SalesService = {
       query = query.eq('store_id', storeId);
     }
 
-    const { data: filteredData, error: filteredError } = await query;
-    if (filteredError) {
-      console.error('Erro ao buscar histórico de vendas:', filteredError);
+    const { data, error } = await query;
+    if (error) {
+      console.error('Erro ao buscar histórico de vendas:', error);
       return [];
     }
 
-    return (filteredData || []).map (data || []).map((s: any, index: number) => {
+    return ((data || []) as unknown as SaleListRow[]).map((s, index) => {
       const payment = s.payments?.[0];
       const paymentStr = payment
         ? `${payment.method}${payment.installments > 1 ? ` ${payment.installments}x` : ''}`
         : 'PIX';
 
       const itemsStr = (s.sale_items || [])
-        .map((i: any) => `${i.product_name} (${i.variant_description}) x${i.quantity}`)
+        .map(i => `${i.product_name} (${i.variant_description}) x${i.quantity}`)
         .join(', ');
 
       return {
         id: index + 1,
         uuid: s.id,
-        tipo: 'EXPENSE', // compatibilidade de tipo com o frontend
+        tipo: 'INCOME',
         valor: Number(s.total) || 0,
         formaPagamento: paymentStr,
         comprador: s.customer_name || 'Consumidor Final',

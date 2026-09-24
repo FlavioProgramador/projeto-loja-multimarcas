@@ -2,80 +2,93 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { ProductRow } from '../types/database';
 import { Product, ProductSku } from '../types';
 
+interface StoreInventoryRow {
+  store_id: string;
+  quantity: number;
+}
+
+interface ProductVariantListRow {
+  id: string;
+  sku: string;
+  barcode: string | null;
+  size: string;
+  color: string;
+  is_active: boolean;
+  store_inventory?: StoreInventoryRow[];
+}
+
+interface ProductListRow {
+  id: string;
+  name: string;
+  sale_price: number | string;
+  brands: { id: string; name: string } | null;
+  categories: { id: string; name: string } | null;
+  product_variants: ProductVariantListRow[];
+}
+
 export const ProductsService = {
   async getAll(storeId?: string): Promise<Product[]> {
-    if (!isSupabaseConfigured) return [];
+    if (!isSupabaseConfigured || !storeId) return [];
 
-    const variantSelect = storeId
-      ? 'id, sku, barcode, size, color, is_active, store_inventory!inner(quantity)'
-      : 'id, sku, barcode, size, color, is_active, stock_quantity';
-
-    let query = supabase
+    const { data, error } = await supabase
       .from('products')
       .select(`
         id,
         name,
-        description,
-        cost_price,
         sale_price,
-        minimum_stock,
-        is_active,
-        image_url,
         brands ( id, name ),
         categories ( id, name ),
-        product_variants ( ${variantSelect} )
+        product_variants (
+          id,
+          sku,
+          barcode,
+          size,
+          color,
+          is_active,
+          store_inventory ( store_id, quantity )
+        )
       `)
       .eq('is_active', true)
       .order('name', { ascending: true });
-
-    if (storeId) {
-      query = query.eq('product_variants.store_inventory.store_id', storeId);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       console.error('Erro ao buscar produtos:', error);
       return [];
     }
 
-    return (data || []).map((p: any, index: number) => {
-      const variants = (p.product_variants || []).filter((v: any) => v.is_active !== false);
-      const skus: ProductSku[] = variants.map((v: any) => ({
-        id: v.id,
-        sku: v.sku,
-        tamanho: v.size,
-        cor: v.color,
-        qtd: storeId
-          ? Number(v.store_inventory?.[0]?.quantity ?? 0)
-          : Number(v.stock_quantity ?? 0)
-      }));
+    return ((data || []) as unknown as ProductListRow[])
+      .filter(product => product.product_variants?.some(variant =>
+        variant.is_active && variant.store_inventory?.some(inventory => inventory.store_id === storeId)
+      ))
+      .map((product, index) => {
+        const variants = (product.product_variants || []).filter(variant => variant.is_active);
+        const skus: ProductSku[] = variants.map(variant => ({
+          id: variant.id,
+          sku: variant.sku,
+          tamanho: variant.size,
+          cor: variant.color,
+          qtd: Number(variant.store_inventory?.find(inventory => inventory.store_id === storeId)?.quantity ?? 0)
+        }));
 
-      return {
-        id: index + 1,
-        uuid: p.id,
-        nome: p.name,
-        marca: p.brands?.name || 'Genérica',
-        categoria: p.categories?.name || 'Geral',
-        preco: Number(p.sale_price) || 0,
-        skus: skus.length > 0 ? skus : [{ tamanho: 'Único', cor: 'Padrão', qtd: 0 }]
-      };
-    });
+        return {
+          id: index + 1,
+          uuid: product.id,
+          nome: product.name,
+          marca: product.brands?.name || 'Genérica',
+          categoria: product.categories?.name || 'Geral',
+          preco: Number(product.sale_price) || 0,
+          skus: skus.length > 0 ? skus : [{ tamanho: 'Único', cor: 'Padrão', qtd: 0 }]
+        };
+      });
   },
 
   async getById(id: string): Promise<ProductRow | null> {
     if (!isSupabaseConfigured) return null;
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        brands (*),
-        categories (*),
-        product_variants (*)
-      `)
+      .select(`*, brands (*), categories (*), product_variants (*)`)
       .eq('id', id)
       .single();
-
     if (error) {
       console.error('Erro ao buscar produto por ID:', error);
       return null;
@@ -90,32 +103,30 @@ export const ProductsService = {
     preco: number;
     custo?: number;
     skus: { tamanho: string; cor: string; qtd: number; sku?: string }[];
-  }): Promise<any> {
+  }): Promise<{ id: string } | null> {
     if (!isSupabaseConfigured) return null;
 
-    const rpcPayload = {
+    const { data, error } = await supabase.rpc('manage_product', {
       p_product_id: null,
       p_name: productData.nome,
       p_brand_name: productData.marca,
       p_category_name: productData.categoria,
       p_sale_price: productData.preco,
       p_cost_price: productData.custo || 0,
-      p_variants: (productData.skus || []).map(s => ({
-        size: s.tamanho,
-        color: s.cor,
-        stock_quantity: Math.max(0, Number(s.qtd) || 0),
-        sku: s.sku || null
+      p_variants: (productData.skus || []).map(sku => ({
+        size: sku.tamanho,
+        color: sku.cor,
+        stock_quantity: Math.max(0, Number(sku.qtd) || 0),
+        sku: sku.sku || null
       }))
-    };
+    });
 
-    const { data, error } = await supabase.rpc('manage_product', rpcPayload);
-    
     if (error) {
       console.error('Erro na RPC manage_product (create):', error);
       throw error;
     }
-
-    return { id: data.product_id };
+    const result = data as { product_id?: string };
+    return result.product_id ? { id: result.product_id } : null;
   },
 
   async update(uuid: string, updates: Partial<{
@@ -123,27 +134,25 @@ export const ProductsService = {
     marca: string;
     categoria: string;
     preco: number;
-    skus: { id?: string; sku?: string; tamanho: string; cor: string; qtd: number }[];
+    skus: { id?: string; sku?: string; tamanho: string; cor: string }[];
   }>): Promise<void> {
     if (!isSupabaseConfigured || !uuid) return;
 
-    const rpcPayload = {
+    const { error } = await supabase.rpc('manage_product', {
       p_product_id: uuid,
-      p_name: updates.nome || null,
-      p_brand_name: updates.marca || null,
-      p_category_name: updates.categoria || null,
-      p_sale_price: updates.preco || null,
-      p_cost_price: null, // não alteramos custo na UI de edição rápida
-      p_variants: (updates.skus || []).map(s => ({
-        id: s.id || null,
-        size: s.tamanho,
-        color: s.cor,
-        stock_quantity: Math.max(0, Number(s.qtd) || 0),
-        sku: s.sku || null
+      p_name: updates.nome ?? null,
+      p_brand_name: updates.marca ?? null,
+      p_category_name: updates.categoria ?? null,
+      p_sale_price: updates.preco ?? null,
+      p_cost_price: null,
+      p_variants: (updates.skus || []).map(sku => ({
+        id: sku.id || null,
+        size: sku.tamanho,
+        color: sku.cor,
+        sku: sku.sku || null
       }))
-    };
+    });
 
-    const { error } = await supabase.rpc('manage_product', rpcPayload);
     if (error) {
       console.error('Erro na RPC manage_product (update):', error);
       throw error;

@@ -14,6 +14,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const mpAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
 
     if (!mpAccessToken) {
@@ -26,7 +27,10 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader || '' } }
     });
 
-    const { storeId, cartItems, customerId, customerName, customerCpf, discountValue, discountPercent } = await req.json();
+    const body = await req.json();
+    const { storeId, cartItems, customerId, customerName, customerCpf, discountValue, discountPercent } = body;
+    const requestedIdempotencyKey = req.headers.get('x-idempotency-key') || body.idempotencyKey;
+    const idempotencyKey = requestedIdempotencyKey?.trim() || crypto.randomUUID();
 
     // 1. Call RPC to create the pending sale
     const { data: saleResult, error: saleError } = await supabase.rpc('create_mp_pix_sale', {
@@ -50,7 +54,7 @@ serve(async (req) => {
     if (!sale_id) throw new Error('A venda pendente não retornou um identificador válido.');
 
     // 2. Call Mercado Pago API to generate PIX
-    const idempotencyKey = crypto.randomUUID();
+    const providerIdempotencyKey = `pix-${idempotencyKey}`;
     const notificationUrl = `${supabaseUrl}/functions/v1/mp-webhook`;
 
     // Only set CPF if it has 11 digits
@@ -80,7 +84,7 @@ serve(async (req) => {
       headers: {
         'Authorization': `Bearer ${mpAccessToken}`,
         'Content-Type': 'application/json',
-        'X-Idempotency-Key': idempotencyKey
+        'X-Idempotency-Key': providerIdempotencyKey
       },
       body: JSON.stringify(mpPayload)
     });
@@ -91,7 +95,8 @@ serve(async (req) => {
       console.error('Mercado Pago Error:', mpData);
       
       try {
-        await supabase.rpc('cancel_mp_pix_sale', { p_sale_id: sale_id });
+        const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+        await serviceSupabase.rpc('cancel_mp_pix_sale', { p_sale_id: sale_id });
       } catch (cancelError) {
         console.error('Falha ao cancelar venda pendente após erro do Mercado Pago:', cancelError);
       }
@@ -99,10 +104,15 @@ serve(async (req) => {
     }
 
     // 3. Update payment with MP provider ID
-    await supabase
+    const { error: paymentUpdateError } = await supabase
       .from('payments')
-      .update({ provider_transaction_id: mpData.id.toString() })
+      .update({ provider: 'MERCADO_PAGO', provider_transaction_id: mpData.id.toString() })
       .eq('sale_id', sale_id);
+
+    if (paymentUpdateError) {
+      console.error('Falha ao vincular o pagamento do Mercado Pago à venda:', paymentUpdateError);
+      throw new Error('Pagamento criado no Mercado Pago, mas não foi possível atualizar a venda.');
+    }
 
     return new Response(
       JSON.stringify({

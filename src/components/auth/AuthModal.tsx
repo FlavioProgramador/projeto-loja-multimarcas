@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { LogIn, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -36,7 +36,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       if (isSignUp) {
-        await signUp(email, password, fullName, 'EMPLOYEE');
+        await signUp(email, password, fullName);
         setSuccessMsg('Cadastro realizado com sucesso! Você já pode entrar.');
         setIsSignUp(false);
       } else {

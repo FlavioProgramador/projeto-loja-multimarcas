@@ -70,7 +70,8 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
   );
 
   const handleSelectSale = (saleId: string) => {
-    setSelectedSaleId(saleId);
+    const selected = movements.find(m => m.vendaId === saleId);
+    setSelectedSaleId(selected?.uuid || saleId);
     const sale = movements.find(m => m.vendaId === saleId);
     if (!sale) return;
 
@@ -339,9 +340,9 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           fontSize: '12px',
-                          background: selectedSaleId === s.vendaId ? 'var(--primary-light)' : 'transparent',
-                          color: selectedSaleId === s.vendaId ? 'var(--primary)' : 'inherit',
-                          fontWeight: selectedSaleId === s.vendaId ? 600 : 400
+                          background: selectedSaleId === (s.uuid || s.vendaId) ? 'var(--primary-light)' : 'transparent',
+                          color: selectedSaleId === (s.uuid || s.vendaId) ? 'var(--primary)' : 'inherit',
+                          fontWeight: selectedSaleId === (s.uuid || s.vendaId) ? 600 : 400
                         }}
                       >
                         <div>

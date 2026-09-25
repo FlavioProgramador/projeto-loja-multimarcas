@@ -6,6 +6,7 @@ export * from './inventory.service';
 export * from './customers.service';
 export * from './suppliers.service';
 export * from './sales.service';
+export * from './returns.service';
 export * from './finance.service';
 export * from './dashboard.service';
 export * from './reports.service';

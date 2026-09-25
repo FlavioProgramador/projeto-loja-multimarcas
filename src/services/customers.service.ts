@@ -4,7 +4,7 @@ import { Customer } from '../types';
 export const CustomersService = {
   async getAll(): Promise<Customer[]> {
     if (!isSupabaseConfigured) return [];
-    
+
     const { data, error } = await supabase
       .from('customers')
       .select(`
@@ -92,5 +92,41 @@ export const CustomersService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async update(uuid: string, customer: Partial<{
+    nome: string;
+    cpf: string;
+    rg: string;
+    telefone: string;
+    email: string;
+    endereco: string;
+    dataNascimento: string;
+  }>): Promise<void> {
+    if (!isSupabaseConfigured) return;
+
+    const payload = {
+      ...(customer.nome !== undefined && { name: customer.nome.trim() }),
+      ...(customer.cpf !== undefined && { cpf: customer.cpf.trim() || null }),
+      ...(customer.rg !== undefined && { rg: customer.rg.trim() || null }),
+      ...(customer.telefone !== undefined && { phone: customer.telefone.trim() || null }),
+      ...(customer.email !== undefined && { email: customer.email.trim() || null }),
+      ...(customer.endereco !== undefined && { address: customer.endereco.trim() || null }),
+      ...(customer.dataNascimento !== undefined && { birth_date: customer.dataNascimento || null })
+    };
+
+    const { error } = await supabase.from('customers').update(payload).eq('id', uuid);
+    if (error) throw error;
+  },
+
+  async remove(uuid: string): Promise<void> {
+    if (!isSupabaseConfigured) return;
+
+    const { error } = await supabase
+      .from('customers')
+      .update({ is_active: false })
+      .eq('id', uuid);
+
+    if (error) throw error;
   }
 };

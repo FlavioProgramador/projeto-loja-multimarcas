@@ -7,32 +7,30 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
+const THEME_STORAGE_KEY = 'coresys_theme_v2';
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('erp_theme');
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
       if (saved === 'light' || saved === 'dark') return saved;
-      return 'light'; // Default to clean light mode as in Stitch
     }
-    return 'light';
+
+    // A identidade visual CoreSys utiliza o modo escuro como experiência inicial.
+    return 'dark';
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
-      document.body.classList.add('dark');
-      document.body.classList.add('dark-mode');
-    } else {
-      root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
-      document.body.classList.remove('dark');
-      document.body.classList.remove('dark-mode');
-    }
-    localStorage.setItem('erp_theme', theme);
+    const isDark = theme === 'dark';
+
+    root.classList.toggle('dark', isDark);
+    root.setAttribute('data-theme', theme);
+    document.body.classList.toggle('dark', isDark);
+    document.body.classList.toggle('dark-mode', isDark);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   const toggleTheme = () => {

@@ -45,15 +45,20 @@ export const CustomersView: React.FC = () => {
     setTimeout(() => setNotificationBanner(null), 4000);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editForm.nome.trim() || !editForm.cpf.trim()) {
       setEditError('Os campos Nome e CPF são obrigatórios.');
       return;
     }
 
     if (updateCustomer && customerToEdit) {
-      updateCustomer(customerToEdit.id, editForm);
-      showBanner('✅ Cliente atualizado com sucesso!');
+      try {
+        await updateCustomer(customerToEdit.id, editForm);
+        showBanner('✅ Cliente atualizado com sucesso!');
+      } catch (err) {
+        setEditError(err instanceof Error ? err.message : 'Não foi possível atualizar o cliente.');
+        return;
+      }
     } else {
       showBanner('⚠️ Função de atualizar cliente não encontrada no StoreContext.');
     }
@@ -61,10 +66,15 @@ export const CustomersView: React.FC = () => {
     setCustomerToEdit(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deleteCustomer && customerToDelete) {
-      deleteCustomer(customerToDelete.id);
-      showBanner('✅ Cliente excluído com sucesso!');
+      try {
+        await deleteCustomer(customerToDelete.id);
+        showBanner('✅ Cliente excluído com sucesso!');
+      } catch (err) {
+        showBanner(`⚠️ ${err instanceof Error ? err.message : 'Não foi possível excluir o cliente.'}`);
+        return;
+      }
     } else {
       showBanner('⚠️ Função de excluir cliente não encontrada no StoreContext.');
     }

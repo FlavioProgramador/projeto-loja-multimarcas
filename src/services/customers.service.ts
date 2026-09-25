@@ -19,6 +19,7 @@ export const CustomersService = {
         sales (
           id,
           sale_number,
+          store_id,
           total,
           created_at,
           sale_items (
@@ -51,6 +52,7 @@ export const CustomersService = {
 
         return {
           vendaId: s.sale_number,
+          uuid: s.id,
           valor: Number(s.total) || 0,
           data: (s.created_at || '').slice(0, 10),
           itens: itemNames || 'Venda PDV'

@@ -35,7 +35,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
 
     const isDark = theme === 'dark';
     const textColor = isDark ? 'var(--text-muted)' : 'var(--text-muted)';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+    const gridColor = isDark ? 'rgba(115,230,203,0.09)' : 'rgba(10,60,48,0.07)';
 
     chartInstance.current = new Chart(ctx, {
       type: 'bar',
@@ -45,7 +45,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
           {
             label: 'Faturamento',
             data: data.length ? data : [0],
-            backgroundColor: 'var(--chart-primary)',
+            backgroundColor: 'var(--brand-primary)',
             hoverBackgroundColor: 'var(--brand-primary)',
             borderRadius: 6
           }
@@ -61,7 +61,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
           tooltip: {
             backgroundColor: isDark ? 'var(--bg-surface-subtle)' : '#ffffff',
             titleColor: isDark ? '#ffffff' : 'var(--text-primary)',
-            bodyColor: 'var(--chart-primary)',
+            bodyColor: 'var(--brand-primary)',
             borderColor: isDark ? 'var(--border-color)' : 'var(--border-color)',
             borderWidth: 1,
             padding: 8,

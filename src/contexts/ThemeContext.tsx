@@ -14,7 +14,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('erp_theme');
       if (saved === 'light' || saved === 'dark') return saved;
-      return 'light'; // Default to clean light mode as in Stitch
     }
     return 'light';
   });

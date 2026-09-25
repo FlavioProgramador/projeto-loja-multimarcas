@@ -168,7 +168,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
             </button>
 
             <div className="header-breadcrumb">
-              <span>Produtos</span>
+              <LayoutDashboard size={14} />
+              <ChevronRight size={13} />
+              <span>{currentModule === 'estoque' ? 'Produtos' : 'CoreSys'}</span>
               <ChevronRight size={13} />
               <strong>{moduleLabels[currentModule]}</strong>
             </div>

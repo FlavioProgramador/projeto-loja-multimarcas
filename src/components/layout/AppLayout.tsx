@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, RotateCcw, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap } from 'lucide-react';
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -66,7 +66,6 @@ const moduleLabels: Record<ActiveModule, string> = {
   dashboard: 'Dashboard',
   pdv: 'PDV / Caixa',
   estoque: 'Estoque & Produtos',
-  trocas: 'Trocas & Devoluções',
   financeiro: 'Financeiro',
   movimentacoes: 'Movimentações',
   clientes: 'Clientes',

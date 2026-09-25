@@ -20,7 +20,6 @@ const menuGroups = [
     title: 'Operações',
     items: [
       { id: 'pdv' as ActiveModule, label: 'PDV / Caixa', icon: ShoppingCart },
-      { id: 'trocas' as ActiveModule, label: 'Trocas & Devoluções', icon: RotateCcw },
     ],
   },
   {
@@ -77,20 +76,25 @@ const moduleLabels: Record<ActiveModule, string> = {
 };
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate, children }) => {
-  const { user, profile, role, signOut } = useAuth();
+  const { user, profile, role } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const displayName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Administrador');
+  const roleLabel = role === 'ADMIN'
+    ? 'Administrador'
+    : role === 'MANAGER'
+      ? 'Gerente'
+      : role === 'CASHIER'
+        ? 'Caixa'
+        : 'Colaborador';
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'CS';
 
   return (
     <div className="app-layout">
       <aside className={`sidebar ${isSidebarOpen ? 'is-open' : 'is-collapsed'}`}>
         <div className="brand-area">
-          <div className="brand-mark" aria-hidden="true">
-            CS
-          </div>
+          <div className="brand-mark" aria-hidden="true">CS</div>
           <div className="brand-copy">
             <span className="brand-name">CoreSys</span>
             <span className="brand-caption">ERP & PDV</span>
@@ -121,7 +125,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
                         aria-current={active ? 'page' : undefined}
                       >
                         <Icon size={18} strokeWidth={1.9} />
-                        <span>{item.label}</span>
+                        <span className="nav-label">{item.label}</span>
                       </button>
                     );
                   })}
@@ -136,18 +140,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
             <div className="avatar avatar-sm">{initials}</div>
             <div className="account-copy">
               <strong>{displayName}</strong>
-              <span>{role === 'ADMIN' ? 'Administrador' : role === 'MANAGER' ? 'Gerente' : role === 'CASHIER' ? 'Caixa' : 'Colaborador'}</span>
+              <span>{roleLabel}</span>
             </div>
-            {user && (
-              <button className="icon-action subtle" onClick={signOut} title="Sair" aria-label="Sair">
-                <span aria-hidden="true">↪</span>
-              </button>
-            )}
           </div>
         </div>
       </aside>
 
-      {!isSidebarOpen && <div className="mobile-nav-backdrop" onClick={() => setIsSidebarOpen(true)} />}
+      {isSidebarOpen === false && (
+        <div className="mobile-nav-backdrop" onClick={() => setIsSidebarOpen(true)} aria-hidden="true" />
+      )}
 
       <div className={`main-wrapper ${isSidebarOpen ? '' : 'sidebar-collapsed'}`}>
         <header className="header">
@@ -177,7 +178,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
               title={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
               aria-label="Alternar tema"
             >
-              {theme === 'dark' ? '☼' : '◐'}
+              {theme === 'dark' ? '☼' : '◐' }
             </button>
           </div>
         </header>

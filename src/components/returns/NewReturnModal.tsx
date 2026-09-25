@@ -96,6 +96,7 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
       const cor = varMatch ? varMatch[2].trim() : 'Padrão';
 
       const prod = products.find(p => p.nome.toLowerCase() === nome.toLowerCase());
+      const variant = prod?.skus.find(s => s.tamanho.trim().toLowerCase() === tamanho.toLowerCase() && s.cor.trim().toLowerCase() === cor.toLowerCase());
       const preco = prod ? prod.preco : 0;
 
       parsedItems.push({
@@ -106,6 +107,7 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
         cor,
         precoUnitario: preco,
         qtd: qty,
+        variantId: variant?.id,
         motivo: 'Tamanho Incorreto'
       });
     });

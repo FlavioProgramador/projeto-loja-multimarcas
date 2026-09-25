@@ -65,6 +65,7 @@ const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
 const moduleLabels: Record<ActiveModule, string> = {
   dashboard: 'Dashboard',
   pdv: 'PDV / Caixa',
+  trocas: 'Trocas / Devoluções',
   estoque: 'Estoque & Produtos',
   financeiro: 'Financeiro',
   movimentacoes: 'Movimentações',

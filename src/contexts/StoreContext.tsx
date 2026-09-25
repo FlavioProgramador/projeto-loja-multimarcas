@@ -32,6 +32,7 @@ import {
   SuppliersService,
   FinanceService
 } from '../services';
+import { ReturnsService } from '../services/returns.service';
 import { storeService } from '../services/store.service';
 
 interface StoreContextType {
@@ -92,11 +93,13 @@ interface StoreContextType {
 
   // Customer actions
   addCustomer: (customer: Omit<Customer, 'id' | 'historico'>) => Promise<void>;
-  updateCustomer: (id: number | string, data: Partial<Customer>) => void;
-  deleteCustomer: (id: number | string) => void;
+  updateCustomer: (id: number | string, data: Partial<Customer>) => Promise<void>;
+  deleteCustomer: (id: number | string) => Promise<void>;
 
   // Supplier actions
   addSupplier: (supplier: Omit<Supplier, 'id' | 'produtos'>) => Promise<void>;
+  updateSupplier: (id: number | string, data: Partial<Supplier>) => Promise<void>;
+  deleteSupplier: (id: number | string) => Promise<void>;
 
   // Automation & Alerts
   checkAlerts: () => void;
@@ -165,6 +168,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         remoteMovements,
         remoteCustomers,
         remoteSuppliers,
+        remoteReturns,
         remoteStores
       ] = await Promise.all([
         ProductsService.getAll(activeStoreId || undefined),
@@ -173,6 +177,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         SalesService.getMovements(activeStoreId || undefined),
         CustomersService.getAll(),
         SuppliersService.getAll(),
+        ReturnsService.getAll(activeStoreId || undefined),
         storeService.getUserStores().catch(() => [])
       ]);
 
@@ -200,6 +205,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       if (remoteSuppliers) {
         setSuppliers(remoteSuppliers);
+      }
+      if (remoteReturns) {
+        setReturns(remoteReturns);
       }
     } catch (err) {
       console.warn('Sincronização com Supabase: mantendo cache local.', err);
@@ -594,151 +602,48 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const processReturn = async ({
-    clienteNome,
-    clienteCpf,
-    vendaOriginalId,
-    itens,
-    tipoResolucao,
-    observacoes
+    clienteNome, clienteCpf, vendaOriginalId, itens, tipoResolucao, observacoes
   }: {
-    clienteNome: string;
-    clienteCpf: string;
-    vendaOriginalId?: string;
-    itens: ReturnItem[];
-    tipoResolucao: 'credito_cliente' | 'vale_troca' | 'estorno_dinheiro';
-    observacoes?: string;
-  }) => {
-    const totalReturnAmount = itens.reduce((sum, item) => sum + item.precoUnitario * item.qtd, 0);
-    const returnIdNum = returns.length + 1001;
-    const returnCode = `DEV-${returnIdNum}`;
-    const currentDate = hoje();
-    const resolvedName = clienteNome.trim() || 'Consumidor Final';
-    const resolvedCpf = clienteCpf.trim() || 'Não informado';
+    clienteNome: string; clienteCpf: string; vendaOriginalId?: string; itens: ReturnItem[];
+    tipoResolucao: 'credito_cliente' | 'vale_troca' | 'estorno_dinheiro'; observacoes?: string;
+  }): Promise<{ success: boolean; message: string; returnRecord: ReturnRecord }> => {
+    if (itens.length === 0) return { success: false, message: 'Nenhum item informado.', returnRecord: {} as ReturnRecord };
+    const normalizedItems = itens.map(item => ({ ...item, qtd: Number(item.qtd), precoUnitario: Number(item.precoUnitario) }));
+    if (normalizedItems.some(item => !Number.isInteger(item.qtd) || item.qtd <= 0))
+      return { success: false, message: 'Quantidade de devolução inválida.', returnRecord: {} as ReturnRecord };
 
-    // 1. Aumentar o estoque físico dos SKUs devolvidos
-    setProducts(prev =>
-      prev.map(prod => {
-        const returnedForThisProd = itens.filter(
-          i => i.produtoId === prod.id || (prod.uuid && i.productUuid === prod.uuid)
-        );
-        if (returnedForThisProd.length === 0) return prod;
-
-        const updatedSkus = prod.skus.map(sku => {
-          const matchItem = returnedForThisProd.find(
-            i =>
-              i.tamanho.trim().toLowerCase() === sku.tamanho.trim().toLowerCase() &&
-              i.cor.trim().toLowerCase() === sku.cor.trim().toLowerCase()
-          );
-          if (!matchItem) return sku;
-          return {
-            ...sku,
-            qtd: sku.qtd + matchItem.qtd
-          };
+    if (isSupabaseConfigured) {
+      if (!activeStoreId) return { success: false, message: 'Nenhuma loja ativa selecionada.', returnRecord: {} as ReturnRecord };
+      if (!vendaOriginalId || !/^[0-9a-f-]{36}$/i.test(vendaOriginalId))
+        return { success: false, message: 'Em produção, a devolução deve estar vinculada ao UUID da venda original.', returnRecord: {} as ReturnRecord };
+      try {
+        const result = await ReturnsService.processReturn({
+          storeId: activeStoreId, originalSaleId: vendaOriginalId, customerName: clienteNome, customerCpf: clienteCpf,
+          items: normalizedItems, resolutionType: tipoResolucao, observations: observacoes
         });
-
-        return { ...prod, skus: updatedSkus };
-      })
-    );
-
-    // 2. Criar registro da devolução
-    const newReturnRecord: ReturnRecord = {
-      id: returnIdNum,
-      codigo: returnCode,
-      data: currentDate,
-      vendaOriginalId,
-      clienteNome: resolvedName,
-      clienteCpf: resolvedCpf,
-      itens,
-      valorTotal: totalReturnAmount,
-      tipoResolucao,
-      status: 'CONCLUIDO',
-      dataValidade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-      observacoes:
-        observacoes ||
-        (tipoResolucao === 'estorno_dinheiro'
-          ? 'Estorno em dinheiro ao cliente'
-          : 'Crédito/Vale gerado para abatimento em futuras compras')
-    };
-
-    setReturns(prev => [newReturnRecord, ...prev]);
-
-    // 3. Atualizar saldo de crédito do cliente
-    if (tipoResolucao === 'credito_cliente' || tipoResolucao === 'vale_troca') {
-      setCustomers(prev => {
-        const existingCustomer =
-          prev.find(c => resolvedCpf !== 'Não informado' && c.cpf === resolvedCpf) ||
-          prev.find(c => c.nome.toLowerCase() === resolvedName.toLowerCase());
-
-        const creditMovement: CustomerCreditMovement = {
-          id: Date.now(),
-          tipo: 'entrada',
-          valor: totalReturnAmount,
-          descricao: `Crédito gerado pela Devolução #${returnCode}`,
-          data: currentDate,
-          referenciaId: returnCode
-        };
-
-        if (existingCustomer) {
-          return prev.map(c =>
-            c.id === existingCustomer.id
-              ? {
-                ...c,
-                saldoCredito: (c.saldoCredito || 0) + totalReturnAmount,
-                movimentacoesCredito: [
-                  creditMovement,
-                  ...(c.movimentacoesCredito || [])
-                ]
-              }
-              : c
-          );
-        } else if (resolvedName !== 'Consumidor Final' && resolvedName !== 'Cliente não identificado') {
-          const nextCustId = prev.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-          return [
-            ...prev,
-            {
-              id: nextCustId,
-              nome: resolvedName,
-              cpf: resolvedCpf,
-              rg: '',
-              telefone: '',
-              email: '',
-              endereco: '',
-              dataNascimento: '',
-              saldoCredito: totalReturnAmount,
-              historico: [],
-              movimentacoesCredito: [creditMovement]
-            }
-          ];
-        }
-        return prev;
-      });
-    } else if (tipoResolucao === 'estorno_dinheiro') {
-      // Registrar saída financeira de estorno
-      const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
-      setTransactions(prev => [
-        {
-          id: nextTransId,
-          tipo: 'EXPENSE',
-          descricao: `Estorno Devolução #${returnCode}`,
-          valor: totalReturnAmount,
-          data: currentDate
-        },
-        ...prev
-      ]);
+        if (!result.success) return { success: false, message: result.message, returnRecord: {} as ReturnRecord };
+        await refreshData();
+        return { success: true, message: result.message, returnRecord: result.returnRecord };
+      } catch (err) {
+        console.error('Erro ao processar devolução no Supabase:', err);
+        return { success: false, message: err instanceof Error ? err.message : 'Erro ao processar devolução.', returnRecord: {} as ReturnRecord };
+      }
     }
 
-    setNotifications(prev => [
-      `🔄 Devolução #${returnCode} registrada. Estoque reabastecido e crédito de R$ ${totalReturnAmount.toFixed(2)} gerado.`,
-      ...prev
-    ]);
-
-    return {
-      success: true,
-      message: `Troca/Devolução #${returnCode} processada com sucesso!`,
-      returnRecord: newReturnRecord
-    };
+    const totalReturnAmount = normalizedItems.reduce((sum, item) => sum + item.precoUnitario * item.qtd, 0);
+    const returnIdNum = returns.length + 1001; const returnCode = `DEV-${returnIdNum}`; const currentDate = hoje();
+    const newReturnRecord: ReturnRecord = { id: returnIdNum, codigo: returnCode, data: currentDate, vendaOriginalId,
+      clienteNome: clienteNome.trim() || 'Consumidor Final', clienteCpf: clienteCpf.trim() || 'Não informado',
+      itens: normalizedItems, valorTotal: totalReturnAmount, tipoResolucao, status: 'CONCLUIDO',
+      dataValidade: new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10), observacoes };
+    setReturns(prev => [newReturnRecord, ...prev]);
+    setProducts(prev => prev.map(prod => {
+      const items = normalizedItems.filter(i => i.produtoId === prod.id || (prod.uuid && i.productUuid === prod.uuid));
+      if (!items.length) return prod;
+      return { ...prod, skus: prod.skus.map(sku => { const match=items.find(i => i.tamanho.trim().toLowerCase()===sku.tamanho.trim().toLowerCase() && i.cor.trim().toLowerCase()===sku.cor.trim().toLowerCase()); return match ? { ...sku, qtd: sku.qtd + match.qtd } : sku; }) };
+    }));
+    return { success: true, message: `Troca/Devolução #${returnCode} processada com sucesso!`, returnRecord: newReturnRecord };
   };
-
   const toggleExpensePaid = async (id: number) => {
     const exp = fixedExpenses.find(e => e.id === id);
     if (!exp) return;
@@ -753,43 +658,52 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addCustomer = async (data: Omit<Customer, 'id' | 'historico'>) => {
-    const nextId = customers.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-    setCustomers(prev => [...prev, { id: nextId, ...data, saldoCredito: 0, historico: [] }]);
+    if (isSupabaseConfigured) { await CustomersService.create(data); await refreshData(); return; }
+    const nextId = customers.reduce((max,c)=>Math.max(max,c.id),0)+1;
+    setCustomers(prev=>[...prev,{ id: nextId, ...data, saldoCredito: 0, historico: [] }]);
+  };
 
-    if (isSupabaseConfigured) {
-      try {
-        await CustomersService.create(data);
-        await refreshData();
-      } catch (err) {
-        console.error('Erro ao adicionar cliente no Supabase:', err);
-      }
+  const updateCustomer = async (id: number | string, data: Partial<Customer>) => {
+    const target=customers.find(c=>String(c.id)===String(id)); if(!target) return;
+    const snapshot=customers; setCustomers(prev=>prev.map(c=>String(c.id)===String(id)?{...c,...data}:c));
+    if(isSupabaseConfigured){
+      if(!target.uuid){setCustomers(snapshot);throw new Error('Cliente sem UUID do Supabase. Atualização cancelada.');}
+      try{await CustomersService.update(target.uuid,data);await refreshData();}catch(err){setCustomers(snapshot);throw err;}
     }
   };
 
-  const updateCustomer = (id: number | string, data: Partial<Customer>) => {
-    setCustomers(prev =>
-      prev.map(c => (String(c.id) === String(id) ? { ...c, ...data } : c))
-    );
-  };
-
-  const deleteCustomer = (id: number | string) => {
-    setCustomers(prev => prev.filter(c => String(c.id) !== String(id)));
+  const deleteCustomer = async (id: number | string) => {
+    const target=customers.find(c=>String(c.id)===String(id)); if(!target) return;
+    const snapshot=customers; setCustomers(prev=>prev.filter(c=>String(c.id)!==String(id)));
+    if(isSupabaseConfigured){
+      if(!target.uuid){setCustomers(snapshot);throw new Error('Cliente sem UUID do Supabase. Exclusão cancelada.');}
+      try{await CustomersService.remove(target.uuid);await refreshData();}catch(err){setCustomers(snapshot);throw err;}
+    }
   };
 
   const addSupplier = async (data: Omit<Supplier, 'id' | 'produtos'>) => {
-    const nextId = suppliers.reduce((max, s) => Math.max(max, s.id), 0) + 1;
-    setSuppliers(prev => [...prev, { id: nextId, ...data, produtos: [] }]);
+    if(isSupabaseConfigured){await SuppliersService.create(data);await refreshData();return;}
+    const nextId=suppliers.reduce((max,s)=>Math.max(max,s.id),0)+1;
+    setSuppliers(prev=>[...prev,{id:nextId,...data,produtos:[]}]);
+  };
 
-    if (isSupabaseConfigured) {
-      try {
-        await SuppliersService.create(data);
-        await refreshData();
-      } catch (err) {
-        console.error('Erro ao adicionar fornecedor no Supabase:', err);
-      }
+  const updateSupplier = async (id:number|string,data:Partial<Supplier>) => {
+    const target=suppliers.find(s=>String(s.id)===String(id)); if(!target)return;
+    const snapshot=suppliers; setSuppliers(prev=>prev.map(s=>String(s.id)===String(id)?{...s,...data}:s));
+    if(isSupabaseConfigured){
+      if(!target.uuid){setSuppliers(snapshot);throw new Error('Fornecedor sem UUID do Supabase. Atualização cancelada.');}
+      try{await SuppliersService.update(target.uuid,data);await refreshData();}catch(err){setSuppliers(snapshot);throw err;}
     }
   };
 
+  const deleteSupplier = async (id:number|string) => {
+    const target=suppliers.find(s=>String(s.id)===String(id)); if(!target)return;
+    const snapshot=suppliers; setSuppliers(prev=>prev.filter(s=>String(s.id)!==String(id)));
+    if(isSupabaseConfigured){
+      if(!target.uuid){setSuppliers(snapshot);throw new Error('Fornecedor sem UUID do Supabase. Exclusão cancelada.');}
+      try{await SuppliersService.remove(target.uuid);await refreshData();}catch(err){setSuppliers(snapshot);throw err;}
+    }
+  };
   const checkAlerts = () => {
     const alerts: string[] = [];
     products.forEach(p => {
@@ -842,6 +756,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateCustomer,
         deleteCustomer,
         addSupplier,
+        updateSupplier,
+        deleteSupplier,
         checkAlerts,
         refreshData
       }}

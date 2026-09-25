@@ -25,14 +25,21 @@ export const CustomersService = {
             product_name,
             quantity
           )
+        ),
+        customer_credit_movements (
+          id,
+          type,
+          amount,
+          description,
+          created_at,
+          reference_id
         )
       `)
       .eq('is_active', true)
       .order('name', { ascending: true });
 
     if (error) {
-      console.error('Erro ao buscar clientes:', error);
-      return [];
+      throw error;
     }
 
     return (data || []).map((c: any, index: number) => {
@@ -50,6 +57,19 @@ export const CustomersService = {
         };
       });
 
+      const creditMovements = (c.customer_credit_movements || []).map((m: any) => ({
+        id: index + 1,
+        tipo: m.type === 'CREDIT' ? 'entrada' as const : 'saida' as const,
+        valor: Number(m.amount) || 0,
+        descricao: m.description,
+        data: (m.created_at || '').slice(0, 10),
+        referenciaId: m.reference_id || undefined
+      }));
+      const saldoCredito = creditMovements.reduce(
+        (total: number, m: any) => total + (m.tipo === 'entrada' ? m.valor : -m.valor),
+        0
+      );
+
       return {
         id: index + 1,
         uuid: c.id,
@@ -60,6 +80,8 @@ export const CustomersService = {
         email: c.email || '',
         endereco: c.address || '',
         dataNascimento: c.birth_date || '',
+        saldoCredito: Math.max(0, saldoCredito),
+        movimentacoesCredito: creditMovements,
         historico
       };
     });

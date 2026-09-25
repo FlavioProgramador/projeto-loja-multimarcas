@@ -1,125 +1,78 @@
-/* ============================================================================
-   VESTRA ERP - DESIGN SYSTEM: RETAIL INTELLIGENCE (GOOGLE STITCH REF)
-   ============================================================================ */
+/* CORESYS — DESIGN SYSTEM DARK PROFESSIONAL */
 
 :root,
-[data-theme='light'] {
-  /* Surface & Backgrounds */
-  --bg-canvas: #f9f9ff;
-  --bg-surface: #ffffff;
-  --bg-surface-subtle: #f0f3ff;
-  --bg-surface-hover: #e7eeff;
-  --bg-surface-high: #dee8ff;
-  --bg-surface-highest: #d8e3fb;
-
-  /* Primary & Accents */
-  --primary: #004ac6;
-  --primary-hover: #003ea8;
-  --primary-container: #2563eb;
-  --primary-light: #e7eeff;
-  --primary-fixed: #dbe1ff;
-  --on-primary: #ffffff;
-  --accent: #2563eb;
-
-  /* Secondary & Neutrals */
-  --secondary: #505f76;
-  --secondary-container: #d0e1fb;
-
-  /* Typography Colors */
-  --text-primary: #111c2d;
-  --text-secondary: #434655;
-  --text-muted: #737686;
-  --text-inverse: #ffffff;
-
-  /* Borders & Outlines */
-  --border-color: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --border-glass: #e2e8f0;
-  --card-border: #e2e8f0;
-  --outline-variant: #c3c6d7;
-
-  /* Status Badges & Indicators */
-  --badge-green: #007d55;
-  --badge-green-bg: #e6f9f0;
-  --badge-yellow: #b45309;
-  --badge-yellow-bg: #fef3c7;
-  --badge-red: #ba1a1a;
-  --badge-red-bg: #ffdad6;
-  --badge-blue: #004ac6;
-  --badge-blue-bg: #e7eeff;
-  --warning: #b45309;
-
-  /* Fonts */
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  /* Spacing */
-  --unit: 4px;
-  --gutter: 24px;
-  --margin-desktop: 32px;
-  --margin-mobile: 16px;
-  --container-max: 1440px;
-
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-full: 9999px;
-
-  /* Shadows (Weightless elevation) */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
-}
-
+[data-theme='light'],
 :root[data-theme='dark'],
 html.dark,
 body.dark,
 body.dark-mode,
 [data-theme='dark'] {
-  --bg-canvas: #0b1329;
-  --bg-surface: #131f37;
-  --bg-surface-subtle: #1a2948;
-  --bg-surface-hover: #22365d;
-  --bg-surface-high: #2a416e;
-  --bg-surface-highest: #355085;
+  --color-background: #080b0a;
+  --color-surface: #101412;
+  --color-surface-elevated: #171b19;
+  --color-surface-hover: #1e2522;
+  --color-surface-active: #23332d;
+  --color-border: #28332f;
+  --color-border-subtle: #1e2824;
+  --color-primary: #00674f;
+  --color-primary-hover: #0a3c30;
+  --color-primary-light: #3ebb9e;
+  --color-accent: #73e6cb;
+  --color-text-primary: #f2f7f5;
+  --color-text-secondary: #a2b4ad;
+  --color-text-muted: #71837b;
+  --color-success: #3ebb9e;
+  --color-warning: #e5b85c;
+  --color-danger: #e57373;
 
-  --primary: #3b82f6;
-  --primary-hover: #60a5fa;
-  --primary-container: #2563eb;
-  --primary-light: rgba(59, 130, 246, 0.2);
-  --primary-fixed: #1e3a8a;
-  --on-primary: #ffffff;
-  --accent: #3b82f6;
-
-  --secondary: #94a3b8;
-  --secondary-container: #1e293b;
-
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --text-inverse: #0b1329;
-
-  --border-color: #243552;
-  --border-subtle: #192640;
-  --border-glass: #243552;
-  --card-border: #243552;
-  --outline-variant: #355085;
-
-  --badge-green: #34d399;
-  --badge-green-bg: rgba(16, 185, 129, 0.2);
-  --badge-yellow: #fbbf24;
-  --badge-yellow-bg: rgba(245, 158, 11, 0.2);
-  --badge-red: #f87171;
-  --badge-red-bg: rgba(239, 68, 68, 0.2);
-  --badge-blue: #60a5fa;
-  --badge-blue-bg: rgba(59, 130, 246, 0.2);
-  --warning: #fbbf24;
-
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+  --bg-canvas: var(--color-background);
+  --bg-surface: var(--color-surface);
+  --bg-surface-subtle: var(--color-surface-elevated);
+  --bg-surface-hover: var(--color-surface-hover);
+  --bg-surface-high: var(--color-surface-active);
+  --bg-surface-highest: #2a4038;
+  --primary: var(--color-primary-light);
+  --primary-hover: #73e6cb;
+  --primary-container: var(--color-primary);
+  --primary-light: rgba(62, 187, 158, 0.16);
+  --primary-fixed: #234f43;
+  --on-primary: var(--color-text-primary);
+  --accent: var(--color-accent);
+  --secondary: #90a29b;
+  --secondary-container: #22302b;
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --text-inverse: var(--color-background);
+  --border-color: var(--color-border);
+  --border-subtle: var(--color-border-subtle);
+  --border-glass: var(--color-border);
+  --card-border: var(--color-border);
+  --outline-variant: #40514a;
+  --badge-green: var(--color-success);
+  --badge-green-bg: rgba(62, 187, 158, 0.14);
+  --badge-yellow: var(--color-warning);
+  --badge-yellow-bg: rgba(229, 184, 92, 0.14);
+  --badge-red: var(--color-danger);
+  --badge-red-bg: rgba(229, 115, 115, 0.14);
+  --badge-blue: var(--color-accent);
+  --badge-blue-bg: rgba(115, 230, 203, 0.12);
+  --warning: var(--color-warning);
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --unit: 4px;
+  --gutter: 24px;
+  --margin-desktop: 32px;
+  --margin-mobile: 16px;
+  --container-max: 1440px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.30);
+  --shadow-md: 0 6px 16px rgba(0,0,0,.28);
+  --shadow-lg: 0 18px 42px rgba(0,0,0,.34);
 }
 
 /* ============================================================================

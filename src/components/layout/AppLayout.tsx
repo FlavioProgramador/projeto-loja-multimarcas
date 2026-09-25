@@ -164,7 +164,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
               aria-label={sidebarOpen ? 'Recolher menu' : 'Expandir menu'}
               title={sidebarOpen ? 'Recolher menu' : 'Expandir menu'}
             >
-              {sidebarOpen ? <ChevronLeft size={17} /> : <ChevronRight size={17} />}
+              {sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
             </button>
 
             <div className="header-breadcrumb">

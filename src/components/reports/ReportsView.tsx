@@ -16,9 +16,11 @@ export const ReportsView: React.FC = () => {
 
   const mesAtualStr = mesAtual();
   const mesAntStr = mesAnterior();
+  const pertenceAoMes = (data: string | undefined, mes: string) =>
+    typeof data === 'string' && data.startsWith(mes);
 
   // Current month stats
-  const transacoesMes = transactions.filter(t => t.data.startsWith(mesAtualStr));
+  const transacoesMes = transactions.filter(t => pertenceAoMes(t.data, mesAtualStr));
   const totalVendasMes = transacoesMes
     .filter(t => t.tipo === 'INCOME')
     .reduce((acc, t) => acc + t.valor, 0);
@@ -26,11 +28,11 @@ export const ReportsView: React.FC = () => {
     .filter(t => t.tipo === 'EXPENSE')
     .reduce((acc, t) => acc + t.valor, 0);
   const lucroMes = totalVendasMes - totalSaidasMes;
-  const qtdVendasMes = movements.filter(m => m.data.startsWith(mesAtualStr)).length;
+  const qtdVendasMes = movements.filter(m => pertenceAoMes(m.data, mesAtualStr)).length;
   const ticketMedioMes = qtdVendasMes > 0 ? totalVendasMes / qtdVendasMes : 0;
 
   // Previous month stats
-  const transacoesAnt = transactions.filter(t => t.data.startsWith(mesAntStr));
+  const transacoesAnt = transactions.filter(t => pertenceAoMes(t.data, mesAntStr));
   const totalVendasAnt = transacoesAnt
     .filter(t => t.tipo === 'INCOME')
     .reduce((acc, t) => acc + t.valor, 0);
@@ -38,7 +40,7 @@ export const ReportsView: React.FC = () => {
     .filter(t => t.tipo === 'EXPENSE')
     .reduce((acc, t) => acc + t.valor, 0);
   const lucroAnt = totalVendasAnt - totalSaidasAnt;
-  const qtdVendasAnt = movements.filter(m => m.data.startsWith(mesAntStr)).length;
+  const qtdVendasAnt = movements.filter(m => pertenceAoMes(m.data, mesAntStr)).length;
   const ticketMedioAnt = qtdVendasAnt > 0 ? totalVendasAnt / qtdVendasAnt : 0;
 
   // Comparisons
@@ -50,9 +52,9 @@ export const ReportsView: React.FC = () => {
   // Top products of the current month
   const vendasPorProduto: Record<string, number> = {};
   movements
-    .filter(m => m.data.startsWith(mesAtualStr))
+    .filter(m => pertenceAoMes(m.data, mesAtualStr))
     .forEach(m => {
-      m.produtos.split(',').forEach(item => {
+      (m.produtos || '').split(',').forEach(item => {
         const clean = item.trim();
         if (!clean) return;
         const nome = clean.split(' x')[0];
@@ -196,7 +198,7 @@ export const ReportsView: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {['PIX', 'Cartão', 'Dinheiro'].map(method => {
               const total = movements
-                .filter(m => m.formaPagamento.includes(method) && m.data.startsWith(mesAtualStr))
+                .filter(m => (m.formaPagamento || '').includes(method) && pertenceAoMes(m.data, mesAtualStr))
                 .reduce((acc, mov) => acc + mov.valor, 0);
 
               return (

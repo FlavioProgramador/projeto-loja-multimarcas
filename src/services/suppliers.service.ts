@@ -49,5 +49,37 @@ export const SuppliersService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async update(uuid: string, supplier: Partial<{
+    nome: string;
+    cnpj: string;
+    contato: string;
+    email: string;
+    endereco: string;
+  }>): Promise<void> {
+    if (!isSupabaseConfigured) return;
+
+    const payload = {
+      ...(supplier.nome !== undefined && { company_name: supplier.nome.trim() }),
+      ...(supplier.cnpj !== undefined && { document: supplier.cnpj.trim() || null }),
+      ...(supplier.contato !== undefined && { contact_name: supplier.contato.trim() || null }),
+      ...(supplier.email !== undefined && { email: supplier.email.trim() || null }),
+      ...(supplier.endereco !== undefined && { address: supplier.endereco.trim() || null })
+    };
+
+    const { error } = await supabase.from('suppliers').update(payload).eq('id', uuid);
+    if (error) throw error;
+  },
+
+  async remove(uuid: string): Promise<void> {
+    if (!isSupabaseConfigured) return;
+
+    const { error } = await supabase
+      .from('suppliers')
+      .update({ is_active: false })
+      .eq('id', uuid);
+
+    if (error) throw error;
   }
 };

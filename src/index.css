@@ -1,53 +1,53 @@
 /* ============================================================================
    CoreSys ERP / PDV — Sistema visual
-   Identidade: #00674f #73E6CB #3ebb9e #0a3c30
+   Identidade: #00A887 #73E6CB #3EBB9E #07352C
    ============================================================================ */
 
 :root,
 [data-theme='light'] {
-  --bg-canvas: #f4f8f6;
-  --bg-surface: #ffffff;
-  --bg-surface-subtle: #edf4f1;
-  --bg-surface-hover: #e5efeb;
-  --bg-surface-high: #dceae5;
-  --bg-surface-highest: #d2e2dc;
+  --bg-canvas: #0B0D0D;
+  --bg-surface: #F4F8F6;
+  --bg-surface-subtle: #151919;
+  --bg-surface-hover: #1C2220;
+  --bg-surface-high: #232A27;
+  --bg-surface-highest: #2A3430;
 
-  --primary: #00674f;
-  --primary-hover: #00533f;
-  --primary-container: #3ebb9e;
-  --primary-light: #e5f6f0;
-  --primary-fixed: #bfeee1;
-  --on-primary: #ffffff;
-  --accent: #3ebb9e;
+  --primary: #00A887;
+  --primary-hover: #007A63;
+  --primary-container: #3EBB9E;
+  --primary-light: #0C3F35;
+  --primary-fixed: #184F45;
+  --on-primary: #F4F8F6;
+  --accent: #3EBB9E;
 
-  --brand-primary: #00674f;
+  --brand-primary: #00A887;
   --brand-accent: #73E6CB;
-  --brand-secondary: #3ebb9e;
-  --brand-deep: #0a3c30;
+  --brand-secondary: #3EBB9E;
+  --brand-deep: #07352C;
 
-  --secondary: #52635f;
-  --secondary-container: #dce7e3;
+  --secondary: #A3B1AD;
+  --secondary-container: #23302C;
 
-  --text-primary: #10201b;
-  --text-secondary: #45534f;
-  --text-muted: #71817c;
-  --text-inverse: #ffffff;
+  --text-primary: #F4F8F6;
+  --text-secondary: #B6C2BE;
+  --text-muted: #82908B;
+  --text-inverse: #F4F8F6;
 
-  --border-color: #d7e3df;
-  --border-subtle: #e9f0ed;
-  --border-glass: #d7e3df;
-  --card-border: #d7e3df;
-  --outline-variant: #b7c8c2;
+  --border-color: #2A3531;
+  --border-subtle: #1D2522;
+  --border-glass: #2A3531;
+  --card-border: #2A3531;
+  --outline-variant: #42514C;
 
-  --badge-green: #00674f;
-  --badge-green-bg: #e4f5ef;
-  --badge-yellow: #6c6651;
-  --badge-yellow-bg: #f2f0e7;
-  --badge-red: #a44848;
-  --badge-red-bg: #f8e9e9;
-  --badge-blue: #00674f;
-  --badge-blue-bg: #e5f6f0;
-  --warning: #6c6651;
+  --badge-green: #00A887;
+  --badge-green-bg: #103B33;
+  --badge-yellow: #D6B15A;
+  --badge-yellow-bg: #3A321A;
+  --badge-red: #D97070;
+  --badge-red-bg: #3A2121;
+  --badge-blue: #00A887;
+  --badge-blue-bg: #0C3F35;
+  --warning: #D6B15A;
 
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -83,16 +83,16 @@ body.dark-mode,
 
   --primary: #73E6CB;
   --primary-hover: #8aedd6;
-  --primary-container: #3ebb9e;
+  --primary-container: #3EBB9E;
   --primary-light: rgba(115, 230, 203, 0.14);
   --primary-fixed: #244b41;
   --on-primary: #08211a;
   --accent: #73E6CB;
 
-  --brand-primary: #00674f;
+  --brand-primary: #00A887;
   --brand-accent: #73E6CB;
-  --brand-secondary: #3ebb9e;
-  --brand-deep: #0a3c30;
+  --brand-secondary: #3EBB9E;
+  --brand-deep: #07352C;
 
   --secondary: #aabcb6;
   --secondary-container: #1b322c;

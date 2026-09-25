@@ -1,5 +1,23 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, RotateCcw, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap, Moon, Sun, LogIn } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  RotateCcw,
+  DollarSign,
+  ArrowLeftRight,
+  Users,
+  Truck,
+  FileText,
+  Zap,
+  Moon,
+  Sun,
+  Search,
+  Bell,
+  UserRound,
+} from 'lucide-react';
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -11,181 +29,181 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
-export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate, children }) => {
-  const { user, signOut } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+const moduleLabels: Record<ActiveModule, string> = {
+  dashboard: 'Dashboard',
+  pdv: 'PDV / Caixa',
+  estoque: 'Estoque & Produtos',
+  trocas: 'Trocas & Devoluções',
+  financeiro: 'Financeiro',
+  movimentacoes: 'Movimentações',
+  clientes: 'Clientes',
+  fornecedores: 'Fornecedores',
+  relatorios: 'Relatórios',
+  automacoes: 'Automações',
+};
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'pdv', label: 'PDV / Caixa', icon: ShoppingCart },
-    { id: 'estoque', label: 'Estoque & Produtos', icon: Package },
-    { id: 'trocas', label: 'Trocas & Devoluções', icon: RotateCcw },
-    { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
-    { id: 'movimentacoes', label: 'Movimentações', icon: ArrowLeftRight },
-    { id: 'clientes', label: 'Clientes', icon: Users },
-    { id: 'fornecedores', label: 'Fornecedores', icon: Truck },
-    { id: 'relatorios', label: 'Relatórios', icon: FileText },
-    { id: 'automacoes', label: 'Automações', icon: Zap },
-  ];
+const menuGroups = [
+  {
+    label: 'Principal',
+    items: [
+      { id: 'dashboard' as ActiveModule, label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'pdv' as ActiveModule, label: 'Vendas', icon: ShoppingCart },
+    ],
+  },
+  {
+    label: 'Catálogo',
+    items: [
+      { id: 'estoque' as ActiveModule, label: 'Estoque & Produtos', icon: Package },
+      { id: 'trocas' as ActiveModule, label: 'Trocas & Devoluções', icon: RotateCcw },
+      { id: 'movimentacoes' as ActiveModule, label: 'Movimentações', icon: ArrowLeftRight },
+    ],
+  },
+  {
+    label: 'Relacionamento',
+    items: [
+      { id: 'clientes' as ActiveModule, label: 'Clientes', icon: Users },
+      { id: 'fornecedores' as ActiveModule, label: 'Fornecedores', icon: Truck },
+    ],
+  },
+  {
+    label: 'Gestão',
+    items: [
+      { id: 'financeiro' as ActiveModule, label: 'Financeiro', icon: DollarSign },
+      { id: 'relatorios' as ActiveModule, label: 'Relatórios', icon: FileText },
+      { id: 'automacoes' as ActiveModule, label: 'Automações', icon: Zap },
+    ],
+  },
+];
+
+const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
+  dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  estoque: ['ADMIN', 'MANAGER'],
+  trocas: ['ADMIN', 'MANAGER'],
+  financeiro: ['ADMIN', 'MANAGER'],
+  movimentacoes: ['ADMIN', 'MANAGER'],
+  clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  fornecedores: ['ADMIN', 'MANAGER'],
+  relatorios: ['ADMIN', 'MANAGER'],
+  automacoes: ['ADMIN'],
+};
+
+export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate, children }) => {
+  const { user, profile, role } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const displayName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Administrador');
+  const roleLabel =
+    role === 'ADMIN' ? 'Administrador' :
+    role === 'MANAGER' ? 'Gerente' :
+    role === 'CASHIER' ? 'Caixa' :
+    'Colaborador';
+  const initials = displayName.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'CS';
 
   return (
-    <div className="app-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-canvas)', position: 'relative' }}>
-
-      {/* Sidebar Retrátil */}
-      <aside style={{
-        width: '260px',
-        background: 'var(--bg-surface)',
-        borderRight: '1px solid var(--border-color)',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'fixed',
-        top: 0,
-        bottom: 0,
-        left: isSidebarOpen ? 0 : '-260px',
-        zIndex: 50,
-        transition: 'left 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-      }}>
-        {/* Logo / Header da Sidebar (Limpo, sem botão de fechar antigo) */}
-        <div style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-md)', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '14px' }}>
-            V
-          </div>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>VESTRA</div>
-            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Retail Management</div>
+    <div className="app-layout">
+      <aside className={`sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}>
+        <div className="logo-area">
+          <div className="coresys-logo-mark">CS</div>
+          <div className="coresys-brand-copy">
+            <strong>CoreSys</strong>
+            <span>Retail OS</span>
           </div>
         </div>
 
-        {/* Navegação */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ fontSize: '10.5px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '8px 10px', letterSpacing: '0.05em' }}>
-            Menu Principal
-          </div>
-          {menuItems.map(item => {
-            const Icon = item.icon;
-            const isActive = currentModule === item.id;
+        <nav className="sidebar-nav" aria-label="Menu principal">
+          {menuGroups.map(group => {
+            const visibleItems = group.items.filter(item => !user || MODULE_PERMISSIONS[item.id].includes(role));
+            if (!visibleItems.length) return null;
+
             return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id as ActiveModule)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  background: isActive ? 'var(--primary-light)' : 'transparent',
-                  color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                  fontSize: '13px',
-                  fontWeight: isActive ? 600 : 500,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <Icon size={16} />
-                <span>{item.label}</span>
-              </button>
+              <section className="nav-group" key={group.label}>
+                <div className="nav-section-title">{group.label}</div>
+                <div className="nav-group-items">
+                  {visibleItems.map(item => {
+                    const Icon = item.icon;
+                    const active = currentModule === item.id;
+
+                    return (
+                      <button
+                        key={item.id}
+                        className={`nav-item ${active ? 'active' : ''}`}
+                        onClick={() => onNavigate(item.id)}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <Icon size={18} strokeWidth={1.9} />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             );
           })}
-        </div>
+        </nav>
 
-        {/* Utilizador / Rodapé da Sidebar */}
-        <div style={{ padding: '16px', borderTop: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.email || 'Admin Vestra'}
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Gestão Ativa</div>
+        <div className="sidebar-footer">
+          <div className="sidebar-user-card">
+            <div className="user-avatar">{initials}</div>
+            <div className="sidebar-user-copy">
+              <strong>{displayName}</strong>
+              <span>{roleLabel}</span>
             </div>
-            {user && (
-              <button onClick={signOut} style={{ border: 'none', background: 'transparent', color: 'var(--badge-red)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
-                Sair
-              </button>
-            )}
+            <ChevronRight size={15} className="sidebar-user-chevron" />
           </div>
         </div>
       </aside>
 
-      {/* Botão de Seta Centralizado na Borda (Toggle Flutuante) */}
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: isSidebarOpen ? '246px' : '12px',
-          transform: 'translateY(-50%)',
-          width: '28px',
-          height: '28px',
-          borderRadius: '50%',
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-color)',
-          color: 'var(--text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
-          zIndex: 60,
-          transition: 'left 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-        }}
-        title={isSidebarOpen ? "Minimizar menu" : "Expandir menu"}
-      >
-        {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-      </button>
-
-      {/* Conteúdo Principal */}
-      <div style={{ flex: 1, marginLeft: isSidebarOpen ? '260px' : '0', display: 'flex', flexDirection: 'column', minHeight: '100vh', transition: 'margin-left 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-
-        {/* Header Superior Limpo */}
-        <header style={{
-          height: '64px',
-          background: 'var(--bg-surface)',
-          borderBottom: '1px solid var(--border-color)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 40
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
-              {currentModule}
-            </span>
-          </div>
-
-          {/* Ações do Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <HeaderAgenda />
-
+      <div className={`main-wrapper ${sidebarOpen ? 'with-sidebar' : 'without-sidebar'}`}>
+        <header className="header">
+          <div className="header-left">
             <button
-              onClick={toggleTheme}
-              style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '8px', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="Alternar tema"
+              className="icon-btn header-menu-btn"
+              onClick={() => setSidebarOpen(open => !open)}
+              aria-label={sidebarOpen ? 'Recolher menu' : 'Expandir menu'}
+              title={sidebarOpen ? 'Recolher menu' : 'Expandir menu'}
             >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              {sidebarOpen ? <ChevronLeft size={17} /> : <ChevronRight size={17} />}
             </button>
 
-            {!user && (
-              <button className="btn btn-sm" style={{ gap: '6px' }}>
-                <LogIn size={14} /> Entrar
-              </button>
-            )}
+            <div className="header-breadcrumb">
+              <span>Produtos</span>
+              <ChevronRight size={13} />
+              <strong>{moduleLabels[currentModule]}</strong>
+            </div>
+          </div>
+
+          <div className="header-center-search">
+            <Search size={16} />
+            <input placeholder="Buscar no sistema..." aria-label="Buscar no sistema" />
+            <span className="search-shortcut">⌘ K</span>
+          </div>
+
+          <div className="header-right">
+            <HeaderAgenda />
+            <button className="icon-btn" onClick={toggleTheme} aria-label="Alternar tema" title="Alternar tema">
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button className="icon-btn notification-btn" aria-label="Notificações">
+              <Bell size={16} />
+              <span className="notification-dot" />
+            </button>
+            <div className="header-profile">
+              <div className="header-avatar">{initials}</div>
+              <div className="header-profile-copy">
+                <strong>{displayName}</strong>
+                <span>{roleLabel}</span>
+              </div>
+              <UserRound size={14} />
+            </div>
           </div>
         </header>
 
-        {/* Corpo da Página */}
-        <main style={{ flex: 1, padding: '24px 32px', maxWidth: '1440px', width: '100%', margin: '0 auto' }}>
+        <main className="page-content">
           {children}
         </main>
       </div>
-
     </div>
   );
 };

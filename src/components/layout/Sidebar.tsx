@@ -9,8 +9,7 @@ import {
   Users,
   Truck,
   FileText,
-  Bot,
-  Store
+  Bot
 } from 'lucide-react';
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -55,6 +54,13 @@ const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
   automacoes: ['ADMIN']
 };
 
+const roleLabels: Record<string, string> = {
+  ADMIN: 'Administrador',
+  MANAGER: 'Gerente',
+  CASHIER: 'Caixa',
+  EMPLOYEE: 'Colaborador'
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentModule,
   onNavigate,
@@ -65,66 +71,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleItemClick = (module: ActiveModule) => {
     onNavigate(module);
-    if (window.innerWidth <= 768) {
-      onClose();
-    }
+    if (window.innerWidth <= 900) onClose();
   };
 
-  const displayName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Admin Vestra');
-  const roleName = `${role.toUpperCase()} • Gestão`;
+  const displayName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Administrador');
   const initials = displayName
     .split(' ')
     .map(n => n[0])
     .join('')
-    .substring(0, 2)
-    .toUpperCase() || 'VT';
+    .slice(0, 2)
+    .toUpperCase() || 'CS';
 
-  const filteredNavItems = NAV_ITEMS.filter(item => 
+  const filteredNavItems = NAV_ITEMS.filter(item =>
     !user || MODULE_PERMISSIONS[item.id]?.includes(role)
   );
 
   return (
     <>
-      <div
-        className={`sidebar-overlay ${isOpen ? 'active' : ''}`}
-        onClick={onClose}
-      />
-      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-        <div className="logo-area">
-          <div className="logo-icon-box">
-            <Store size={20} />
-          </div>
-          <div>
-            <h1 className="logo-title">VESTRA</h1>
-            <p className="logo-subtitle">Retail Management</p>
+      <div className={`sidebar-overlay ${isOpen ? 'active' : ''}`} onClick={onClose} />
+      <aside className={`sidebar ${isOpen ? 'is-open' : 'is-collapsed'}`}>
+        <div className="brand-area">
+          <div className="brand-mark" aria-hidden="true">CS</div>
+          <div className="brand-copy">
+            <span className="brand-name">CoreSys</span>
+            <span className="brand-caption">ERP & PDV</span>
           </div>
         </div>
 
-        <div className="nav-section-title">Menu Principal</div>
-
-        <nav className="sidebar-nav">
-          {filteredNavItems.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${currentModule === item.id ? 'active' : ''}`}
-              onClick={() => handleItemClick(item.id)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
+        <nav className="sidebar-navigation" aria-label="Navegação principal">
+          <section className="nav-group">
+            <h2 className="nav-group-title">Módulos</h2>
+            <div className="nav-group-items">
+              {filteredNavItems.map(item => (
+                <button
+                  key={item.id}
+                  className={`nav-item ${currentModule === item.id ? 'active' : ''}`}
+                  onClick={() => handleItemClick(item.id)}
+                  aria-current={currentModule === item.id ? 'page' : undefined}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user-card">
-            <div className="user-avatar">{initials}</div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {displayName}
-              </p>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {roleName}
-              </p>
+          <div className="sidebar-account">
+            <div className="avatar avatar-sm">{initials}</div>
+            <div className="account-copy">
+              <strong>{displayName}</strong>
+              <span>{roleLabels[role] || 'Usuário'}</span>
             </div>
           </div>
         </div>

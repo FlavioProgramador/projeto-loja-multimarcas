@@ -442,7 +442,7 @@ export const DashboardView: React.FC = () => {
           data={paymentChartData.data}
           title="Faturamento por Forma de Pagamento"
           subtitle="Distribuição do valor recebido"
-          colors={['#10b981', '#2563eb', '#f59e0b', '#8b5cf6', '#ef4444']}
+          colors={['#00674f', '#3ebb9e', '#73E6CB', '#0a3c30', '#8ab8ac']}
         />
 
         {/* Top 5 Card */}
@@ -458,7 +458,7 @@ export const DashboardView: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{
                 width: 28, height: 28, borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+                background: 'var(--brand-primary)',
                 color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
@@ -532,7 +532,7 @@ export const DashboardView: React.FC = () => {
                           height: '100%',
                           width: `${barWidth}%`,
                           borderRadius: '2px',
-                          background: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#cd7f32' : 'var(--primary)',
+                          background: idx === 0 ? 'var(--primary)' : idx === 1 ? 'var(--brand-secondary)' : idx === 2 ? 'var(--brand-accent)' : 'var(--primary)',
                           transition: 'width 0.3s ease'
                         }} />
                       </div>
@@ -711,7 +711,7 @@ export const DashboardView: React.FC = () => {
           </div>
 
           {/* CTA Card */}
-          <div className="card" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', color: '#ffffff', border: 'none' }}>
+          <div className="card" style={{ background: 'var(--brand-deep)', color: '#ffffff', border: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
               <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '4px' }}>
                 Retail Intelligence
@@ -728,7 +728,7 @@ export const DashboardView: React.FC = () => {
               className="btn btn-sm"
               style={{
                 backgroundColor: '#ffffff',
-                color: '#1e3a8a',
+                color: 'var(--brand-deep)',
                 fontWeight: 700,
                 border: 'none'
               }}

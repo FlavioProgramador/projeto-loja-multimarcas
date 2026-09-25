@@ -308,7 +308,7 @@ export const PdvView: React.FC = () => {
         {/* Banner de Notificação Superior */}
         {notificationBanner && (
           <div style={{
-            background: notificationBanner.includes('⚠️') ? '#f59e0b' : 'var(--badge-green)',
+            background: notificationBanner.includes('⚠️') ? 'var(--badge-yellow)' : 'var(--badge-green)',
             color: '#fff', padding: '12px 18px', borderRadius: 'var(--radius-lg)',
             marginBottom: '16px', fontSize: '13.5px', fontWeight: 600, boxShadow: 'var(--shadow-md)'
           }}>

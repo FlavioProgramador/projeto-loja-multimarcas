@@ -13,8 +13,16 @@ export interface TopProductsChartProps {
 }
 
 const DEFAULT_COLORS = [
-  '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#06b6d4', '#ec4899', '#64748b', '#84cc16', '#f97316'
+  '#00674f',
+  '#3ebb9e',
+  '#73E6CB',
+  '#0a3c30',
+  '#8ab8ac',
+  '#5f8f83',
+  '#bfeee1',
+  '#71817c',
+  '#45534f',
+  '#d7e3df'
 ];
 
 export const TopProductsChart: React.FC<TopProductsChartProps> = ({
@@ -39,7 +47,7 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
     if (!ctx) return;
 
     const isDark = theme === 'dark';
-    const textColor = isDark ? '#cbd5e1' : '#434655';
+    const textColor = 'var(--text-secondary)';
 
     chartInstance.current = new Chart(ctx, {
       type: 'doughnut',
@@ -50,7 +58,7 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
             data: data.length ? data : [1],
             backgroundColor: colors.slice(0, Math.max(labels.length, 1)),
             borderWidth: 2,
-            borderColor: isDark ? '#151e32' : '#ffffff'
+            borderColor: isDark ? 'var(--bg-surface)' : '#ffffff'
           }
         ]
       },
@@ -73,10 +81,10 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
             }
           },
           tooltip: {
-            backgroundColor: isDark ? '#1e293b' : '#ffffff',
-            titleColor: isDark ? '#ffffff' : '#111c2d',
-            bodyColor: isDark ? '#cbd5e1' : '#434655',
-            borderColor: isDark ? '#334155' : '#e2e8f0',
+            backgroundColor: isDark ? 'var(--bg-surface-subtle)' : '#ffffff',
+            titleColor: isDark ? 'var(--text-primary)' : 'var(--text-primary)',
+            bodyColor: 'var(--text-secondary)',
+            borderColor: 'var(--border-color)',
             borderWidth: 1,
             padding: 8,
             cornerRadius: 6

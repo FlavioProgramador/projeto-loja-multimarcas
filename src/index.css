@@ -1426,3 +1426,42 @@ select option {
     page-break-inside: avoid;
   }
 }
+
+
+/* CORE SYS — LIGHT THEME OVERRIDES */
+/* A identidade CoreSys usa a paleta verde também no tema claro. */
+:root,
+[data-theme='light'] {
+  --bg-canvas: #f6faf8;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #eef5f2;
+  --bg-surface-hover: #e4efeb;
+  --bg-surface-high: #dbeae4;
+  --bg-surface-highest: #d2e3dc;
+  --primary: #00674f;
+  --primary-hover: #0a3c30;
+  --primary-container: #3ebb9e;
+  --primary-light: #e0f4ee;
+  --accent: #3ebb9e;
+  --secondary: #52635f;
+  --secondary-container: #dce7e3;
+  --text-primary: #142033;
+  --text-secondary: #52625d;
+  --text-muted: #778982;
+  --text-inverse: #ffffff;
+  --border-color: #d7e3df;
+  --border-subtle: #e8efed;
+  --border-glass: #d7e3df;
+  --card-border: #d7e3df;
+  --outline-variant: #b7c8c2;
+  --badge-green: #007a61;
+  --badge-green-bg: #e4f4ef;
+  --badge-yellow: #826b25;
+  --badge-yellow-bg: #fbf4db;
+  --badge-red: #a94d4d;
+  --badge-red-bg: #f8e7e7;
+  --badge-blue: #00674f;
+  --badge-blue-bg: #e0f4ee;
+  --warning: #826b25;
+  --on-primary: #ffffff;
+}

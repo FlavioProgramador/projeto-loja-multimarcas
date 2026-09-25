@@ -61,7 +61,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           ) : (
             <LogIn size={18} style={{ color: 'var(--primary)' }} />
           )}
-          <span>{isSignUp ? 'Criar Conta no VESTRA' : 'Acessar VESTRA ERP'}</span>
+          <span>{isSignUp ? 'Criar Conta no CoreSys' : 'Acessar CoreSys ERP'}</span>
         </div>
       }
       maxWidth="440px"
@@ -138,7 +138,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <label>E-mail</label>
           <input
             type="email"
-            placeholder="admin@vestra.com"
+            placeholder="admin@coresys.com.br"
             value={email}
             onChange={e => setEmail(e.target.value)}
             required

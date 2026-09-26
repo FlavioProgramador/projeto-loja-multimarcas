@@ -309,7 +309,7 @@ export const PdvView: React.FC = () => {
         {notificationBanner && (
           <div style={{
             background: notificationBanner.includes('⚠️') ? 'var(--badge-yellow)' : 'var(--badge-green)',
-            color: '#fff', padding: '12px 18px', borderRadius: 'var(--radius-lg)',
+            color: 'var(--on-primary)', padding: '12px 18px', borderRadius: 'var(--radius-lg)',
             marginBottom: '16px', fontSize: '13.5px', fontWeight: 600, boxShadow: 'var(--shadow-md)'
           }}>
             {notificationBanner}
@@ -586,7 +586,7 @@ export const PdvView: React.FC = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '20px', fontWeight: 700 }}>
                 <span style={{ fontSize: '15px', alignSelf: 'center', color: '#e4e4e7' }}>Total a Pagar</span>
-                <span style={{ fontFamily: 'var(--font-mono)', color: '#fff' }}>{formatMoeda(calculatedTotal)}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatMoeda(calculatedTotal)}</span>
               </div>
             </div>
 

@@ -30,11 +30,11 @@ body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSyst
 .sidebar { width: 250px !important; background: var(--ref-sidebar) !important; border-right: 1px solid var(--ref-border-soft) !important; box-shadow: 12px 0 30px rgba(0,0,0,.22) !important; }
 .brand-area { min-height: 92px !important; padding: 22px 20px !important; border-bottom: 1px solid var(--ref-border-soft) !important; }
 .brand-mark { background: transparent !important; border: 1px solid rgba(115,230,203,.3) !important; color: var(--ref-teal-light) !important; border-radius: 9px !important; }
-.brand-name { color: #fff !important; font-size: 19px !important; letter-spacing: -.03em !important; }
-.brand-caption { color: #686868 !important; }
+.brand-name { color: var(--ref-text) !important; font-size: 19px !important; letter-spacing: -.03em !important; }
+.brand-caption { color: var(--ref-text-3) !important; }
 .sidebar-navigation { padding: 20px 13px !important; }
 .nav-group { margin-bottom: 24px !important; }
-.nav-group-title { color: #656565 !important; font-size: 10px !important; letter-spacing: .08em !important; }
+.nav-group-title { color: #8d9a95 !important; font-size: 10px !important; letter-spacing: .08em !important; }
 .nav-group-items { gap: 4px !important; }
 .nav-item { min-height: 44px !important; border-radius: 9px !important; color: #c7c7c7 !important; border: 1px solid transparent !important; }
 .nav-item:hover { background: #1b1b1b !important; color: #fff !important; }
@@ -46,13 +46,13 @@ body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSyst
 
 .main-wrapper { background: var(--ref-canvas) !important; }
 .header { min-height: 76px !important; padding: 0 30px !important; background: #0b0b0b !important; border-bottom: 1px solid var(--ref-border-soft) !important; backdrop-filter: none !important; }
-.breadcrumb-overline { color: #666 !important; }
-.breadcrumb-divider { color: #444 !important; }
+.breadcrumb-overline { color: #8d9a95 !important; }
+.breadcrumb-divider { color: #66736f !important; }
 .breadcrumb strong { color: #f2f2f2 !important; }
 .header .icon-action { background: #151515 !important; border-color: #2c2c2c !important; color: #bcbcbc !important; }
 .header .icon-action:hover { color: var(--ref-teal-light) !important; border-color: #3b3b3b !important; }
 .global-search { max-width: 430px !important; }
-.global-search input { background: #151515 !important; border-color: #2d2d2d !important; color: #eee !important; border-radius: 8px !important; }
+.global-search input { background: #151515 !important; border-color: #303030 !important; color: #f3f3f3 !important; border-radius: 8px !important; }
 
 .page-content { max-width: 1500px !important; padding: 32px 36px 48px !important; }
 .page-header { margin-bottom: 26px !important; gap: 18px !important; }

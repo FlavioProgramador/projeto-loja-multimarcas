@@ -58,7 +58,7 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
             data: data.length ? data : [1],
             backgroundColor: colors.slice(0, Math.max(labels.length, 1)),
             borderWidth: 2,
-            borderColor: isDark ? 'var(--bg-surface)' : '#ffffff'
+            borderColor: isDark ? 'var(--bg-surface)' : 'var(--bg-surface)'
           }
         ]
       },

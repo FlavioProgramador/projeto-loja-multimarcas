@@ -55,11 +55,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenNotificat
                   value={activeStoreId || ''}
                   onChange={(e) => setActiveStoreId(e.target.value)}
                   style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 4,
-                    padding: '4px 8px',
-                    color: 'var(--text)',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '6px 10px',
+                    color: 'var(--text-primary)',
                     fontSize: '0.85rem'
                   }}
                 >

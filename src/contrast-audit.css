@@ -1,0 +1,7 @@
+/* Global visual contrast safeguards for CoreSys. Keep business logic untouched. */
+html, body, #root { color-scheme: dark; }
+*, *::before, *::after { text-rendering: optimizeLegibility; }
+button, input, select, textarea { color: var(--text-primary); }
+input::placeholder, textarea::placeholder { color: var(--input-placeholder, var(--text-muted)); opacity: 1; }
+select, select option, select optgroup { background-color: var(--input-background, var(--bg-surface)); color: var(--input-foreground, var(--text-primary)); }
+button:disabled, input:disabled, select:disabled, textarea:disabled { color: var(--text-disabled, #8b9994); opacity: .7; }

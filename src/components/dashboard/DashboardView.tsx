@@ -459,7 +459,7 @@ export const DashboardView: React.FC = () => {
               <div style={{
                 width: 28, height: 28, borderRadius: 'var(--radius-md)',
                 background: 'var(--brand-primary)',
-                color: '#fff',
+                color: 'var(--text-primary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
                 <Trophy size={14} />
@@ -711,7 +711,7 @@ export const DashboardView: React.FC = () => {
           </div>
 
           {/* CTA Card */}
-          <div className="card" style={{ background: 'var(--brand-deep)', color: '#ffffff', border: 'none' }}>
+          <div className="card" style={{ background: 'var(--brand-deep)', color: 'var(--text-primary)', border: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
               <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '4px' }}>
                 Retail Intelligence
@@ -727,7 +727,7 @@ export const DashboardView: React.FC = () => {
               href="#/relatorios"
               className="btn btn-sm"
               style={{
-                backgroundColor: '#ffffff',
+                backgroundColor: 'var(--text-primary)',
                 color: 'var(--brand-deep)',
                 fontWeight: 700,
                 border: 'none'

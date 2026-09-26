@@ -1,0 +1,395 @@
+/* ============================================================================
+   CoreSys — Theme overrides
+   LIGHT MODE: visual contract based on the approved reference.
+   DARK MODE: preserves the original reference-theme appearance.
+   ============================================================================ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-canvas: #f6faf8;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #eef5f2;
+  --bg-surface-hover: #e4efeb;
+  --bg-surface-high: #dbeae4;
+  --bg-surface-highest: #d2e3dc;
+
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+
+  --border-color: #d7e3df;
+  --border-subtle: #e8efed;
+  --border-glass: #d7e3df;
+  --card-border: #d7e3df;
+
+  --primary: #00674f;
+  --primary-hover: #005640;
+  --primary-container: #3ebb9e;
+  --primary-light: #e6f3f0;
+  --accent: #00674f;
+  --brand-primary: #00674f;
+  --brand-accent: #00674f;
+  --brand-secondary: #3ebb9e;
+  --brand-deep: #0a3c30;
+
+  --secondary: #52525b;
+  --secondary-container: #dce7e3;
+  --text-inverse: #ffffff;
+
+  --input-background: #f8faf9;
+  --input-foreground: #18181b;
+  --input-placeholder: #71717a;
+  --input-border: #d7e3df;
+
+  --surface: #ffffff;
+  --surface-hover: #f8faf9;
+  --surface-elevated: #ffffff;
+  --foreground: #18181b;
+
+  --sidebar-bg: #0a3c30;
+  --sidebar-text: #ffffff;
+
+  --badge-green: #007a61;
+  --badge-green-bg: #e4f4ef;
+  --badge-red: #a94d4d;
+  --badge-red-bg: #f8e7e7;
+  --badge-yellow: #826b25;
+  --badge-yellow-bg: #fbf4db;
+  --badge-blue: #00674f;
+  --badge-blue-bg: #e0f4ee;
+}
+
+[data-theme='dark'] {
+  /* Dark mode remains governed by the original reference theme. */
+  --sidebar-bg: #111111;
+  --sidebar-text: #f3f3f3;
+  --text-primary: #f3f3f3;
+  --text-secondary: #b8b8b8;
+  --text-muted: #858585;
+}
+
+/* ============================================================================
+   LIGHT MODE — force the visual layer over reference-theme.css.
+   reference-theme.css intentionally contains !important dark tokens, so the
+   light selectors below also use !important. This is scoped to light mode and
+   therefore cannot change the original dark appearance.
+   ============================================================================ */
+
+:root:not([data-theme='dark']),
+[data-theme='light'] {
+  background: var(--bg-canvas) !important;
+}
+
+:root:not([data-theme='dark']) html,
+:root:not([data-theme='dark']) body,
+:root:not([data-theme='dark']) #root,
+[data-theme='light'] body,
+[data-theme='light'] #root,
+[data-theme='light'] .app-layout,
+[data-theme='light'] .main-wrapper,
+[data-theme='light'] .page-content {
+  background: var(--bg-canvas) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Sidebar: dark green, white content, as in the reference. */
+[data-theme='light'] .sidebar,
+:root:not([data-theme='dark']) .sidebar {
+  background: #0a3c30 !important;
+  color: #ffffff !important;
+  border-right: 1px solid rgba(255,255,255,.08) !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] .brand-area,
+:root:not([data-theme='dark']) .brand-area {
+  border-color: rgba(255,255,255,.08) !important;
+}
+
+[data-theme='light'] .brand-mark,
+:root:not([data-theme='dark']) .brand-mark {
+  background: transparent !important;
+  border: 1px solid rgba(115,230,203,.28) !important;
+  color: #73e6cb !important;
+}
+
+[data-theme='light'] .brand-name,
+[data-theme='light'] .brand-caption,
+[data-theme='light'] .nav-group-title,
+[data-theme='light'] .nav-item,
+[data-theme='light'] .sidebar-footer,
+[data-theme='light'] .sidebar-account,
+:root:not([data-theme='dark']) .brand-name,
+:root:not([data-theme='dark']) .brand-caption,
+:root:not([data-theme='dark']) .nav-group-title,
+:root:not([data-theme='dark']) .nav-item,
+:root:not([data-theme='dark']) .sidebar-footer,
+:root:not([data-theme='dark']) .sidebar-account {
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .brand-caption,
+[data-theme='light'] .nav-group-title,
+[data-theme='light'] .sidebar-account span,
+:root:not([data-theme='dark']) .brand-caption,
+:root:not([data-theme='dark']) .nav-group-title,
+:root:not([data-theme='dark']) .sidebar-account span {
+  color: rgba(255,255,255,.58) !important;
+}
+
+[data-theme='light'] .nav-item,
+:root:not([data-theme='dark']) .nav-item {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: rgba(255,255,255,.78) !important;
+}
+
+[data-theme='light'] .nav-item:hover,
+:root:not([data-theme='dark']) .nav-item:hover {
+  background: rgba(255,255,255,.08) !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .nav-item.active,
+:root:not([data-theme='dark']) .nav-item.active {
+  background: #155e4c !important;
+  border-color: #3ebb9e !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] .nav-item.active svg,
+:root:not([data-theme='dark']) .nav-item.active svg {
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .sidebar-account,
+:root:not([data-theme='dark']) .sidebar-account {
+  background: rgba(255,255,255,.055) !important;
+  border-color: rgba(255,255,255,.08) !important;
+}
+
+[data-theme='light'] .avatar,
+:root:not([data-theme='dark']) .avatar {
+  background: #73e6cb !important;
+  color: #0a3c30 !important;
+}
+
+/* Header: white, compact, clean. */
+[data-theme='light'] .header,
+:root:not([data-theme='dark']) .header {
+  min-height: 62px !important;
+  height: 62px !important;
+  padding: 0 24px !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e8efed !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+[data-theme='light'] .breadcrumb-overline,
+:root:not([data-theme='dark']) .breadcrumb-overline {
+  color: #71717a !important;
+}
+
+[data-theme='light'] .breadcrumb-divider,
+:root:not([data-theme='dark']) .breadcrumb-divider {
+  color: #a1a1aa !important;
+}
+
+[data-theme='light'] .breadcrumb strong,
+:root:not([data-theme='dark']) .breadcrumb strong {
+  color: #18181b !important;
+}
+
+[data-theme='light'] .header .icon-action,
+:root:not([data-theme='dark']) .header .icon-action {
+  background: #ffffff !important;
+  border-color: #d7e3df !important;
+  color: #52525b !important;
+}
+
+/* Main typography. */
+[data-theme='light'] .page-title,
+:root:not([data-theme='dark']) .page-title {
+  color: #18181b !important;
+}
+
+[data-theme='light'] .page-subtitle,
+:root:not([data-theme='dark']) .page-subtitle {
+  color: #71717a !important;
+}
+
+/* Cards, panels and dashboard surfaces. */
+[data-theme='light'] .card,
+[data-theme='light'] .table-wrap,
+[data-theme='light'] .panel,
+[data-theme='light'] .section-card,
+[data-theme='light'] .modal-content,
+[data-theme='light'] .chart-card,
+[data-theme='light'] .dashboard-chart,
+[data-theme='light'] .chart-container,
+:root:not([data-theme='dark']) .card,
+:root:not([data-theme='dark']) .table-wrap,
+:root:not([data-theme='dark']) .panel,
+:root:not([data-theme='dark']) .section-card,
+:root:not([data-theme='dark']) .modal-content,
+:root:not([data-theme='dark']) .chart-card,
+:root:not([data-theme='dark']) .dashboard-chart,
+:root:not([data-theme='dark']) .chart-container {
+  background: #ffffff !important;
+  color: #18181b !important;
+  border: 1px solid #d7e3df !important;
+  box-shadow: 0 2px 8px rgba(16,33,27,.06) !important;
+}
+
+[data-theme='light'] .card-label,
+[data-theme='light'] .muted,
+[data-theme='light'] .text-muted,
+:root:not([data-theme='dark']) .card-label,
+:root:not([data-theme='dark']) .muted,
+:root:not([data-theme='dark']) .text-muted {
+  color: #71717a !important;
+}
+
+[data-theme='light'] .card-value,
+:root:not([data-theme='dark']) .card-value {
+  color: #18181b !important;
+}
+
+[data-theme='light'] .card-icon-box,
+:root:not([data-theme='dark']) .card-icon-box {
+  border-radius: 50% !important;
+}
+
+/* Dashboard chart titles and labels. */
+[data-theme='light'] .chart-card h2,
+[data-theme='light'] .chart-card h3,
+[data-theme='light'] .section-title,
+[data-theme='light'] .dashboard-chart h2,
+[data-theme='light'] .dashboard-chart h3,
+:root:not([data-theme='dark']) .chart-card h2,
+:root:not([data-theme='dark']) .chart-card h3,
+:root:not([data-theme='dark']) .section-title,
+:root:not([data-theme='dark']) .dashboard-chart h2,
+:root:not([data-theme='dark']) .dashboard-chart h3 {
+  color: #18181b !important;
+}
+
+[data-theme='light'] .recharts-cartesian-grid line,
+:root:not([data-theme='dark']) .recharts-cartesian-grid line {
+  stroke: #e4e4e7 !important;
+}
+
+[data-theme='light'] .recharts-text,
+:root:not([data-theme='dark']) .recharts-text {
+  fill: #71717a !important;
+}
+
+/* Controls. */
+[data-theme='light'] .btn,
+:root:not([data-theme='dark']) .btn {
+  background: #00674f !important;
+  color: #ffffff !important;
+  border-color: #00674f !important;
+}
+
+[data-theme='light'] .btn:hover,
+:root:not([data-theme='dark']) .btn:hover {
+  background: #005640 !important;
+  border-color: #005640 !important;
+}
+
+[data-theme='light'] .btn-outline,
+:root:not([data-theme='dark']) .btn-outline {
+  background: #ffffff !important;
+  color: #52525b !important;
+  border-color: #d7e3df !important;
+}
+
+[data-theme='light'] input,
+[data-theme='light'] select,
+[data-theme='light'] textarea,
+:root:not([data-theme='dark']) input,
+:root:not([data-theme='dark']) select,
+:root:not([data-theme='dark']) textarea {
+  background: #f8faf9 !important;
+  color: #18181b !important;
+  border-color: #d7e3df !important;
+}
+
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder,
+:root:not([data-theme='dark']) input::placeholder,
+:root:not([data-theme='dark']) textarea::placeholder {
+  color: #71717a !important;
+}
+
+/* Tables. */
+[data-theme='light'] thead,
+[data-theme='light'] thead tr,
+[data-theme='light'] th,
+:root:not([data-theme='dark']) thead,
+:root:not([data-theme='dark']) thead tr,
+:root:not([data-theme='dark']) th {
+  background: #f8faf9 !important;
+  color: #52525b !important;
+  border-color: #e4e4e7 !important;
+}
+
+[data-theme='light'] td,
+:root:not([data-theme='dark']) td {
+  background: #ffffff !important;
+  color: #18181b !important;
+  border-color: #e8efed !important;
+}
+
+[data-theme='light'] tbody tr:hover,
+:root:not([data-theme='dark']) tbody tr:hover {
+  background: #f8faf9 !important;
+}
+
+/* Keep inventory and other page-specific surfaces light as well. */
+[data-theme='light'] .inventory-metric-card,
+[data-theme='light'] .inventory-table-card,
+[data-theme='light'] .inventory-product-card,
+:root:not([data-theme='dark']) .inventory-metric-card,
+:root:not([data-theme='dark']) .inventory-table-card,
+:root:not([data-theme='dark']) .inventory-product-card {
+  background: #ffffff !important;
+  color: #18181b !important;
+  border-color: #d7e3df !important;
+  box-shadow: 0 2px 8px rgba(16,33,27,.06) !important;
+}
+
+/* ============================================================================
+   Shared base tokens
+   ============================================================================ */
+
+html,
+body,
+#root,
+.app-layout,
+.main-wrapper,
+.page-content {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+.sidebar {
+  background-color: var(--sidebar-bg) !important;
+  color: var(--sidebar-text) !important;
+}
+
+input,
+select,
+textarea {
+  color: var(--text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}

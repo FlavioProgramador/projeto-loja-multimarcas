@@ -10,6 +10,10 @@ import { StatCard } from '../ui/StatCard';
 import { StatusBadge } from '../ui/StatusBadge';
 import { RevenueChart } from './RevenueChart';
 import { TopProductsChart } from './TopProductsChart';
+import { useTheme } from '../../contexts/ThemeContext';
+
+const CHART_COLORS_DARK = ['#3ebb9e', '#73E6CB', '#00674f', '#0a3c30'];
+const CHART_COLORS_LIGHT = ['#00674f', '#3ebb9e', '#0a3c30', '#73E6CB'];
 
 // ─── Date Period Helpers ────────────────────────────────────────────────────────
 
@@ -117,7 +121,10 @@ function normalizePaymentMethod(raw: string): string {
 
 export const DashboardView: React.FC = () => {
   const { transactions, movements, products, notifications } = useStore();
+  const { theme } = useTheme();
   const [period, setPeriod] = useState<PeriodKey>('mes');
+
+  const activeColors = theme === 'dark' ? CHART_COLORS_DARK : CHART_COLORS_LIGHT;
 
   const { start, end } = useMemo(() => getDateRange(period), [period]);
 
@@ -421,12 +428,14 @@ export const DashboardView: React.FC = () => {
           delta={revenueDelta}
           title={`Faturamento Diário — ${PERIOD_LABELS[period]}`}
           subtitle="Receita por dia no período selecionado"
+          color={activeColors[0]}
         />
         <TopProductsChart
           labels={categoryChartData.labels}
           data={categoryChartData.data}
           title="Distribuição por Categoria"
           subtitle="Volume vendido por categoria real"
+          colors={activeColors}
         />
       </div>
 
@@ -442,7 +451,7 @@ export const DashboardView: React.FC = () => {
           data={paymentChartData.data}
           title="Faturamento por Forma de Pagamento"
           subtitle="Distribuição do valor recebido"
-          colors={['#00674f', '#3ebb9e', '#73E6CB', '#0a3c30', '#8ab8ac']}
+          colors={activeColors}
         />
 
         {/* Top 5 Card */}
@@ -524,7 +533,7 @@ export const DashboardView: React.FC = () => {
                       <div style={{
                         height: '4px',
                         borderRadius: '2px',
-                        background: 'var(--bg-surface-subtle)',
+                        background: theme === 'dark' ? '#0a3c30' : 'var(--bg-surface-subtle)',
                         marginTop: '4px',
                         overflow: 'hidden'
                       }}>
@@ -532,7 +541,7 @@ export const DashboardView: React.FC = () => {
                           height: '100%',
                           width: `${barWidth}%`,
                           borderRadius: '2px',
-                          background: idx === 0 ? 'var(--primary)' : idx === 1 ? 'var(--brand-secondary)' : idx === 2 ? 'var(--brand-accent)' : 'var(--primary)',
+                          background: activeColors[0],
                           transition: 'width 0.3s ease'
                         }} />
                       </div>

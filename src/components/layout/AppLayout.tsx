@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap, Settings, Sun, Moon, Minus, Plus, HelpCircle } from 'lucide-react';
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -79,6 +79,27 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
   const { user, profile, role } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    document.body.style.zoom = `${zoomLevel}%`;
+  }, [zoomLevel]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    }
+    if (isSettingsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSettingsOpen]);
 
   const displayName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Administrador');
   const roleLabel = role === 'ADMIN'
@@ -172,14 +193,140 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
           <div className="header-right">
             <HeaderAgenda />
 
-            <button
-              className="icon-action"
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
-              aria-label="Alternar tema"
-            >
-              {theme === 'dark' ? '☼' : '◐' }
-            </button>
+            <div style={{ position: 'relative' }} ref={settingsRef}>
+              <button
+                className="icon-action"
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                aria-label="Configurações"
+                title="Configurações"
+              >
+                <Settings size={18} />
+              </button>
+
+              {isSettingsOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  width: '240px',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: 'var(--shadow-md)',
+                  zIndex: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}>
+                  {/* Tema */}
+                  <div style={{
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Tema</span>
+                    <button
+                      onClick={toggleTheme}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'var(--bg-surface-subtle)',
+                        border: '1px solid var(--border-color)',
+                        padding: '4px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+                      {theme === 'dark' ? 'Escuro' : 'Claro'}
+                    </button>
+                  </div>
+
+                  {/* Zoom */}
+                  <div style={{
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Tamanho</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => setZoomLevel(z => Math.max(z - 10, 50))}
+                        style={{
+                          background: 'var(--bg-surface-subtle)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', minWidth: '35px', textAlign: 'center' }}>
+                        {zoomLevel}%
+                      </span>
+                      <button
+                        onClick={() => setZoomLevel(z => Math.min(z + 10, 200))}
+                        style={{
+                          background: 'var(--bg-surface-subtle)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Suporte */}
+                  <div style={{ padding: '8px' }}>
+                    <a
+                      href="mailto:suporte@vestra.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px',
+                        color: 'var(--text-primary)',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        borderRadius: 'var(--radius-sm)',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-subtle)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <HelpCircle size={16} />
+                      Central de Suporte
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

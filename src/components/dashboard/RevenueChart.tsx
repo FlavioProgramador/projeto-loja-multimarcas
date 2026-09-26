@@ -10,6 +10,7 @@ export interface RevenueChartProps {
   delta?: string;
   title?: string;
   subtitle?: string;
+  color?: string;
 }
 
 export const RevenueChart: React.FC<RevenueChartProps> = ({
@@ -17,7 +18,8 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
   data,
   delta = "+0.0%",
   title = "Faturamento Diário",
-  subtitle = "Desempenho no período selecionado"
+  subtitle = "Desempenho no período selecionado",
+  color = "var(--brand-primary)"
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstance = useRef<Chart | null>(null);
@@ -45,8 +47,8 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
           {
             label: 'Faturamento',
             data: data.length ? data : [0],
-            backgroundColor: 'var(--brand-primary)',
-            hoverBackgroundColor: 'var(--brand-primary)',
+            backgroundColor: color,
+            hoverBackgroundColor: color,
             borderRadius: 6
           }
         ]

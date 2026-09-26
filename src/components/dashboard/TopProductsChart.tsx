@@ -56,9 +56,9 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
         datasets: [
           {
             data: data.length ? data : [1],
-            backgroundColor: colors.slice(0, Math.max(labels.length, 1)),
+            backgroundColor: (data.length ? data : [1]).map((_, i) => colors[i % colors.length]),
             borderWidth: 2,
-            borderColor: isDark ? 'var(--bg-surface)' : 'var(--bg-surface)'
+            borderColor: 'var(--bg-surface)'
           }
         ]
       },

@@ -59,7 +59,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
             display: false
           },
           tooltip: {
-            backgroundColor: isDark ? 'var(--bg-surface-subtle)' : '#ffffff',
+            backgroundColor: isDark ? 'var(--bg-surface-subtle)' : 'var(--bg-surface)',
             titleColor: isDark ? '#ffffff' : 'var(--text-primary)',
             bodyColor: 'var(--brand-primary)',
             borderColor: isDark ? 'var(--border-color)' : 'var(--border-color)',

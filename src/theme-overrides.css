@@ -1,0 +1,127 @@
+/* ============================================================================
+   CoreSys — Theme overrides
+   Light Mode redesign + original Dark Mode preservation.
+   ============================================================================ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-canvas: #f4f4f5;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f8f9fa;
+  --bg-surface-hover: #f1f2f3;
+  --bg-surface-high: #ececef;
+  --bg-surface-highest: #e4e4e7;
+
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+
+  --border-color: #e4e4e7;
+  --border-subtle: #f4f4f5;
+  --border-glass: #e4e4e7;
+  --card-border: #e4e4e7;
+  --outline-variant: #a1a1aa;
+
+  --primary: #00674f;
+  --primary-hover: #005640;
+  --primary-container: #3ebb9e;
+  --primary-light: #e6f3f0;
+  --accent: #00674f;
+  --brand-primary: #00674f;
+  --brand-accent: #3ebb9e;
+  --brand-secondary: #3ebb9e;
+  --brand-deep: #0a3c30;
+
+  --secondary: #52525b;
+  --secondary-container: #f4f4f5;
+  --text-inverse: #ffffff;
+  --input-background: #f4f4f5;
+  --input-foreground: #18181b;
+  --input-placeholder: #71717a;
+  --input-border: #d4d4d8;
+  --surface: #ffffff;
+  --surface-hover: #f8f9fa;
+  --surface-elevated: #ffffff;
+  --foreground: #18181b;
+
+  --sidebar-bg: #00674f;
+  --sidebar-text: #ffffff;
+}
+
+[data-theme='dark'] {
+  /* Dark mode intentionally keeps the original project palette. */
+  --sidebar-bg: var(--brand-deep);
+  --sidebar-text: var(--text-primary);
+  --text-primary: #f2f8f5;
+}
+
+/* Workspace */
+html,
+body,
+#root,
+.app-layout,
+.main-wrapper,
+.page-content {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+/* Sidebar follows the theme-specific sidebar tokens. */
+.sidebar {
+  background-color: var(--sidebar-bg) !important;
+  color: var(--sidebar-text) !important;
+  border-right-color: color-mix(in srgb, var(--sidebar-text) 10%, transparent) !important;
+}
+
+.sidebar .brand-name,
+.sidebar .account-copy strong {
+  color: var(--sidebar-text) !important;
+}
+
+.sidebar .brand-caption,
+.sidebar .nav-group-title,
+.sidebar .account-copy span {
+  color: color-mix(in srgb, var(--sidebar-text) 62%, transparent) !important;
+}
+
+.sidebar .nav-item {
+  color: color-mix(in srgb, var(--sidebar-text) 78%, transparent) !important;
+}
+
+.sidebar .nav-item:hover {
+  background: color-mix(in srgb, var(--sidebar-text) 10%, transparent) !important;
+  color: var(--sidebar-text) !important;
+}
+
+.sidebar .nav-item.active {
+  background: color-mix(in srgb, var(--sidebar-text) 14%, transparent) !important;
+  border-color: color-mix(in srgb, var(--sidebar-text) 18%, transparent) !important;
+  color: var(--sidebar-text) !important;
+  box-shadow: inset 3px 0 0 var(--brand-accent);
+}
+
+.sidebar .brand-area,
+.sidebar .sidebar-footer {
+  border-color: color-mix(in srgb, var(--sidebar-text) 10%, transparent) !important;
+}
+
+.sidebar .sidebar-account {
+  background: color-mix(in srgb, var(--sidebar-text) 5%, transparent) !important;
+  border-color: color-mix(in srgb, var(--sidebar-text) 8%, transparent) !important;
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}

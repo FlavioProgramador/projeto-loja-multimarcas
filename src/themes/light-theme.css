@@ -1,0 +1,51 @@
+/* CoreSys — tema claro
+ * O tema claro é aplicado somente quando a raiz não está em dark mode.
+ * Este arquivo é a única fonte de verdade das variáveis específicas do tema claro.
+ */
+:root:not(.dark):not([data-theme='dark']),
+[data-theme='light'] {
+  color-scheme: light;
+  --bg-canvas: #f6faf8;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #eef5f2;
+  --bg-surface-hover: #e4efeb;
+  --bg-surface-high: #dbeae4;
+  --bg-surface-highest: #d2e3dc;
+
+  --primary: #00674f;
+  --primary-hover: #0a3c30;
+  --primary-container: #3ebb9e;
+  --primary-light: #e0f4ee;
+  --primary-fixed: #bfeee1;
+  --on-primary: #ffffff;
+  --accent: #3ebb9e;
+
+  --brand-primary: #00674f;
+  --brand-accent: #00674f;
+  --brand-secondary: #3ebb9e;
+  --brand-deep: #0a3c30;
+
+  --secondary: #52635f;
+  --secondary-container: #dce7e3;
+
+  --text-primary: #142033;
+  --text-secondary: #52625d;
+  --text-muted: #61736c;
+  --text-inverse: #ffffff;
+
+  --border-color: #d7e3df;
+  --border-subtle: #e8efed;
+  --border-glass: #d7e3df;
+  --card-border: #d7e3df;
+  --outline-variant: #b7c8c2;
+
+  --badge-green: #007a61;
+  --badge-green-bg: #e4f4ef;
+  --badge-yellow: #826b25;
+  --badge-yellow-bg: #fbf4db;
+  --badge-red: #a94d4d;
+  --badge-red-bg: #f8e7e7;
+  --badge-blue: #00674f;
+  --badge-blue-bg: #e0f4ee;
+  --warning: #826b25;
+}

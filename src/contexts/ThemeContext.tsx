@@ -18,8 +18,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved === 'light' || saved === 'dark') return saved;
     }
 
-    // A identidade visual CoreSys utiliza o modo escuro como experiência inicial.
-    return 'dark';
+    // O CoreSys inicia no modo claro; o modo escuro permanece disponível pelo seletor de tema.
+    return 'light';
   });
 
   useEffect(() => {

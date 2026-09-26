@@ -1430,7 +1430,7 @@ select option {
   .main-wrapper,
   .page-content {
     background: #fff !important;
-    color: #000 !important;
+    color: var(--text-primary) !important;
   }
 
   .btn,

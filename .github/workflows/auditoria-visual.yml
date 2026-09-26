@@ -1,0 +1,21 @@
+name: Auditoria Visual CoreSys
+on:
+  push:
+    branches:
+      - fix/auditoria-visual-contraste-20260925
+jobs:
+  visual-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Type Check
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}

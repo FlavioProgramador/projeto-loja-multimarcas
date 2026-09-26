@@ -1,63 +1,73 @@
 /* ============================================================================
-   CoreSys — Theme overrides
-   Light Mode redesign + original Dark Mode preservation.
+   CoreSys — Reference UI theme
+   Light Mode mirrors the supplied reference image.
+   Dark Mode is intentionally untouched and inherits the original index.css.
    ============================================================================ */
 
 :root,
 [data-theme='light'] {
   color-scheme: light;
 
-  --bg-canvas: #f4f4f5;
+  /* Reference canvas / surfaces */
+  --bg-canvas: #f4f8f7;
   --bg-surface: #ffffff;
-  --bg-surface-subtle: #f8f9fa;
-  --bg-surface-hover: #f1f2f3;
-  --bg-surface-high: #ececef;
-  --bg-surface-highest: #e4e4e7;
+  --bg-surface-subtle: #f8faf9;
+  --bg-surface-hover: #eef4f2;
+  --bg-surface-high: #e8efed;
+  --bg-surface-highest: #dfe8e5;
 
-  --text-primary: #18181b;
-  --text-secondary: #52525b;
-  --text-muted: #a1a1aa;
+  /* Reference typography */
+  --text-primary: #10211b;
+  --text-secondary: #53635e;
+  --text-muted: #879590;
+  --text-inverse: #ffffff;
 
-  --border-color: #e4e4e7;
-  --border-subtle: #f4f4f5;
-  --border-glass: #e4e4e7;
-  --card-border: #e4e4e7;
-  --outline-variant: #a1a1aa;
+  /* Reference borders */
+  --border-color: #dfe9e6;
+  --border-subtle: #edf3f1;
+  --border-glass: #dfe9e6;
+  --card-border: #dfe9e6;
+  --outline-variant: #aebfba;
 
+  /* Brand */
   --primary: #00674f;
   --primary-hover: #005640;
   --primary-container: #3ebb9e;
   --primary-light: #e6f3f0;
   --accent: #00674f;
   --brand-primary: #00674f;
-  --brand-accent: #3ebb9e;
+  --brand-accent: #73e9cd;
   --brand-secondary: #3ebb9e;
   --brand-deep: #0a3c30;
 
-  --secondary: #52525b;
-  --secondary-container: #f4f4f5;
-  --text-inverse: #ffffff;
-  --input-background: #f4f4f5;
-  --input-foreground: #18181b;
-  --input-placeholder: #71717a;
-  --input-border: #d4d4d8;
+  --secondary: #53635e;
+  --secondary-container: #eef4f2;
+
+  /* Forms */
+  --input-background: #f4f8f7;
+  --input-foreground: #10211b;
+  --input-placeholder: #8b9894;
+  --input-border: #dfe9e6;
+
   --surface: #ffffff;
-  --surface-hover: #f8f9fa;
+  --surface-hover: #f8faf9;
   --surface-elevated: #ffffff;
-  --foreground: #18181b;
+  --foreground: #10211b;
 
-  --sidebar-bg: #00674f;
+  /* Sidebar from the reference image */
+  --sidebar-bg: #0a3c30;
   --sidebar-text: #ffffff;
+
+  /* Reference shadows */
+  --shadow-sm: 0 1px 2px rgba(16, 33, 27, 0.06);
+  --shadow-md: 0 6px 18px rgba(16, 33, 27, 0.08);
+  --shadow-lg: 0 18px 42px rgba(16, 33, 27, 0.12);
 }
 
-[data-theme='dark'] {
-  /* Dark mode intentionally keeps the original project palette. */
-  --sidebar-bg: var(--brand-deep);
-  --sidebar-text: var(--text-primary);
-  --text-primary: #f2f8f5;
-}
+/* ============================================================================
+   Workspace
+   ============================================================================ */
 
-/* Workspace */
 html,
 body,
 #root,
@@ -68,60 +78,332 @@ body,
   color: var(--text-primary);
 }
 
-/* Sidebar follows the theme-specific sidebar tokens. */
-.sidebar {
-  background-color: var(--sidebar-bg) !important;
-  color: var(--sidebar-text) !important;
-  border-right-color: color-mix(in srgb, var(--sidebar-text) 10%, transparent) !important;
+[data-theme='light'] .main-wrapper {
+  margin-left: 232px;
 }
 
-.sidebar .brand-name,
-.sidebar .account-copy strong {
-  color: var(--sidebar-text) !important;
+[data-theme='light'] .header {
+  min-height: 62px;
+  height: 62px;
+  background: #fefefe;
+  border-bottom-color: #e7efec;
+  box-shadow: 0 1px 0 rgba(16, 33, 27, 0.025);
 }
 
-.sidebar .brand-caption,
-.sidebar .nav-group-title,
-.sidebar .account-copy span {
-  color: color-mix(in srgb, var(--sidebar-text) 62%, transparent) !important;
+[data-theme='light'] .page-content {
+  background: var(--bg-canvas);
 }
 
-.sidebar .nav-item {
-  color: color-mix(in srgb, var(--sidebar-text) 78%, transparent) !important;
-}
-
-.sidebar .nav-item:hover {
-  background: color-mix(in srgb, var(--sidebar-text) 10%, transparent) !important;
-  color: var(--sidebar-text) !important;
-}
-
-.sidebar .nav-item.active {
-  background: color-mix(in srgb, var(--sidebar-text) 14%, transparent) !important;
-  border-color: color-mix(in srgb, var(--sidebar-text) 18%, transparent) !important;
-  color: var(--sidebar-text) !important;
-  box-shadow: inset 3px 0 0 var(--brand-accent);
-}
-
-.sidebar .brand-area,
-.sidebar .sidebar-footer {
-  border-color: color-mix(in srgb, var(--sidebar-text) 10%, transparent) !important;
-}
-
-.sidebar .sidebar-account {
-  background: color-mix(in srgb, var(--sidebar-text) 5%, transparent) !important;
-  border-color: color-mix(in srgb, var(--sidebar-text) 8%, transparent) !important;
-}
-
-/* Inputs */
-input,
-select,
-textarea {
-  background-color: var(--bg-canvas);
+[data-theme='light'] .page-title,
+[data-theme='light'] .section-title,
+[data-theme='light'] h1,
+[data-theme='light'] h2,
+[data-theme='light'] h3,
+[data-theme='light'] h4 {
   color: var(--text-primary);
+}
+
+[data-theme='light'] .page-subtitle,
+[data-theme='light'] .muted,
+[data-theme='light'] .text-muted {
+  color: var(--text-secondary);
+}
+
+/* ============================================================================
+   Sidebar — fixed visual identity from reference
+   ============================================================================ */
+
+[data-theme='light'] .sidebar {
+  width: 232px;
+  background: #0a3c30 !important;
+  color: #ffffff !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 5px 0 18px rgba(10, 60, 48, 0.08);
+}
+
+[data-theme='light'] .brand-area {
+  min-height: 70px;
+  height: 70px;
+  padding: 15px 12px;
+  border-bottom-color: rgba(255, 255, 255, 0.075) !important;
+}
+
+[data-theme='light'] .brand-mark {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 9px;
+  background: #71e9cd;
+  color: #0a3c30;
+  font-size: 11px;
+}
+
+[data-theme='light'] .brand-name,
+[data-theme='light'] .account-copy strong {
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .brand-name {
+  font-size: 16px;
+}
+
+[data-theme='light'] .brand-caption {
+  color: rgba(255, 255, 255, 0.52) !important;
+}
+
+[data-theme='light'] .sidebar-navigation {
+  padding: 12px 8px;
+}
+
+[data-theme='light'] .nav-group {
+  margin-bottom: 13px;
+}
+
+[data-theme='light'] .nav-group-title {
+  padding: 0 8px 6px;
+  color: rgba(255, 255, 255, 0.52) !important;
+  font-size: 9px;
+  letter-spacing: 0.065em;
+}
+
+[data-theme='light'] .nav-group-items {
+  gap: 2px;
+}
+
+[data-theme='light'] .nav-item {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.70) !important;
+  font-size: 12px;
+}
+
+[data-theme='light'] .nav-item:hover {
+  background: rgba(115, 233, 205, 0.08) !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .nav-item.active {
+  background: rgba(62, 187, 158, 0.22) !important;
+  border-color: #73e9cd !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 0 #73e9cd;
+}
+
+[data-theme='light'] .nav-item.active svg,
+[data-theme='light'] .nav-item:hover svg {
+  color: currentColor;
+}
+
+[data-theme='light'] .sidebar-footer {
+  border-top-color: rgba(255, 255, 255, 0.075) !important;
+}
+
+[data-theme='light'] .sidebar-account {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+[data-theme='light'] .account-copy span {
+  color: rgba(255, 255, 255, 0.52) !important;
+}
+
+/* ============================================================================
+   Header / navigation controls
+   ============================================================================ */
+
+[data-theme='light'] .hamburger-btn,
+[data-theme='light'] .icon-action {
+  background: #ffffff;
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+  box-shadow: none;
+}
+
+[data-theme='light'] .hamburger-btn:hover,
+[data-theme='light'] .icon-action:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: #bcdad2;
+}
+
+/* ============================================================================
+   Generic cards / tables — white surfaces from reference
+   ============================================================================ */
+
+[data-theme='light'] .card,
+[data-theme='light'] .table-container,
+[data-theme='light'] .data-table-container,
+[data-theme='light'] .panel,
+[data-theme='light'] .modal-content,
+[data-theme='light'] .modal,
+[data-theme='light'] .pdv-right,
+[data-theme='light'] .cart-panel {
+  background: #ffffff;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme='light'] table {
+  background: #ffffff;
+  color: var(--text-primary);
+}
+
+[data-theme='light'] th {
+  background: #f0f6f4;
+  color: #53635e;
   border-color: var(--border-color);
 }
 
-input::placeholder,
-textarea::placeholder {
-  color: var(--text-muted);
+[data-theme='light'] td {
+  background: #ffffff;
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+/* ============================================================================
+   Forms — soft gray-green fields from reference
+   ============================================================================ */
+
+[data-theme='light'] input,
+[data-theme='light'] select,
+[data-theme='light'] textarea {
+  background-color: #f4f8f7;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  box-shadow: inset 0 1px 2px rgba(16, 33, 27, 0.025);
+}
+
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder {
+  color: #8b9894;
+}
+
+[data-theme='light'] input:focus,
+[data-theme='light'] select:focus,
+[data-theme='light'] textarea:focus {
+  border-color: #8fcfc0;
+  box-shadow: 0 0 0 3px rgba(62, 187, 158, 0.10);
+}
+
+/* ============================================================================
+   Buttons — CoreSys green / mint hierarchy
+   ============================================================================ */
+
+[data-theme='light'] .btn-primary,
+[data-theme='light'] button.btn-primary,
+[data-theme='light'] .btn-success,
+[data-theme='light'] button.btn-success {
+  background: #00674f;
+  color: #ffffff;
+  border-color: #00674f;
+}
+
+[data-theme='light'] .btn-primary:hover,
+[data-theme='light'] button.btn-primary:hover,
+[data-theme='light'] .btn-success:hover,
+[data-theme='light'] button.btn-success:hover {
+  background: #005640;
+  border-color: #005640;
+}
+
+/* ============================================================================
+   PDV — reproduce the supplied reference composition
+   ============================================================================ */
+
+[data-theme='light'] .pdv-grid {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+}
+
+[data-theme='light'] .pdv-left {
+  background: transparent !important;
+}
+
+[data-theme='light'] .pdv-right {
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+[data-theme='light'] .pdv-grid .product-table,
+[data-theme='light'] .pdv-grid .table-wrap,
+[data-theme='light'] .pdv-grid .products-table {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 11px;
+}
+
+[data-theme='light'] .pdv-grid button:not(.btn-primary):not(.btn-success) {
+  color: var(--text-secondary);
+}
+
+[data-theme='light'] .pdv-grid .btn,
+[data-theme='light'] .pdv-grid button.btn {
+  border-radius: 8px;
+}
+
+/* Search / filter controls inside the PDV */
+[data-theme='light'] .search-box,
+[data-theme='light'] .search-input,
+[data-theme='light'] .filter-control,
+[data-theme='light'] .category-chip,
+[data-theme='light'] .category-button {
+  background: #ffffff;
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme='light'] .category-chip.active,
+[data-theme='light'] .category-button.active {
+  background: #10211b;
+  color: #ffffff;
+  border-color: #10211b;
+}
+
+/* Status pills */
+[data-theme='light'] .status-normal,
+[data-theme='light'] .badge-success,
+[data-theme='light'] .badge-green {
+  background: #e1f3ed;
+  color: #19745e;
+}
+
+[data-theme='light'] .status-out,
+[data-theme='light'] .badge-danger,
+[data-theme='light'] .badge-red {
+  background: #f8e6e6;
+  color: #a55353;
+}
+
+/* Total block shown in the reference */
+[data-theme='light'] .cart-total,
+[data-theme='light'] .total-card,
+[data-theme='light'] .checkout-total {
+  background: #10211b;
+  color: #ffffff;
+  border-color: #10211b;
+}
+
+/* ============================================================================
+   Dark Mode
+   ============================================================================
+   No redesign is applied here. The original index.css palette remains the
+   source of truth. These aliases only preserve sidebar semantics.
+   ============================================================================ */
+
+[data-theme='dark'] {
+  --sidebar-bg: var(--brand-deep);
+  --sidebar-text: var(--text-primary);
+  --text-primary: #f2f8f5;
+}
+
+/* Never let light-only geometry leak into dark mode. */
+[data-theme='dark'] .main-wrapper {
+  margin-left: 250px;
+}
+
+[data-theme='dark'] .sidebar {
+  width: 250px;
 }

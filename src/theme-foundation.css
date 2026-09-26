@@ -1,0 +1,179 @@
+/* ============================================================================
+   CoreSys — Hybrid SaaS Theme Foundation
+   Light/dark workspace + permanently dark brand sidebar.
+   This file is intentionally loaded after the existing theme files so these
+   tokens become the final source of truth without disturbing component logic.
+   ============================================================================ */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* MODO CLARO (Default) */
+  --bg-canvas: #f4f4f5;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f8f9fa;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+  --border-color: #e4e4e7;
+  --border-subtle: #f4f4f5;
+
+  /* Paleta da Marca */
+  --primary: #00674f;
+  --primary-light: #e6f3f0;
+
+  /* Compatibilidade com tokens já utilizados pelo projeto */
+  --bg-surface-hover: #f1f2f3;
+  --bg-surface-high: #ececef;
+  --bg-surface-highest: #e4e4e7;
+  --primary-hover: #005640;
+  --primary-container: #3ebb9e;
+  --primary-fixed: #e6f3f0;
+  --on-primary: #ffffff;
+  --accent: #00674f;
+  --brand-primary: #00674f;
+  --brand-accent: #3ebb9e;
+  --brand-secondary: #3ebb9e;
+  --brand-deep: #0a3c30;
+  --secondary: #52525b;
+  --secondary-container: #f4f4f5;
+  --text-inverse: #ffffff;
+  --border-glass: #e4e4e7;
+  --card-border: #e4e4e7;
+  --outline-variant: #a1a1aa;
+  --input-background: #f4f4f5;
+  --input-foreground: #18181b;
+  --input-placeholder: #71717a;
+  --input-border: #d4d4d8;
+  --surface: #ffffff;
+  --surface-hover: #f8f9fa;
+  --surface-elevated: #ffffff;
+  --foreground: #18181b;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* MODO ESCURO */
+  --bg-canvas: #09090b;
+  --bg-surface: #18181b;
+  --bg-surface-subtle: #27272a;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --border-color: #3f3f46;
+  --border-subtle: #27272a;
+  --primary: #3ebb9e;
+  --primary-light: rgba(62, 187, 158, 0.15);
+
+  /* Compatibilidade com tokens já utilizados pelo projeto */
+  --bg-surface-hover: #303035;
+  --bg-surface-high: #3f3f46;
+  --bg-surface-highest: #52525b;
+  --primary-hover: #5bc8ad;
+  --primary-container: #3ebb9e;
+  --primary-fixed: rgba(62, 187, 158, 0.15);
+  --on-primary: #071713;
+  --accent: #3ebb9e;
+  --brand-primary: #00674f;
+  --brand-accent: #3ebb9e;
+  --brand-secondary: #3ebb9e;
+  --brand-deep: #0a3c30;
+  --secondary: #a1a1aa;
+  --secondary-container: #27272a;
+  --text-inverse: #09090b;
+  --border-glass: #3f3f46;
+  --card-border: #3f3f46;
+  --outline-variant: #52525b;
+  --input-background: #09090b;
+  --input-foreground: #f4f4f5;
+  --input-placeholder: #71717a;
+  --input-border: #3f3f46;
+  --surface: #18181b;
+  --surface-hover: #27272a;
+  --surface-elevated: #27272a;
+  --foreground: #f4f4f5;
+}
+
+/* --------------------------------------------------------------------------
+   Workspace foundation
+   -------------------------------------------------------------------------- */
+html,
+body,
+#root,
+.app-layout,
+.main-wrapper,
+.page-content {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+/* --------------------------------------------------------------------------
+   Inputs: predictable contrast in both workspace modes
+   -------------------------------------------------------------------------- */
+input,
+select,
+textarea {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar: permanently dark, independent of workspace theme
+   -------------------------------------------------------------------------- */
+.sidebar {
+  background: #0a3c30 !important;
+  color: #f4f4f5 !important;
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar .brand-name,
+.sidebar .account-copy strong {
+  color: #f4f4f5 !important;
+}
+
+.sidebar .brand-caption,
+.sidebar .nav-group-title,
+.sidebar .account-copy span {
+  color: rgba(244, 244, 245, 0.62) !important;
+}
+
+.sidebar .nav-item {
+  color: rgba(244, 244, 245, 0.78) !important;
+}
+
+.sidebar .nav-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f4f4f5 !important;
+}
+
+.sidebar .nav-item.active {
+  background: #00674f !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 0 #3ebb9e;
+}
+
+.sidebar .sidebar-account {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.sidebar .brand-mark,
+.sidebar .avatar {
+  background: #3ebb9e;
+  color: #0a3c30;
+}
+
+/* Keep sidebar separators independent from workspace theme. */
+.sidebar .brand-area,
+.sidebar .sidebar-footer {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}

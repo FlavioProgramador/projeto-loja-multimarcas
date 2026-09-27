@@ -12,6 +12,12 @@ serve(async (req) => {
   }
 
   try {
+    const webhookSecret = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET');
+    if (!webhookSecret) {
+      console.error('MERCADOPAGO_WEBHOOK_SECRET não configurado');
+      return new Response('Webhook misconfigured', { status: 500, headers });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const mpAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');

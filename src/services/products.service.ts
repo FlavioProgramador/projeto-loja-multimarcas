@@ -116,7 +116,7 @@ export const ProductsService = {
       p_variants: (productData.skus || []).map(sku => ({
         size: sku.tamanho,
         color: sku.cor,
-        stock_quantity: Math.max(0, Number(sku.qtd) || 0),
+        stock_quantity: 0,
         sku: sku.sku || null
       }))
     });

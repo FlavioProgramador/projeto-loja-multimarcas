@@ -828,7 +828,7 @@ BEGIN
 
   FOR v_variant IN
     SELECT * FROM jsonb_to_recordset(coalesce(p_variants,'[]'::jsonb))
-      AS (id uuid,sku text,barcode text,size text,color text,stock_quantity int,minimum_stock int)
+      AS (id uuid,sku text,barcode text,size text,color text,minimum_stock int)
   LOOP
     v_generated_sku:=nullif(trim(v_variant.sku),'');
     IF v_generated_sku IS NULL THEN
@@ -867,12 +867,12 @@ BEGIN
       v_variant_ids:=array_append(v_variant_ids,v_variant.id);
     ELSE
       INSERT INTO public.product_variants(
-        product_id,sku,barcode,size,color,stock_quantity,minimum_stock,is_active
+        product_id,sku,barcode,size,color,minimum_stock,is_active
       )
       VALUES(
         v_product_id,trim(v_generated_sku),nullif(trim(v_variant.barcode),''),
         coalesce(v_variant.size,'Único'),coalesce(v_variant.color,'Padrão'),
-        0,coalesce(v_variant.minimum_stock,0),true
+        coalesce(v_variant.minimum_stock,0),true
       )
       RETURNING id INTO v_variant.id;
 

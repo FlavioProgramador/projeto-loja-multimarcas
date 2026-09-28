@@ -65,13 +65,13 @@ CREATE POLICY "sale_idempotency deny all"
 
 -- 3) Harden helper visibility.
 CREATE OR REPLACE FUNCTION public.get_variant_stock_by_store(p_variant_id uuid)
-RETURNS TABLE(store_id uuid, store_name text, quantity integer)
+RETURNS TABLE(store_id uuid, store_name text, stock_quantity bigint)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path TO public
 AS $$
-  SELECT s.id, s.name, COALESCE(si.quantity, 0)::integer
+  SELECT s.id, s.name, COALESCE(si.quantity, 0)::bigint
   FROM public.stores s
   LEFT JOIN public.store_inventory si
     ON si.store_id = s.id
@@ -1103,7 +1103,7 @@ $$;
 
 -- 9) Fix direct report/helper auth checks without changing signatures.
 CREATE OR REPLACE FUNCTION public.report_stock_status(p_store_id uuid)
-RETURNS TABLE(product_id uuid, product_name text, variant_id uuid, sku text, size text, color text, stock integer, minimum_stock integer)
+RETURNS TABLE(product_id uuid, product_name text, variant_id uuid, variant_sku text, stock_quantity integer, reserved_quantity integer, minimum_stock integer, status text)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
@@ -1116,19 +1116,24 @@ BEGIN
     RAISE EXCEPTION 'Acesso negado à loja.';
   END IF;
   RETURN QUERY
-  SELECT p.id,p.name,pv.id,pv.sku,pv.size,pv.color,
-         coalesce(si.quantity,0)::integer,pv.minimum_stock
+  SELECT p.id,p.name,pv.id,pv.sku,si.quantity,pv.reserved_quantity,pv.minimum_stock,
+         CASE WHEN si.quantity=0 THEN 'OUT_OF_STOCK'
+              WHEN si.quantity<=pv.minimum_stock THEN 'LOW_STOCK'
+              ELSE 'OK' END
   FROM public.products p
   JOIN public.product_variants pv ON pv.product_id=p.id
   JOIN public.store_inventory si
     ON si.product_variant_id=pv.id AND si.store_id=p_store_id
   WHERE p.is_active=true AND pv.is_active=true
-  ORDER BY p.name,pv.size,pv.color;
+  ORDER BY CASE WHEN si.quantity=0 THEN 1
+                WHEN si.quantity<=pv.minimum_stock THEN 2
+                ELSE 3 END,
+           si.quantity;
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.report_top_selling_products(p_limit integer DEFAULT 10,p_store_id uuid DEFAULT NULL)
-RETURNS TABLE(product_id uuid, product_name text, quantity_sold bigint, revenue numeric)
+CREATE OR REPLACE FUNCTION public.report_top_selling_products(p_limit integer, p_store_id uuid)
+RETURNS TABLE(product_id uuid, product_name text, total_quantity_sold bigint, total_revenue numeric)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
@@ -1144,13 +1149,13 @@ BEGIN
     RAISE EXCEPTION 'Limite inválido.';
   END IF;
   RETURN QUERY
-  SELECT si.product_id,max(si.product_name),sum(si.quantity)::bigint,
-         round(sum(si.total),2)
+  SELECT p.id,p.name,sum(si.quantity)::bigint,sum(si.total)::numeric
   FROM public.sale_items si
   JOIN public.sales s ON s.id=si.sale_id
+  JOIN public.products p ON p.id=si.product_id
   WHERE s.store_id=p_store_id AND s.status='COMPLETED'
-  GROUP BY si.product_id
-  ORDER BY sum(si.quantity) DESC, max(si.product_name)
+  GROUP BY p.id,p.name
+  ORDER BY total_quantity_sold DESC
   LIMIT p_limit;
 END;
 $$;
@@ -1160,7 +1165,7 @@ CREATE OR REPLACE FUNCTION public.report_inventory_movements_summary(
   p_end_date timestamptz,
   p_store_id uuid
 )
-RETURNS TABLE(type text, total_quantity bigint, movement_count bigint)
+RETURNS TABLE(movement_type text, total_quantity bigint)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
@@ -1176,22 +1181,22 @@ BEGIN
     RAISE EXCEPTION 'Período inválido.';
   END IF;
   RETURN QUERY
-  SELECT im.type,sum(im.quantity)::bigint,count(*)::bigint
+  SELECT im.type,sum(im.quantity)::bigint
   FROM public.inventory_movements im
   WHERE im.store_id=p_store_id
     AND im.created_at>=p_start_date
     AND im.created_at<=p_end_date
   GROUP BY im.type
-  ORDER BY im.type;
+  ORDER BY total_quantity DESC;
 END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_profitability_by_product(
   p_store_id uuid,
-  p_start_date date,
-  p_end_date date
+  start_date date,
+  end_date date
 )
-RETURNS TABLE(product_id uuid, product_name text, revenue numeric, cost numeric, profit numeric, margin_percent numeric)
+RETURNS TABLE(product_id uuid, product_name text, category_id uuid, total_quantity bigint, total_revenue numeric, total_cost numeric, margin_value numeric, margin_percentage numeric)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
@@ -1203,33 +1208,30 @@ BEGIN
   IF p_store_id IS NULL OR NOT public.has_store_access(p_store_id) THEN
     RAISE EXCEPTION 'Acesso negado à loja.';
   END IF;
-  IF p_start_date IS NULL OR p_end_date IS NULL OR p_start_date > p_end_date THEN
-    RAISE EXCEPTION 'Período inválido.';
-  END IF;
   RETURN QUERY
-  SELECT si.product_id,max(si.product_name),
-         round(sum(si.total),2),
-         round(sum(si.quantity*p.cost_price),2),
-         round(sum(si.total-si.quantity*p.cost_price),2),
-         round(CASE WHEN sum(si.total)=0 THEN 0
-                    ELSE (sum(si.total-si.quantity*p.cost_price)/sum(si.total))*100 END,2)
+  SELECT p.id,p.name,p.category_id,sum(si.quantity)::bigint,sum(si.total),sum(si.quantity*p.cost_price),
+         sum(si.total)-sum(si.quantity*p.cost_price),
+         CASE WHEN sum(si.total)>0
+              THEN ((sum(si.total)-sum(si.quantity*p.cost_price))/sum(si.total))*100
+              ELSE 0 END
   FROM public.sale_items si
   JOIN public.sales s ON s.id=si.sale_id
   JOIN public.products p ON p.id=si.product_id
   WHERE s.store_id=p_store_id
     AND s.status='COMPLETED'
-    AND s.created_at::date BETWEEN p_start_date AND p_end_date
-  GROUP BY si.product_id
-  ORDER BY max(si.product_name);
+  AND (p_start_date IS NULL OR s.completed_at::date>=p_start_date)
+    AND (p_end_date IS NULL OR s.completed_at::date<=p_end_date)
+  GROUP BY p.id,p.name,p.category_id
+  ORDER BY margin_value DESC;
 END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_profitability_by_category(
   p_store_id uuid,
-  p_start_date date,
-  p_end_date date
+  start_date date,
+  end_date date
 )
-RETURNS TABLE(category_id uuid, category_name text, revenue numeric, cost numeric, profit numeric, margin_percent numeric)
+RETURNS TABLE(category_id uuid, category_name text, total_quantity bigint, total_revenue numeric, total_cost numeric, margin_value numeric, margin_percentage numeric)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
@@ -1245,21 +1247,21 @@ BEGIN
     RAISE EXCEPTION 'Período inválido.';
   END IF;
   RETURN QUERY
-  SELECT c.id,c.name,
-         round(sum(si.total),2),
-         round(sum(si.quantity*p.cost_price),2),
-         round(sum(si.total-si.quantity*p.cost_price),2),
-         round(CASE WHEN sum(si.total)=0 THEN 0
-                    ELSE (sum(si.total-si.quantity*p.cost_price)/sum(si.total))*100 END,2)
+  SELECT c.id,coalesce(c.name,'Sem Categoria'),sum(si.quantity)::bigint,sum(si.total),sum(si.quantity*p.cost_price),
+         sum(si.total)-sum(si.quantity*p.cost_price),
+         CASE WHEN sum(si.total)>0
+              THEN ((sum(si.total)-sum(si.quantity*p.cost_price))/sum(si.total))*100
+              ELSE 0 END
   FROM public.sale_items si
   JOIN public.sales s ON s.id=si.sale_id
   JOIN public.products p ON p.id=si.product_id
   LEFT JOIN public.categories c ON c.id=p.category_id
   WHERE s.store_id=p_store_id
     AND s.status='COMPLETED'
-    AND s.created_at::date BETWEEN p_start_date AND p_end_date
+  AND (p_start_date IS NULL OR s.completed_at::date>=p_start_date)
+    AND (p_end_date IS NULL OR s.completed_at::date<=p_end_date)
   GROUP BY c.id,c.name
-  ORDER BY c.name;
+  ORDER BY margin_value DESC;
 END;
 $$;
 

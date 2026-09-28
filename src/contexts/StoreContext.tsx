@@ -261,8 +261,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setProducts(prev => [...prev, newProd]);
 
     if (isSupabaseConfigured) {
+      if (!activeStoreId) {
+        setProducts(prev => prev.filter(product => product.id !== newId));
+        throw new Error('Nenhuma loja ativa selecionada.');
+      }
+
       try {
-        await ProductsService.create(prodData);
+        const created = await ProductsService.create(prodData);
+        if (!created?.id) throw new Error('O produto não retornou um identificador válido.');
+
+        // Product CRUD and stock movement are deliberately separate.
+        // Register each initial quantity through the stock RPC for the active store.
+        for (const sku of prodData.skus) {
+          const quantity = Math.max(0, Number(sku.qtd) || 0);
+          if (quantity === 0) continue;
+
+          const createdVariant = await ProductsService.getVariantByAttributes(
+            created.id,
+            sku.tamanho.trim() || 'Único',
+            sku.cor.trim() || 'Padrão',
+            sku.sku
+          );
+          if (!createdVariant) {
+            throw new Error('Não foi possível localizar uma variação recém-criada para lançar o estoque inicial.');
+          }
+
+          await InventoryService.registerStockEntry({
+            storeId: activeStoreId,
+            productName: prodData.nome,
+            brand: prodData.marca,
+            category: prodData.categoria,
+            price: prodData.preco,
+            skuIndex: -1,
+            qtd: quantity,
+            custoUnitario: prodData.custo ?? 0,
+            newSize: sku.tamanho,
+            newColor: sku.cor,
+            variantId: createdVariant.id
+          });
+        }
+
         await refreshData();
       } catch (err) {
         setProducts(prev => prev.filter(product => product.id !== newId));

@@ -78,7 +78,8 @@ serve(async (req) => {
       return new Response('Invalid or expired webhook signature', { status: 403, headers });
     }
 
-    const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+    const normalizedDataId = String(dataId).toLowerCase();
+    const manifest = `id:${normalizedDataId};request-id:${xRequestId};ts:${ts};`;
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',

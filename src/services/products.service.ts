@@ -96,6 +96,34 @@ export const ProductsService = {
     return data as ProductRow;
   },
 
+  async getVariantByAttributes(
+    productId: string,
+    size: string,
+    color: string,
+    sku?: string
+  ): Promise<{ id: string } | null> {
+    if (!isSupabaseConfigured || !productId) return null;
+
+    let query = supabase
+      .from('product_variants')
+      .select('id')
+      .eq('product_id', productId)
+      .eq('size', size || 'Único')
+      .eq('color', color || 'Padrão')
+      .eq('is_active', true);
+
+    if (sku) {
+      query = query.eq('sku', sku);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error) {
+      console.error('Erro ao localizar variação criada:', error);
+      throw error;
+    }
+    return data as { id: string } | null;
+  },
+
   async create(productData: {
     nome: string;
     marca: string;
@@ -116,7 +144,6 @@ export const ProductsService = {
       p_variants: (productData.skus || []).map(sku => ({
         size: sku.tamanho,
         color: sku.cor,
-        stock_quantity: Math.max(0, Number(sku.qtd) || 0),
         sku: sku.sku || null
       }))
     });

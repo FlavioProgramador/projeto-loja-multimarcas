@@ -1,0 +1,27 @@
+-- CoreSys authorization/integrity regression checklist.
+-- These are transaction-safe assertions intended for a dedicated test session.
+-- Real authenticated-user coverage requires real JWT-backed sessions.
+--
+-- Structural assertions:
+-- 1. Legacy complete_sale(uuid,text,text,jsonb,text,integer,numeric,numeric,text)
+--    must have EXECUTE=false for authenticated/anon.
+-- 2. Modern complete_sale must have EXECUTE=true for authenticated and false for anon.
+-- 3. create_mp_pix_sale modern signature must have EXECUTE=true for authenticated
+--    and false for anon.
+-- 4. Sensitive RPCs must have EXECUTE=false for anon.
+-- 5. Every product stock total must equal SUM(store_inventory.quantity).
+-- 6. Every physical_inventory UPDATE policy must have both USING and WITH CHECK.
+--
+-- Behavioral matrix to execute with real user JWTs:
+-- ADMIN: role management, sales, inventory approval, reports only for authorized store.
+-- MANAGER: sales, stock entry, returns, inventory approval, reports for authorized store.
+-- CASHIER: sales/returns/cancel according to business rules; no product management.
+-- EMPLOYEE: denied all privileged RPCs.
+-- Missing profile / inactive profile / null role / inactive store link: denied.
+-- Cross-store access: denied.
+-- Repeated idempotency key: same result, no duplicate sale/stock movement.
+-- Legacy sale RPC: denied.
+-- Physical inventory with incomplete counts: denied.
+-- Return quantity > sold minus previous returns: denied.
+--
+-- Run before and after the migration in a non-production test transaction/session.

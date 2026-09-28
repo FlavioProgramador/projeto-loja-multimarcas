@@ -90,7 +90,6 @@ export const InventoryService = {
 
         if (productLookupError) throw productLookupError;
 
-        let targetVariantId: string;
         if (existingProduct) {
           const variants = ((existingProduct as unknown as ExistingProduct).product_variants || [])
             .filter(variant => variant.is_active && variant.store_inventory?.some(item => item.store_id === params.storeId));

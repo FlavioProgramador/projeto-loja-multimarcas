@@ -124,7 +124,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
 
         <nav className="sidebar-navigation" aria-label="Navegação principal">
           {menuGroups.map(group => {
-            const visibleItems = group.items.filter(item => !user || MODULE_PERMISSIONS[item.id].includes(role));
+            const visibleItems = group.items.filter(item => !user || (role && MODULE_PERMISSIONS[item.id].includes(role)));
             if (visibleItems.length === 0) return null;
 
             return (

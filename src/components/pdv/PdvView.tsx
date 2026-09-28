@@ -113,7 +113,9 @@ export const PdvView: React.FC = () => {
     if (!prod) return;
     const skuIndex = skuSelections[productId] !== undefined ? skuSelections[productId] : 0;
     const result = addItem(prod, skuIndex);
-    if (!result.success) showBanner(`⚠️ ${result.message || 'Stock insuficiente.'}`);
+    if (!result.success) {
+      showBanner(`⚠️ ${result.message || 'Stock insuficiente.'}`);
+    }
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -279,9 +281,190 @@ export const PdvView: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      if (e.key === 'F4') {
+        e.preventDefault();
+        if (isCheckoutModalOpen) handleConfirmSale();
+        else if (cart.length > 0) setIsCheckoutModalOpen(true);
+        else showBanner('⚠️ Carrinho vazio. Pressione F2 para procurar produtos.');
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (showCustomerSuggestions) return setShowCustomerSuggestions(false);
+        if (isCheckoutModalOpen) return setIsCheckoutModalOpen(false);
+        if (isReturnModalOpen) return setIsReturnModalOpen(false);
+        if (isNewCustomerModalOpen) return setIsNewCustomerModalOpen(false);
+        if (document.activeElement === searchInputRef.current && searchTerm) return setSearchTerm('');
+        if (cart.length > 0) setIsClearCartModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isCheckoutModalOpen, isReturnModalOpen, isNewCustomerModalOpen, showCustomerSuggestions, cart.length, searchTerm, clearCart, handleConfirmSale]);
+
   return (
     <>
-      {/* O restante da interface original permanece neste componente. */}
+      <div className="module-fade" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {notificationBanner && (
+          <div style={{
+            background: notificationBanner.includes('⚠️') ? 'var(--badge-yellow)' : 'var(--badge-green)',
+            color: 'var(--on-primary)', padding: '12px 18px', borderRadius: 'var(--radius-lg)',
+            marginBottom: '16px', fontSize: '13.5px', fontWeight: 600, boxShadow: 'var(--shadow-md)'
+          }}>
+            {notificationBanner}
+          </div>
+        )}
+
+        <div className="page-header" style={{ alignItems: 'flex-start', paddingBottom: '16px' }}>
+          <div>
+            <h1 className="page-title" style={{ fontSize: '24px', letterSpacing: '-0.5px' }}>PDV</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><kbd className="kbd-key">F2</kbd> Procurar</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><kbd className="kbd-key">F4</kbd> Finalizar</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><kbd className="kbd-key">ESC</kbd> Limpar</span>
+            </div>
+          </div>
+          <button className="btn btn-outline" style={{ background: 'var(--bg-surface)' }} onClick={() => setIsReturnModalOpen(true)}>
+            <RotateCcw size={16} /> Trocas
+          </button>
+        </div>
+
+        <div className="pdv-grid">
+          <div className="pdv-left" style={{ display: 'flex', flexDirection: 'column', background: 'transparent', border: 'none', boxShadow: 'none', padding: 0 }}>
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <input
+                ref={searchInputRef}
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Buscar produto..."
+                className="input"
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: '12px' }}>
+              {filteredProducts.map(product => {
+                const skuIndex = skuSelections[product.id] ?? 0;
+                return (
+                  <div key={product.uuid} className="card" style={{ padding: '16px' }}>
+                    <div style={{ fontWeight: 700 }}>{product.nome}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>{product.marca} · {product.categoria}</div>
+                    <div style={{ marginTop: '10px', fontWeight: 700 }}>{formatMoeda(product.preco)}</div>
+                    <select value={skuIndex} onChange={e => handleSkuChange(product.id, Number(e.target.value))} className="input" style={{ marginTop: '10px' }}>
+                      {product.skus.map((sku, index) => (
+                        <option key={sku.id || index} value={index}>{sku.tamanho} / {sku.cor} · {sku.qtd}</option>
+                      ))}
+                    </select>
+                    <button className="btn btn-primary" style={{ marginTop: '10px', width: '100%' }} onClick={() => handleAddToCart(product.id)}>
+                      <Plus size={16} /> Adicionar
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <aside className="pdv-right card" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '12px' }}>Carrinho</div>
+            {cart.length === 0 ? (
+              <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>Nenhum item no carrinho.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                {cart.map(item => (
+                  <div key={item.variantId || item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{item.nome}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{item.tamanho} / {item.cor} · x{item.qtd}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{formatMoeda(item.preco * item.qtd)}</span>
+                      <button className="btn btn-sm" onClick={() => removeItem(item.variantId)} aria-label="Remover item"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span>Subtotal</span><strong>{formatMoeda(subtotal)}</strong></div>
+              <button onClick={handleOpenCheckout} className="btn btn-primary" style={{ width: '100%' }}><ShoppingCart size={16} /> Finalizar venda</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      {isCheckoutModalOpen && (
+        <CheckoutModal
+          open={isCheckoutModalOpen}
+          onClose={() => setIsCheckoutModalOpen(false)}
+          onConfirm={handleConfirmSale}
+          isLoading={isGeneratingPix}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          buyerName={buyerName}
+          setBuyerName={setBuyerName}
+          cpf={cpf}
+          setCpf={setCpf}
+          discountValue={discountValue}
+          setDiscountValue={setDiscountValue}
+          discountPercent={discountPercent}
+          setDiscountPercent={setDiscountPercent}
+          installments={installments}
+          setInstallments={setInstallments}
+          amountPaid={amountPaid}
+          setAmountPaid={setAmountPaid}
+          calculatedTotal={calculatedTotal}
+        />
+      )}
+
+      {qrCodeBase64 && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold">Pagamento PIX</h2>
+            <p className="mt-1 text-sm text-gray-600">Escaneie o QR Code no aplicativo do seu banco.</p>
+            <img src={`data:image/png;base64,${qrCodeBase64}`} alt="QR Code PIX" className="mx-auto mt-4 h-64 w-64" />
+            {qrCode && (
+              <textarea readOnly value={qrCode} aria-label="Código PIX copia e cola" className="mt-4 w-full rounded-lg border p-3 text-xs" rows={4} />
+            )}
+            <button onClick={() => setQrCodeBase64(null)} className="mt-5 w-full rounded-lg bg-black px-4 py-2 text-white">Fechar</button>
+          </div>
+        </div>
+      )}
+
+      {isClearCartModalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+          <div className="card" style={{ padding: '24px', maxWidth: 420, width: '100%' }}>
+            <h2>Limpar carrinho?</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>Isso removerá todos os itens do carrinho.</p>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button className="btn btn-outline" onClick={() => setIsClearCartModalOpen(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={() => { clearCart(); setIsClearCartModalOpen(false); }}>Limpar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReturnModalOpen && (
+        <NewReturnModal
+          open={isReturnModalOpen}
+          onClose={() => setIsReturnModalOpen(false)}
+        />
+      )}
+
+      {isNewCustomerModalOpen && (
+        <NewCustomerModal
+          open={isNewCustomerModalOpen}
+          onClose={() => setIsNewCustomerModalOpen(false)}
+        />
+      )}
+
+      <ReceiptPrinter saleData={lastSaleData} />
     </>
   );
 };

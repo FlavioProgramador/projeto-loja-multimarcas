@@ -450,10 +450,21 @@ BEGIN
   END IF;
 
   FOR v_item IN
-    SELECT * FROM jsonb_to_recordset(p_items) AS x(
-      variant_id uuid,quantity integer,unit_price numeric,product_id uuid,product_name text,variant_description text
+    SELECT
+      x.variant_id,
+      sum(x.quantity)::integer AS quantity,
+      (array_agg(x.product_name ORDER BY x.product_name NULLS LAST))[1] AS product_name,
+      (array_agg(x.variant_description ORDER BY x.variant_description NULLS LAST))[1] AS variant_description
+    FROM jsonb_to_recordset(p_items) AS x(
+      variant_id uuid,
+      quantity integer,
+      unit_price numeric,
+      product_id uuid,
+      product_name text,
+      variant_description text
     )
-    ORDER BY variant_id
+    GROUP BY x.variant_id
+    ORDER BY x.variant_id
   LOOP
     IF v_item.variant_id IS NULL OR v_item.quantity IS NULL OR v_item.quantity<=0 THEN
       RAISE EXCEPTION 'Item de venda inválido.';
@@ -499,10 +510,21 @@ BEGIN
   VALUES(btrim(p_idempotency_key),v_sale_id);
 
   FOR v_item IN
-    SELECT * FROM jsonb_to_recordset(p_items) AS x(
-      variant_id uuid,quantity integer,unit_price numeric,product_id uuid,product_name text,variant_description text
+    SELECT
+      x.variant_id,
+      sum(x.quantity)::integer AS quantity,
+      (array_agg(x.product_name ORDER BY x.product_name NULLS LAST))[1] AS product_name,
+      (array_agg(x.variant_description ORDER BY x.variant_description NULLS LAST))[1] AS variant_description
+    FROM jsonb_to_recordset(p_items) AS x(
+      variant_id uuid,
+      quantity integer,
+      unit_price numeric,
+      product_id uuid,
+      product_name text,
+      variant_description text
     )
-    ORDER BY variant_id
+    GROUP BY x.variant_id
+    ORDER BY x.variant_id
   LOOP
     INSERT INTO public.sale_items(
       sale_id,product_id,product_variant_id,product_name,variant_description,quantity,unit_price,total

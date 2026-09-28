@@ -143,7 +143,8 @@ export const ProductsService = {
       p_cost_price: productData.custo || 0,
       p_variants: (productData.skus || []).map(sku => ({
         size: sku.tamanho,
-        color: sku.cor,        sku: sku.sku || null
+        color: sku.cor,
+        sku: sku.sku || null
       }))
     });
 

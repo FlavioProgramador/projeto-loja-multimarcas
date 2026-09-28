@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { AuthSuccessNotice } from './LoginPage';
@@ -14,6 +14,16 @@ export const ResetPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  const strength = useMemo(() => {
+    let score = 0;
+    if (password.length >= 10) score++;
+    if (/[a-z]/.test(password)) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./`~]/.test(password)) score++;
+    return score <= 1 ? 'Muito fraca' : score === 2 ? 'Fraca' : score === 3 ? 'Média' : 'Forte';
+  }, [password]);
 
   const isAuthenticatedPasswordChange = Boolean(user && !isPasswordRecovery);
   const canReset = Boolean(user && (isPasswordRecovery || isAuthenticatedPasswordChange));
@@ -77,7 +87,12 @@ export const ResetPasswordPage: React.FC = () => {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 disabled={loading}
+                aria-describedby="reset-password-help"
               />
+              <div id="reset-password-help" className="auth-password-help">
+                <span>Mínimo de 10 caracteres.</span>
+                {password && <strong>{strength}</strong>}
+              </div>
             </div>
             <div className="auth-field">
               <label htmlFor="confirm-password">Confirmar senha</label>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { AuthSuccessNotice } from './LoginPage';
@@ -10,6 +10,17 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function getPasswordStrength(value: string) {
+  let score = 0;
+  if (value.length >= 10) score++;
+  if (/[a-z]/.test(value)) score++;
+  if (/[A-Z]/.test(value)) score++;
+  if (/\d/.test(value)) score++;
+  if (/[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./\`~]/.test(value)) score++;
+  const label = score <= 1 ? 'Muito fraca' : score === 2 ? 'Fraca' : score === 3 ? 'Média' : 'Forte';
+  return { label, score };
+}
+
 export const RegisterPage: React.FC = () => {
   const { signUp, isConfigured } = useAuth();
   const [fullName, setFullName] = useState('');
@@ -19,6 +30,7 @@ export const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [created, setCreated] = useState(false);
+  const strength = useMemo(() => getPasswordStrength(password), [password]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -32,8 +44,8 @@ export const RegisterPage: React.FC = () => {
       setErrorMsg('Informe um e-mail válido.');
       return;
     }
-    if (password.length < 6) {
-      setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
+    if (password.length < 10) {
+      setErrorMsg('A senha deve ter pelo menos 10 caracteres.');
       return;
     }
     if (password !== passwordConfirmation) {
@@ -99,7 +111,11 @@ export const RegisterPage: React.FC = () => {
 
               <div className="auth-field">
                 <label htmlFor="register-password">Senha</label>
-                <input id="register-password" name="password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} disabled={loading} />
+                <input id="register-password" name="password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} disabled={loading} aria-describedby="register-password-help" />
+                <div id="register-password-help" className="auth-password-help">
+                  <span>Mínimo de 10 caracteres.</span>
+                  {password && <strong>{strength.label}</strong>}
+                </div>
               </div>
 
               <div className="auth-field">

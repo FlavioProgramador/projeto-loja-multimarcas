@@ -148,8 +148,6 @@ export const InventoryService = {
           if (varErr) throw varErr;
           targetVariantId = newVariant.id;
         }
-
-
       }
 
       const { data: rpcResult, error: updateError } = await supabase.rpc('register_stock_entry', {

@@ -7,16 +7,16 @@ import { mapAuthError } from '../lib/auth-errors';
 import { goToApp, goToLogin } from '../lib/auth-routing';
 
 export const ResetPasswordPage: React.FC = () => {
-  const { updatePassword, reauthenticate, isPasswordRecovery, user, signOut } = useAuth();
+  const { updatePassword, isPasswordRecovery, user, signOut } = useAuth();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const canReset = Boolean(user && isPasswordRecovery);
+  const isAuthenticatedPasswordChange = Boolean(user && !isPasswordRecovery);
+  const canReset = Boolean(user && (isPasswordRecovery || isAuthenticatedPasswordChange));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -33,11 +33,7 @@ export const ResetPasswordPage: React.FC = () => {
 
     try {
       setLoading(true);
-      if (!isPasswordRecovery && currentPassword.trim()) {
-        await updatePassword(password, currentPassword);
-      } else {
-        await updatePassword(password);
-      }
+      await updatePassword(password);
       setDone(true);
       window.setTimeout(() => goToApp(true), 800);
     } catch (err) {

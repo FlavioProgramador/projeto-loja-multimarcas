@@ -1,148 +1,150 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN');
+
+function corsHeaders(origin: string | null) {
+  const allowedOrigin = ALLOWED_ORIGIN || origin || '*';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-signature, x-request-id',
+  };
+}
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const headers = corsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers });
   }
 
   try {
+    const webhookSecret = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET');
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const mpAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
 
-    // Usar Service Key para bypass RLS no webhook (necessário pois webhooks não têm sessão de usuário)
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (!webhookSecret || !mpAccessToken || !supabaseServiceKey) {
+      console.error('MP webhook misconfigured: required secrets are missing');
+      return new Response('Webhook misconfigured', { status: 500, headers });
+    }
 
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
-    const webhookSecret = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET');
 
-    // Validação Criptográfica Obrigatória (Hardening Adicional)
-    if (webhookSecret) {
-      if (!xSignature || !xRequestId) {
-        console.error("Missing x-signature or x-request-id");
-        return new Response("Missing signature headers", { status: 403 });
-      }
-
-      const parts = xSignature.split(',');
-      let ts = '';
-      let v1 = '';
-      for (const part of parts) {
-        const [key, value] = part.split('=');
-        if (key.trim() === 'ts') ts = value;
-        if (key.trim() === 'v1') v1 = value;
-      }
-      
-      if (ts && v1) {
-        // Tolerância de tempo (ex: rejeitar se for mais antigo que 10 minutos para evitar Replay Attacks)
-        const currentTs = Math.floor(Date.now() / 1000);
-        const webhookTs = parseInt(ts, 10);
-        if (Math.abs(currentTs - webhookTs) > 600) { // 10 minutos
-           console.error("Invalid x-signature: timestamp expired");
-           return new Response("Timestamp expired", { status: 403 });
-        }
-
-        // Obter os IDs da URL ou Body. MP usa req.url.searchParams para extrair data.id.
-        // O manifesto oficial do MP: "id:[data.id];request-id:[x-request-id];ts:[ts];"
-        const url = new URL(req.url);
-        let bodyContent;
-        try { bodyContent = await req.clone().json(); } catch(e) {}
-        
-        const dataId = url.searchParams.get('data.id') || (bodyContent && bodyContent.data && bodyContent.data.id) || url.searchParams.get('id');
-        
-        if (dataId) {
-          const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
-          const encoder = new TextEncoder();
-          const key = await crypto.subtle.importKey(
-            "raw", encoder.encode(webhookSecret),
-            { name: "HMAC", hash: "SHA-256" },
-            false, ["sign", "verify"]
-          );
-          const signatureBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(manifest));
-          const hashArray = Array.from(new Uint8Array(signatureBuffer));
-          const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-          
-          if (hashHex !== v1) {
-             console.error("Invalid x-signature: mismatch");
-             return new Response("Invalid signature", { status: 403 });
-          }
-        }
-      }
+    if (!xSignature || !xRequestId) {
+      return new Response('Missing signature headers', { status: 403, headers });
     }
 
     const url = new URL(req.url);
     const paymentId = url.searchParams.get('data.id') || url.searchParams.get('id');
-    const topic = url.searchParams.get('type') || url.searchParams.get('topic');
 
-    let body;
-    try { body = await req.json(); } catch(e) {}
+    let body: Record<string, unknown> | null = null;
+    try {
+      const parsed = await req.json();
+      if (parsed && typeof parsed === 'object') body = parsed as Record<string, unknown>;
+    } catch (_) {}
 
-    const id = paymentId || (body && body.data && body.data.id);
+    const nestedData =
+      body?.data && typeof body.data === 'object'
+        ? body.data as Record<string, unknown>
+        : null;
 
-    if (!id) {
-       return new Response("No ID provided", { status: 200 });
+    const dataId = paymentId || (typeof nestedData?.id === 'string' ? nestedData.id : null);
+
+    if (!dataId) {
+      return new Response(JSON.stringify({ received: true }), {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        status: 200
+      });
     }
 
-    // Buscar detalhes do pagamento no MP para confirmar o status (segurança: não confiar só no payload)
-    const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
-      headers: { 'Authorization': `Bearer ${mpAccessToken}` }
+    const ts = xSignature
+      .split(',')
+      .map(part => part.trim())
+      .find(part => part.startsWith('ts='))
+      ?.slice(3) || '';
+
+    const v1 = xSignature
+      .split(',')
+      .map(part => part.trim())
+      .find(part => part.startsWith('v1='))
+      ?.slice(3) || '';
+
+    const timestamp = Number(ts);
+
+    if (!ts || !v1 || !Number.isFinite(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 600) {
+      return new Response('Invalid or expired webhook signature', { status: 403, headers });
+    }
+
+    const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const hex = v1.match(/.{1,2}/g);
+    const signatureBytes = new Uint8Array(hex?.map(byte => parseInt(byte, 16)) || []);
+    const validSignature =
+      signatureBytes.length === 32 &&
+      await crypto.subtle.verify('HMAC', key, signatureBytes, encoder.encode(manifest));
+
+    if (!validSignature) {
+      return new Response('Invalid webhook signature', { status: 403, headers });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {
+      headers: { Authorization: `Bearer ${mpAccessToken}` }
     });
 
     if (!mpResponse.ok) {
-       console.error('Failed to fetch payment from MP:', await mpResponse.text());
-       return new Response("Failed to fetch payment from MP", { status: 400 });
+      console.error('Falha ao consultar MP:', dataId, await mpResponse.text());
+      return new Response(JSON.stringify({ error: 'Failed to fetch payment' }), {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        status: 502
+      });
     }
 
     const paymentInfo = await mpResponse.json();
-    const status = paymentInfo.status; // 'approved', 'pending', 'rejected', 'cancelled'
-    const externalReference = paymentInfo.external_reference; // Nosso sale_id interno
-
-    console.log(`MP Webhook: payment ${id}, status=${status}, sale_id=${externalReference}`);
+    const status = paymentInfo.status;
+    const externalReference = paymentInfo.external_reference;
 
     if (!externalReference) {
-       return new Response("No external_reference found", { status: 200 });
+      return new Response(JSON.stringify({ received: true }), {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        status: 200
+      });
     }
 
     if (status === 'approved') {
-      // ✅ PIX aprovado — finalizar venda
       const { error } = await supabase.rpc('approve_mp_pix_sale', {
         p_sale_id: externalReference,
-        p_provider_transaction_id: id.toString()
+        p_provider_transaction_id: String(dataId)
       });
-      if (error) {
-        console.error('Error approving sale:', error);
-        throw error;
-      }
-      console.log(`Sale ${externalReference} approved successfully.`);
-
-    } else if (status === 'cancelled' || status === 'rejected' || status === 'expired') {
-      // ❌ PIX cancelado/rejeitado/expirado — estornar estoque
-      console.log(`PIX ${status} for sale ${externalReference}. Rolling back stock...`);
+      if (error) throw error;
+    } else if (['cancelled', 'rejected', 'expired'].includes(status)) {
       const { error } = await supabase.rpc('cancel_mp_pix_sale', {
         p_sale_id: externalReference
       });
-      if (error) {
-        // Se a RPC não existir ainda, logar mas não falhar o webhook (MP vai tentar de novo)
-        console.error('Error rolling back sale (cancel_mp_pix_sale RPC may not exist yet):', error);
-      } else {
-        console.log(`Sale ${externalReference} cancelled and stock restored.`);
-      }
+      if (error) throw error;
     }
 
     return new Response(JSON.stringify({ success: true, status }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       status: 200
     });
-
-  } catch (error: any) {
-    console.error('MP Webhook error:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 400 });
+  } catch (error) {
+    console.error('MP Webhook erro crítico:', error);
+    return new Response(JSON.stringify({ error: 'Webhook processing failed' }), {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      status: 500
+    });
   }
 });
-

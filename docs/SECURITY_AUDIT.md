@@ -127,3 +127,35 @@ Foram identificadas e corrigidas **15 vulnerabilidades**, distribuídas em 3 ní
 6. `security_v04b_approve_pix_idempotency_drop_recreate` — Idempotência em `approve_mp_pix_sale`
 7. `security_v05b_rls_direct_insert_protection` — Remoção de INSERT direto + restrição de visualização financeira
 8. `security_v06_create_mp_pix_sale_auth_required` — Auth obrigatória em `create_mp_pix_sale`
+
+
+## Hardening Supabase — 2026-09-27
+
+### Estado
+- RLS mantido nas tabelas public.
+- RPCs sensíveis foram retiradas de anon/PUBLIC.
+- Aprovação e cancelamento PIX passaram a ser exclusivas de service_role.
+- create_mp_pix_sale usa assinatura multi-loja com idempotência obrigatória.
+- search_path foi fixado nas funções públicas auditadas.
+- unaccent foi movida para schema extensions.
+- RLS de inventário físico passou a respeitar loja e papel.
+- Perfil passou a ter leitura do próprio registro; ADMIN mantém leitura administrativa.
+- Índices de cobertura foram adicionados para FKs públicas identificadas pelo advisor.
+- Índices não utilizados não foram removidos em massa.
+- Schema stripe não foi alterado.
+
+### Validações realizadas
+- Usuário anônimo não lê profiles.
+- Usuário autenticado sem acesso não lê perfis de terceiros.
+- ADMIN consegue ler os perfis administrativos permitidos.
+- anon não possui EXECUTE nas RPCs públicas sensíveis.
+- create_mp_pix_sale está disponível para authenticated.
+- approve_mp_pix_sale/cancel_mp_pix_sale estão disponíveis apenas para service_role.
+- process_return/register_stock_entry/approve_physical_inventory permanecem disponíveis para authenticated e validam papel/loja dentro da função.
+- soma de estoque em store_inventory permaneceu igual à soma derivada em product_variants após o hardening.
+
+### Pendências conhecidas
+- Security Advisor ainda reporta SECDEF para funções legitimamente expostas a authenticated; isso não implica vulnerabilidade por si só e deve ser acompanhado por testes de autorização internos.
+- Password leak protection do Supabase Auth continua desativado e requer alteração na configuração do Auth.
+- Três funções gerenciadas pelo Stripe ainda aparecem com search_path mutável; não foram alteradas para evitar impacto na integração gerenciada.
+- O advisor de performance ainda pode reportar índices não utilizados em tabelas pequenas; não foram removidos sem evidência de segurança/benefício.

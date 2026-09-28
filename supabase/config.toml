@@ -1,6 +1,5 @@
-# A string used to distinguish different Supabase projects on the same host. Defaults to the
-# working directory name when running `supabase init`.
-project_id = "vestra"
+# COREsys Supabase project configuration
+project_id = "ndrjynlbwrugakjqtzwy"
 
 [api]
 enabled = true
@@ -17,7 +16,6 @@ enabled = true
 port = 54323
 api_url = "http://127.0.0.1"
 
-# Email testing server
 [inbucket]
 enabled = true
 port = 54324

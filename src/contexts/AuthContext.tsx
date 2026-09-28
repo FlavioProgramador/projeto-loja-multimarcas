@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { AuthService, AuthDenialReason, StoreAccessSummary, VALID_ROLES } from '../services/auth.service';
@@ -25,16 +25,23 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const SENSITIVE_KEYS = [
+  'erp_products',
   'erp_customers',
   'erp_transactions',
   'erp_movements',
+  'erp_returns',
   'erp_suppliers',
   'erp_fixed_expenses',
-  'erp_notifications'
+  'erp_notifications',
+  '@vestra-agenda'
 ];
 
 function clearLocalCaches() {
-  SENSITIVE_KEYS.forEach(key => localStorage.removeItem(key));
+  if (typeof window === 'undefined') return;
+  SENSITIVE_KEYS.forEach(key => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
 }
 
 function isAppPath() {
@@ -50,7 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [denialReason, setDenialReason] = useState<AuthDenialReason | null>(null);
-  const initializingRef = useRef(true);
 
   const resetState = useCallback(() => {
     setUser(null);
@@ -100,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     let cancelled = false;
+    let eventSequence = 0;
 
     const init = async () => {
       try {
@@ -107,43 +114,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (cancelled) return;
         await applyAuthorizedSession(session);
       } catch {
-        console.error('Erro ao recuperar sessão.');
-        if (!cancelled) resetState();
-      } finally {
         if (!cancelled) {
-          initializingRef.current = false;
-          setLoading(false);
+          console.error('Erro ao recuperar sessão.');
+          resetState();
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
-    init();
+    void init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'INITIAL_SESSION') return;
 
-      if (event === 'TOKEN_REFRESHED' && !session) {
-        resetState();
-        setDenialReason('unauthenticated');
-        clearLocalCaches();
-        if (isAppPath()) goToLogin(true);
-        setLoading(false);
-        return;
-      }
+      const sequence = ++eventSequence;
 
-      if (event === 'SIGNED_OUT') {
-        resetState();
-        setIsPasswordRecovery(false);
-        clearLocalCaches();
-        setLoading(false);
-        return;
-      }
+      // Supabase documents a known deadlock hazard when making async calls directly
+      // inside this callback. Defer session reconciliation until the callback returns.
+      window.setTimeout(() => {
+        if (cancelled || sequence !== eventSequence) return;
 
-      try {
-        await applyAuthorizedSession(session, event);
-      } finally {
-        setLoading(false);
-      }
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          resetState();
+          setDenialReason('unauthenticated');
+          clearLocalCaches();
+          if (isAppPath()) goToLogin(true);
+          setLoading(false);
+          return;
+        }
+
+        if (event === 'SIGNED_OUT') {
+          resetState();
+          setIsPasswordRecovery(false);
+          clearLocalCaches();
+          setLoading(false);
+          return;
+        }
+
+        void applyAuthorizedSession(session, event)
+          .catch(() => {
+            if (!cancelled && sequence === eventSequence) {
+              resetState();
+              setDenialReason('unauthenticated');
+              clearLocalCaches();
+            }
+          })
+          .finally(() => {
+            if (!cancelled && sequence === eventSequence) setLoading(false);
+          });
+      }, 0);
     });
 
     return () => {

@@ -7,9 +7,10 @@ import { mapAuthError } from '../lib/auth-errors';
 import { goToApp, goToLogin } from '../lib/auth-routing';
 
 export const ResetPasswordPage: React.FC = () => {
-  const { updatePassword, isPasswordRecovery, user, signOut } = useAuth();
+  const { updatePassword, reauthenticate, isPasswordRecovery, user, signOut } = useAuth();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -21,8 +22,8 @@ export const ResetPasswordPage: React.FC = () => {
     event.preventDefault();
     setErrorMsg(null);
 
-    if (password.length < 8) {
-      setErrorMsg('A nova senha deve ter pelo menos 8 caracteres.');
+    if (password.length < 10) {
+      setErrorMsg('A nova senha deve ter pelo menos 10 caracteres.');
       return;
     }
     if (password !== confirm) {
@@ -32,7 +33,11 @@ export const ResetPasswordPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await updatePassword(password);
+      if (!isPasswordRecovery && currentPassword.trim()) {
+        await updatePassword(password, currentPassword);
+      } else {
+        await updatePassword(password);
+      }
       setDone(true);
       window.setTimeout(() => goToApp(true), 800);
     } catch (err) {

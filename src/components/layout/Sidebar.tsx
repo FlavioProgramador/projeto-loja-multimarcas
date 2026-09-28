@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .toUpperCase() || 'CS';
 
   const filteredNavItems = NAV_ITEMS.filter(item =>
-    !user || MODULE_PERMISSIONS[item.id]?.includes(role)
+    !user || (role ? MODULE_PERMISSIONS[item.id]?.includes(role) : false)
   );
 
   return (

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { StoreProvider } from './contexts/StoreContext';
 import { CartProvider } from './contexts/CartContext';
 import { AppLayout } from './components/layout/AppLayout';
@@ -14,9 +14,11 @@ import { SuppliersView } from './components/suppliers/SuppliersView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AutomationsView } from './components/automations/AutomationsView';
 import { ReturnsView } from './components/returns/ReturnsView';
-import { AuthModal } from './components/auth/AuthModal';
-import { useAuth } from './contexts/AuthContext';
 import { ActiveModule } from './types';
+import { AuthBootScreen, LoginPage } from './pages/LoginPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { getAuthScreen, goToApp, goToLogin, goToResetPassword, AuthScreen } from './lib/auth-routing';
 
 const VALID_MODULES: ActiveModule[] = [
   'dashboard',
@@ -45,7 +47,7 @@ const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
   dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
   pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
   estoque: ['ADMIN', 'MANAGER'],
-  trocas: ['ADMIN', 'MANAGER'], // ADICIONADO: permissão para trocas/devoluções
+  trocas: ['ADMIN', 'MANAGER'],
   financeiro: ['ADMIN', 'MANAGER'],
   movimentacoes: ['ADMIN', 'MANAGER'],
   clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
@@ -54,8 +56,25 @@ const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
   automacoes: ['ADMIN']
 };
 
+function useAuthScreen(): AuthScreen {
+  const [screen, setScreen] = useState<AuthScreen>(getAuthScreen);
+
+  useEffect(() => {
+    const sync = () => setScreen(getAuthScreen());
+    window.addEventListener('popstate', sync);
+    window.addEventListener('hashchange', sync);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener('hashchange', sync);
+    };
+  }, []);
+
+  return screen;
+}
+
 export function AppContent() {
-  const { user, loading, isConfigured, role } = useAuth();
+  const { loading, isAuthorized, isPasswordRecovery, role } = useAuth();
+  const screen = useAuthScreen();
   const [currentModule, setCurrentModule] = useState<ActiveModule>(getInitialModule);
 
   useEffect(() => {
@@ -70,32 +89,46 @@ export function AppContent() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+
+    if (isPasswordRecovery && screen !== 'reset-password') {
+      goToResetPassword(true);
+      return;
+    }
+
+    if (!isAuthorized && screen === 'app') {
+      goToLogin(true);
+      return;
+    }
+
+    if (isAuthorized && !isPasswordRecovery && (screen === 'login' || screen === 'forgot-password')) {
+      goToApp(true);
+    }
+  }, [loading, isAuthorized, isPasswordRecovery, screen]);
+
   const handleNavigate = (module: ActiveModule) => {
     setCurrentModule(module);
     window.location.hash = `#/${module}`;
   };
 
-  // ─── Auth Guard ────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '14px', gap: '10px' }}>
-        <div className="spinner" style={{ width: 20, height: 20, border: '2px solid var(--border-color)', borderTop: '2px solid var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        Carregando...
-      </div>
-    );
+    return <AuthBootScreen />;
   }
 
-  if (isConfigured && !user) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-main)' }}>
-        <AuthModal isOpen={true} onClose={() => { }} />
-      </div>
-    );
+  if (screen === 'forgot-password') {
+    return <ForgotPasswordPage />;
   }
-  // ──────────────────────────────────────────────────────────────────────────
 
-  // RBAC Guard
-  const hasPermission = user ? MODULE_PERMISSIONS[currentModule]?.includes(role) : true;
+  if (screen === 'reset-password' || isPasswordRecovery) {
+    return <ResetPasswordPage />;
+  }
+
+  if (!isAuthorized) {
+    return <LoginPage />;
+  }
+
+  const hasPermission = role ? MODULE_PERMISSIONS[currentModule]?.includes(role) : false;
   const safeModule = hasPermission ? currentModule : 'dashboard';
   if (!hasPermission && window.location.hash !== '#/dashboard') {
     window.location.hash = '#/dashboard';

@@ -100,6 +100,27 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Claim the delivery only after signature verification. A repeated x-request-id
+    // is treated as a replay and acknowledged without re-running settlement logic.
+    const { error: replayInsertError } = await supabase
+      .from('mp_webhook_events')
+      .insert({
+        request_id: xRequestId,
+        provider_payment_id: String(dataId),
+        signature_ts: timestamp
+      });
+
+    if (replayInsertError) {
+      // 23505 = unique_violation on the request_id primary key.
+      if (replayInsertError.code === '23505') {
+        return new Response(JSON.stringify({ success: true, replayed: true }), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+      throw replayInsertError;
+    }
+
     const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {
       headers: { Authorization: `Bearer ${mpAccessToken}` }
     });

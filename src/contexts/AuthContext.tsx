@@ -1,39 +1,97 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
-import { AuthService } from '../services/auth.service';
+import { AuthService, AuthDenialReason, StoreAccessSummary, VALID_ROLES } from '../services/auth.service';
 import { ProfileRow, UserRole } from '../types/database';
+import { goToLogin } from '../lib/auth-routing';
 
 interface AuthContextType {
   user: User | null;
   profile: ProfileRow | null;
-  role: UserRole;
+  role: UserRole | null;
+  stores: StoreAccessSummary[];
   loading: boolean;
   isConfigured: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  isAuthorized: boolean;
+  isPasswordRecovery: boolean;
+  denialReason: AuthDenialReason | null;
+  signIn: (email: string, password: string, rememberAccess?: boolean) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SENSITIVE_KEYS = [
+  'erp_customers',
+  'erp_transactions',
+  'erp_movements',
+  'erp_suppliers',
+  'erp_fixed_expenses',
+  'erp_notifications'
+];
+
+function clearLocalCaches() {
+  SENSITIVE_KEYS.forEach(key => localStorage.removeItem(key));
+}
+
+function isAppPath() {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  return path !== '/login' && path !== '/forgot-password' && path !== '/reset-password';
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [stores, setStores] = useState<StoreAccessSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [denialReason, setDenialReason] = useState<AuthDenialReason | null>(null);
+  const initializingRef = useRef(true);
 
-  const fetchProfile = async (currentUser: User | null) => {
-    if (!currentUser || !isSupabaseConfigured) {
-      setProfile(null);
+  const resetState = useCallback(() => {
+    setUser(null);
+    setProfile(null);
+    setStores([]);
+    setDenialReason(null);
+  }, []);
+
+  const applyAuthorizedSession = useCallback(async (session: Session | null, event?: string) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      setIsPasswordRecovery(true);
+    }
+
+    if (!session?.user) {
+      resetState();
       return;
     }
-    try {
-      const prof = await AuthService.getCurrentProfile();
-      setProfile(prof);
-    } catch (err) {
-      console.error('Erro ao obter perfil no AuthProvider:', err);
+
+    const { context, reason } = await AuthService.resolveAccessContext();
+
+    if (event === 'PASSWORD_RECOVERY') {
+      setUser(session.user);
+      setProfile(context?.profile ?? null);
+      setStores(context?.stores ?? []);
+      setDenialReason(null);
+      return;
     }
-  };
+
+    if (!context) {
+      await AuthService.signOut().catch(() => undefined);
+      resetState();
+      setDenialReason(reason ?? 'no_profile');
+      clearLocalCaches();
+      return;
+    }
+
+    setUser(context.user);
+    setProfile(context.profile);
+    setStores(context.stores);
+    setDenialReason(null);
+  }, [resetState]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -41,33 +99,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Obter sessão inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user);
-      }
-      setLoading(false);
-    });
+    let cancelled = false;
 
-    // Escutar mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user);
-      } else {
-        setProfile(null);
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        await applyAuthorizedSession(session);
+      } catch {
+        console.error('Erro ao recuperar sessão.');
+        if (!cancelled) resetState();
+      } finally {
+        if (!cancelled) {
+          initializingRef.current = false;
+          setLoading(false);
+        }
       }
-      setLoading(false);
+    };
+
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'INITIAL_SESSION') return;
+
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        resetState();
+        setDenialReason('unauthenticated');
+        clearLocalCaches();
+        if (isAppPath()) goToLogin(true);
+        setLoading(false);
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        resetState();
+        setIsPasswordRecovery(false);
+        clearLocalCaches();
+        setLoading(false);
+        return;
+      }
+
+      try {
+        await applyAuthorizedSession(session, event);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applyAuthorizedSession, resetState]);
 
-  const signIn = async (email: string, password: string) => {
-    await AuthService.signIn(email, password);
+  const signIn = async (email: string, password: string, rememberAccess = true) => {
+    await AuthService.signIn(email, password, rememberAccess);
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -75,25 +161,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    setIsPasswordRecovery(false);
     await AuthService.signOut();
-    setUser(null);
-    setProfile(null);
-    // V-07: Limpar dados sensíveis do cache local no logout
-    // Clientes, transações, movimentações e fornecedores não devem persistir entre sessões
-    const SENSITIVE_KEYS = [
-      'erp_customers',
-      'erp_transactions',
-      'erp_movements',
-      'erp_suppliers',
-      'erp_fixed_expenses',
-      'erp_notifications',
-    ];
-    SENSITIVE_KEYS.forEach(key => localStorage.removeItem(key));
+    resetState();
+    clearLocalCaches();
+    goToLogin(true);
   };
 
-  // SEGURANÇA: fallback deve ser null, nunca ADMIN.
-  // Se o perfil falhar ao carregar, o usuário fica sem permissão — não ganha acesso.
-  const role: UserRole = (profile?.role as UserRole) ?? 'EMPLOYEE';
+  const requestPasswordReset = async (email: string) => {
+    await AuthService.requestPasswordReset(email);
+  };
+
+  const updatePassword = async (password: string) => {
+    await AuthService.updatePassword(password);
+    setIsPasswordRecovery(false);
+  };
+
+  const role: UserRole | null =
+    profile && VALID_ROLES.includes(profile.role) ? profile.role : null;
+
+  const isAuthorized = Boolean(
+    user &&
+    profile &&
+    role &&
+    profile.is_active !== false &&
+    stores.length > 0 &&
+    !denialReason
+  );
 
   return (
     <AuthContext.Provider
@@ -101,11 +195,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         profile,
         role,
+        stores,
         loading,
         isConfigured: isSupabaseConfigured,
+        isAuthorized,
+        isPasswordRecovery,
+        denialReason,
         signIn,
         signUp,
-        signOut
+        signOut,
+        requestPasswordReset,
+        updatePassword
       }}
     >
       {children}

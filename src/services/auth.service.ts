@@ -183,9 +183,24 @@ export const AuthService = {
     if (error) throw error;
   },
 
-  async updatePassword(newPassword: string) {
+  async reauthenticate() {
     assertConfigured();
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await supabase.auth.reauthenticate();
+    if (error) throw error;
+  },
+
+  async updatePassword(newPassword: string, currentPassword?: string) {
+    assertConfigured();
+
+    const payload: { password: string; current_password?: string } = {
+      password: newPassword
+    };
+
+    if (currentPassword) {
+      payload.current_password = currentPassword;
+    }
+
+    const { error } = await supabase.auth.updateUser(payload);
     if (error) throw error;
   },
 

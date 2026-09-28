@@ -1,81 +1,82 @@
 .auth-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(280px, 42%) 1fr;
-  background: #f6faf8;
+  grid-template-columns: minmax(390px, 44%) 1fr;
+  background: #f3f8f6;
   color: #142033;
   font-family: Inter, system-ui, sans-serif;
 }
 
 .auth-brand {
-  background: linear-gradient(180deg, #07352c 0%, #0a3c30 48%, #00674f 100%);
-  color: #f2f8f5;
-  padding: 48px 40px;
+  background: #d9f0e8;
+  color: #07352c;
+  padding: 64px clamp(34px, 5vw, 76px);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 32px;
 }
 
-.auth-brand-mark {
-  display: flex;
+.auth-brand-logo-wrap {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  width: min(470px, 100%);
+  padding: 0;
 }
 
-.auth-brand-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(115, 230, 203, 0.16);
-  border: 1px solid rgba(115, 230, 203, 0.35);
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #73e6cb;
+.auth-brand-full-logo {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-.auth-brand h1 {
-  margin: 0;
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
-.auth-brand p {
-  margin: 8px 0 0;
-  color: #c1d1cb;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  max-width: 32ch;
+.auth-brand-quote {
+  max-width: 390px;
+  margin: clamp(120px, 22vh, 220px) 0 0 24px;
+  padding-left: 18px;
+  border-left: 2px solid #00674f;
+  color: #07352c;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.2rem, 2vw, 1.65rem);
+  font-style: italic;
+  line-height: 1.35;
 }
 
 .auth-brand-foot {
   font-size: 0.8rem;
-  color: #9eb1aa;
+  color: #477467;
 }
 
 .auth-main {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px;
+  padding: 48px 28px;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 450px;
   background: #ffffff;
   border: 1px solid #d7e3df;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(7, 53, 44, 0.08);
-  padding: 32px 28px;
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(7, 53, 44, 0.12);
+  padding: 40px 36px;
+}
+
+.auth-card-kicker {
+  margin-bottom: 10px;
+  color: #008b6d;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .auth-card h2 {
   margin: 0 0 6px;
-  font-size: 1.45rem;
+  font-size: 1.72rem;
+  line-height: 1.15;
   letter-spacing: -0.03em;
   color: #0a3c30;
 }
@@ -84,6 +85,23 @@
   margin: 0 0 24px;
   color: #52625d;
   font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.auth-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e2ece8;
+  color: #687873;
+  font-size: 0.84rem;
+}
+
+.auth-card-register .auth-field {
+  margin-bottom: 12px;
 }
 
 .auth-field {
@@ -120,6 +138,14 @@
 .auth-field input:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.auth-field input:-webkit-autofill,
+.auth-field input:-webkit-autofill:hover,
+.auth-field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #142033;
+  -webkit-box-shadow: 0 0 0 1000px #f6faf8 inset;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 .auth-password-wrap {
@@ -162,6 +188,17 @@
   cursor: pointer;
 }
 
+.auth-row input[type='checkbox'] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: #00674f;
+  cursor: pointer;
+}
+
 .auth-link {
   background: none;
   border: 0;
@@ -190,10 +227,15 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  font-size: 0.95rem;
+  box-shadow: 0 8px 16px rgba(0, 103, 79, 0.16);
+  transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .auth-submit:hover:not(:disabled) {
   background: #0a3c30;
+  box-shadow: 0 10px 20px rgba(0, 103, 79, 0.22);
+  transform: translateY(-1px);
 }
 
 .auth-submit:disabled {
@@ -259,12 +301,12 @@
   }
 
   .auth-brand {
-    padding: 28px 20px 20px;
+    padding: 32px 24px 26px;
     min-height: auto;
   }
 
-  .auth-brand p {
-    max-width: none;
+  .auth-brand-quote {
+    margin-top: 34px;
   }
 
   .auth-brand-foot {

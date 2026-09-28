@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { useAuth } from '../contexts/AuthContext';
 import { mapAuthError, AUTH_ACCESS_DENIED, AUTH_SESSION_EXPIRED } from '../lib/auth-errors';
-import { goToForgotPassword } from '../lib/auth-routing';
+import { goToForgotPassword, goToRegister } from '../lib/auth-routing';
 import { getRememberAccess } from '../lib/auth-storage';
 
 function isValidEmail(value: string) {
@@ -74,8 +74,9 @@ export const LoginPage: React.FC = () => {
   return (
     <AuthShell>
       <div className="auth-card">
-        <h2>Entrar</h2>
-        <p className="auth-lead">Use sua conta corporativa para acessar o COREsys.</p>
+        <div className="auth-card-kicker">Acesso seguro</div>
+        <h2>Bem-vindo de volta</h2>
+        <p className="auth-lead">Entre com sua conta corporativa para acessar o CoreSys.</p>
 
         {(errorMsg || denialMessage) && (
           <div className="auth-alert error" role="alert">
@@ -170,6 +171,13 @@ export const LoginPage: React.FC = () => {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+
+        <div className="auth-card-footer">
+          <span>Ainda não possui uma conta?</span>
+          <button type="button" className="auth-link" onClick={goToRegister}>
+            Criar conta
+          </button>
+        </div>
       </div>
     </AuthShell>
   );

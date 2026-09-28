@@ -1,9 +1,10 @@
-export type AuthScreen = 'login' | 'forgot-password' | 'reset-password' | 'app';
+export type AuthScreen = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'app';
 
 export function getAuthScreen(): AuthScreen {
   if (typeof window === 'undefined') return 'app';
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   if (path === '/login') return 'login';
+  if (path === '/register') return 'register';
   if (path === '/forgot-password') return 'forgot-password';
   if (path === '/reset-password') return 'reset-password';
   return 'app';
@@ -21,6 +22,10 @@ export function navigateTo(path: string, replace = false): void {
 
 export function goToLogin(replace = true): void {
   navigateTo('/login', replace);
+}
+
+export function goToRegister(): void {
+  navigateTo('/register');
 }
 
 export function goToApp(replace = true): void {

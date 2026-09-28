@@ -10,13 +10,12 @@ export const AuthShell: React.FC<AuthShellProps> = ({ children }) => {
     <div className="auth-shell" data-theme="light">
       <aside className="auth-brand" aria-label="Identidade COREsys">
         <div>
-          <div className="auth-brand-mark">
-            <div className="auth-brand-logo" aria-hidden="true">CS</div>
-            <div>
-              <h1>COREsys</h1>
-              <p>ERP e PDV para lojas de moda multimarcas.</p>
-            </div>
+          <div className="auth-brand-logo-wrap">
+            <img className="auth-brand-full-logo" src="/logo_completa.png" alt="CoreSys" />
           </div>
+          <blockquote className="auth-brand-quote">
+            “Mais controle para sua operação. Mais tempo para fazer seu negócio crescer.”
+          </blockquote>
         </div>
         <div className="auth-brand-foot">Acesso restrito a usuários autorizados.</div>
       </aside>

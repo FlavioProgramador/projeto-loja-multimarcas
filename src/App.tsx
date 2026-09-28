@@ -16,6 +16,7 @@ import { AutomationsView } from './components/automations/AutomationsView';
 import { ReturnsView } from './components/returns/ReturnsView';
 import { ActiveModule } from './types';
 import { AuthBootScreen, LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { getAuthScreen, goToApp, goToLogin, goToResetPassword, AuthScreen } from './lib/auth-routing';
@@ -102,7 +103,7 @@ export function AppContent() {
       return;
     }
 
-    if (isAuthorized && !isPasswordRecovery && (screen === 'login' || screen === 'forgot-password')) {
+    if (isAuthorized && !isPasswordRecovery && (screen === 'login' || screen === 'register' || screen === 'forgot-password')) {
       goToApp(true);
     }
   }, [loading, isAuthorized, isPasswordRecovery, screen]);
@@ -118,6 +119,10 @@ export function AppContent() {
 
   if (screen === 'forgot-password') {
     return <ForgotPasswordPage />;
+  }
+
+  if (screen === 'register') {
+    return <RegisterPage />;
   }
 
   if (screen === 'reset-password' || isPasswordRecovery) {

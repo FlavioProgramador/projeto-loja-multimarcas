@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap, Settings, Sun, Moon, Minus, Plus, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap, Settings, Sun, Moon, Minus, Plus, HelpCircle, LogOut } from 'lucide-react';
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -76,7 +76,7 @@ const moduleLabels: Record<ActiveModule, string> = {
 };
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate, children }) => {
-  const { user, profile, role } = useAuth();
+  const { user, profile, role, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -111,11 +111,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
         : 'Colaborador';
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'CS';
 
+  const handleSignOut = async () => {
+    if (!window.confirm('Deseja encerrar a sessão?')) return;
+    await signOut();
+  };
+
   return (
     <div className="app-layout">
       <aside className={`sidebar ${isSidebarOpen ? 'is-open' : 'is-collapsed'}`}>
         <div className="brand-area">
-          <div className="brand-mark" aria-hidden="true">CS</div>
+          <img className="brand-mark brand-logo-image" src="/logo.png" alt="CoreSys" />
           <div className="brand-copy">
             <span className="brand-name">CoreSys</span>
             <span className="brand-caption">ERP & PDV</span>
@@ -323,6 +328,34 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
                       <HelpCircle size={16} />
                       Central de Suporte
                     </a>
+                  </div>
+
+                  <div style={{ padding: '0 8px 8px' }}>
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px',
+                        color: 'var(--text-primary)',
+                        background: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-subtle)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <LogOut size={16} />
+                      Sair
+                    </button>
                   </div>
                 </div>
               )}

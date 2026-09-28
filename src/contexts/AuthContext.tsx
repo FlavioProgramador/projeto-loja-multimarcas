@@ -40,7 +40,7 @@ function clearLocalCaches() {
 function isAppPath() {
   if (typeof window === 'undefined') return false;
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
-  return path !== '/login' && path !== '/forgot-password' && path !== '/reset-password';
+  return path !== '/login' && path !== '/register' && path !== '/forgot-password' && path !== '/reset-password';
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

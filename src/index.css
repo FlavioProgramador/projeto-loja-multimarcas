@@ -263,6 +263,11 @@ textarea:focus-visible {
   letter-spacing: 0.04em;
 }
 
+.brand-logo-image {
+  object-fit: contain;
+  padding: 5px;
+}
+
 .brand-copy {
   min-width: 0;
   display: flex;

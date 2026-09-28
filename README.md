@@ -26,8 +26,10 @@ Um sistema completo de Ponto de Venda (PDV) e Gestão Empresarial (ERP) moderno,
   - Relatórios de vendas e produtos mais vendidos (Top Products).
 
 - **Gestão de Acesso (Auth)**:
-  - Sistema de Login seguro via Supabase Auth.
-  - Gestão de diferentes papéis e permissões (Caixa, Gerente).
+  - Login com Supabase Auth (`signInWithPassword`) e sessão JWT gerenciada pelo cliente oficial.
+  - Tela de login em `/login`, recuperação de senha e proteção das rotas da aplicação.
+  - Perfil (`profiles`), papel e vínculo de loja (`user_store_access`) validados após o login.
+  - Logout real com `signOut()` e limpeza de cache local.
 
 ## 💻 Tecnologias Utilizadas
 

@@ -65,8 +65,6 @@ export const InventoryService = {
         throw new Error('O custo unitário deve ser um valor válido e não negativo.');
       }
 
-      let targetVariantId: string;
-
       if (params.variantId) {
         targetVariantId = params.variantId;
       } else {

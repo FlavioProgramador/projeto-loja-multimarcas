@@ -2,7 +2,7 @@ import React from 'react';
 import { CartItem } from '../../types';
 import { formatMoeda } from '../../lib/utils';
 
-interface ReceiptPrinterProps {
+export interface ReceiptData {
   saleNumber?: string;
   cartItems: CartItem[];
   totalFinal: number;
@@ -13,16 +13,26 @@ interface ReceiptPrinterProps {
   cpf?: string;
 }
 
+interface ReceiptPrinterProps {
+  saleData?: ReceiptData | null;
+}
+
 export const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
-  saleNumber = '00000',
-  cartItems,
-  totalFinal,
-  paymentMethod,
-  amountPaid,
-  change,
-  buyerName,
-  cpf
+  saleData
 }) => {
+  if (!saleData) return null;
+
+  const {
+    saleNumber = '00000',
+    cartItems = [],
+    totalFinal,
+    paymentMethod,
+    amountPaid,
+    change,
+    buyerName,
+    cpf
+  } = saleData;
+
   return (
     <div id="receipt-print-area" className="print-only">
       <div className="receipt-container" style={{ width: '80mm', margin: '0 auto', fontFamily: 'monospace', color: '#000', fontSize: '12px', background: '#fff', padding: '10px' }}>
@@ -44,7 +54,7 @@ export const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
           </thead>
           <tbody>
             {cartItems.map((item, idx) => (
-              <tr key={idx}>
+              <tr key={`${item.variantId ?? item.productUuid ?? item.produtoId}-${item.skuIndex}-${idx}`}>
                 <td style={{ verticalAlign: 'top', paddingTop: '4px' }}>{item.qtd}x</td>
                 <td style={{ paddingTop: '4px' }}>
                   {item.nome}

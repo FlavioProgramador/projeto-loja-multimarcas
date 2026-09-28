@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";\n\n// O gateway da Edge Function deve validar o JWT antes deste handler.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+
+// O gateway da Edge Function deve validar o JWT antes deste handler.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',

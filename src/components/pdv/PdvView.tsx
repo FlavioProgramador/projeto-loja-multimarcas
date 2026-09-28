@@ -40,6 +40,7 @@ export const PdvView: React.FC = () => {
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
   const [pendingSaleId, setPendingSaleId] = useState<string | null>(null);
+  const [pixIdempotencyKey, setPixIdempotencyKey] = useState<string | null>(null);
 
   // Modal & Notifications
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -179,6 +180,7 @@ export const PdvView: React.FC = () => {
             setDiscountPercent('');
             setQrCodeBase64(null);
             setPendingSaleId(null);
+            setPixIdempotencyKey(null);
 
             setTimeout(() => window.print(), 300);
           }
@@ -195,8 +197,14 @@ export const PdvView: React.FC = () => {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
         return;
       }
+      if (!activeStoreId) {
+        showBanner('Nenhuma loja ativa selecionada para gerar o PIX.');
+        return;
+      }
       setIsGeneratingPix(true);
       try {
+        const idempotencyKey = pixIdempotencyKey || crypto.randomUUID();
+        setPixIdempotencyKey(idempotencyKey);
         const rpcItems = cart.map(item => ({
           variant_id: (item as any).variantId || (item as any).id,
           product_id: (item as any).productUuid || null,
@@ -213,11 +221,30 @@ export const PdvView: React.FC = () => {
             buyerName: buyerName.trim() || 'Cliente não identificado',
             cpf: cpf.trim() || 'Não informado',
             discountValue: numDescVal,
-            discountPercent: numDescPerc
+            customerId: matchedCustomer?.uuid || null,
+            customerName: buyerName.trim() || 'Cliente não identificado',
+            customerCpf: cpf.trim() || 'Não informado',
+            discountPercent: numDescPerc,
+            idempotencyKey
+          },
+          headers: {
+            'x-idempotency-key': idempotencyKey
           }
         });
 
-        if (error) throw new Error(error.message);
+        if (error) {
+          let message = error.message;
+          const context = (error as any).context;
+          if (context instanceof Response) {
+            try {
+              const payload = await context.clone().json();
+              message = payload?.error || payload?.message || message;
+            } catch {
+              // Mantém a mensagem do SDK quando o backend não retorna JSON.
+            }
+          }
+          throw new Error(message);
+        }
 
         if (data && data.qr_code_base64 && data.sale_id) {
           setQrCodeBase64(data.qr_code_base64);

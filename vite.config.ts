@@ -5,7 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    envDir: 'env',
+    // As variáveis locais ficam em .env.local na raiz do projeto.
+    envDir: '.',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

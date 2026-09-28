@@ -1,0 +1,5 @@
+-- Product-service follow-up.
+-- manage_product no longer accepts/mutates stock quantity.
+-- Callers creating a new product must create the entity first, then call
+-- register_stock_entry for each initial stock quantity.
+-- This file is documentation-only and intentionally contains no DDL.

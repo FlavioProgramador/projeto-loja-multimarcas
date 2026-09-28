@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Product,
   FinancialTransaction,
@@ -34,6 +34,7 @@ import {
 } from '../services';
 import { ReturnsService } from '../services/returns.service';
 import { storeService } from '../services/store.service';
+import { useAuth } from './AuthContext';
 
 interface StoreContextType {
   products: Product[];
@@ -109,6 +110,8 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isAuthorized } = useAuth();
+  const previousUserId = useRef<string | null>(null);
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('erp_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
@@ -154,6 +157,70 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [userStores, setUserStores] = useState<UserStoreAccess[]>([]);
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthorized) {
+      setProducts([]);
+      setTransactions([]);
+      setMovements([]);
+      setCustomers([]);
+      setReturns([]);
+      setSuppliers([]);
+      setFixedExpenses([]);
+      setNotifications([]);
+      setUserStores([]);
+      setActiveStoreId(null);
+
+      const keys = [
+        'erp_products',
+        'erp_transactions',
+        'erp_movements',
+        'erp_customers',
+        'erp_returns',
+        'erp_suppliers',
+        'erp_fixed_expenses',
+        'erp_notifications'
+      ];
+
+      keys.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+      previousUserId.current = null;
+      return;
+    }
+
+    if (previousUserId.current && previousUserId.current !== user?.id) {
+      setProducts([]);
+      setTransactions([]);
+      setMovements([]);
+      setCustomers([]);
+      setReturns([]);
+      setSuppliers([]);
+      setFixedExpenses([]);
+      setNotifications([]);
+      setUserStores([]);
+      setActiveStoreId(null);
+
+      const keys = [
+        'erp_products',
+        'erp_transactions',
+        'erp_movements',
+        'erp_customers',
+        'erp_returns',
+        'erp_suppliers',
+        'erp_fixed_expenses',
+        'erp_notifications'
+      ];
+
+      keys.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+    }
+
+    previousUserId.current = user?.id ?? null;
+  }, [isAuthorized, user?.id]);
 
   // Carregar dados reais do Supabase na inicialização
   const refreshData = useCallback(async () => {
@@ -222,37 +289,45 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Persistência no localStorage como fallback / cache
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_products', JSON.stringify(products));
-  }, [products]);
+  }, [isAuthorized, products]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+  }, [isAuthorized, transactions]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_movements', JSON.stringify(movements));
-  }, [movements]);
+  }, [isAuthorized, movements]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_customers', JSON.stringify(customers));
-  }, [customers]);
+  }, [isAuthorized, customers]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_returns', JSON.stringify(returns));
-  }, [returns]);
+  }, [isAuthorized, returns]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_suppliers', JSON.stringify(suppliers));
-  }, [suppliers]);
+  }, [isAuthorized, suppliers]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_fixed_expenses', JSON.stringify(fixedExpenses));
-  }, [fixedExpenses]);
+  }, [isAuthorized, fixedExpenses]);
 
 
   useEffect(() => {
+    if (!isAuthorized) return;
     localStorage.setItem('erp_notifications', JSON.stringify(notifications));
-  }, [notifications]);
+  }, [isAuthorized, notifications]);
 
   // Product methods
   const addProduct = async (prodData: Omit<Product, 'id'>) => {

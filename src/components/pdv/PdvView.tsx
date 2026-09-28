@@ -606,13 +606,13 @@ export const PdvView: React.FC = () => {
             )}
 
             {/* Totalizador Clean */}
-            <div style={{ padding: '14px 16px', background: 'var(--text-primary)', color: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', marginTop: 'auto', marginBottom: '12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#a1a1aa', marginBottom: '4px' }}>
+            <div style={{ padding: '14px 16px', background: 'var(--bg-surface-high)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', marginTop: 'auto', marginBottom: '12px', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                 <span>Subtotal</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatMoeda(subtotal)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '20px', fontWeight: 700 }}>
-                <span style={{ fontSize: '15px', alignSelf: 'center', color: '#e4e4e7' }}>Total a Pagar</span>
+                <span style={{ fontSize: '15px', alignSelf: 'center', color: 'var(--text-primary)' }}>Total a Pagar</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatMoeda(calculatedTotal)}</span>
               </div>
             </div>

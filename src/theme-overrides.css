@@ -393,3 +393,133 @@ input::placeholder,
 textarea::placeholder {
   color: var(--text-muted);
 }
+
+/* ============================================================================
+   Contrast safeguards
+   ============================================================================ */
+
+:root[data-theme='dark'],
+html.dark,
+body.dark,
+body.dark-mode,
+[data-theme='dark'] {
+  --text-disabled: #a9bbb5;
+  --input-placeholder: #aebdb8;
+}
+
+:root:not([data-theme='dark']),
+[data-theme='light'] {
+  --text-disabled: #667085;
+  --input-placeholder: #667085;
+}
+
+/* Small secondary text must remain readable on every dark surface. */
+.page-subtitle,
+.card-label,
+.text-muted,
+.muted,
+th,
+.recharts-text,
+.inventory-tab,
+.inventory-breadcrumbs {
+  color: var(--text-secondary) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder) !important;
+  opacity: 1 !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: var(--text-disabled) !important;
+  opacity: 1 !important;
+}
+
+.btn-success {
+  background: #3ebb9e !important;
+  color: #05261e !important;
+}
+
+.btn-danger {
+  background: #b94f5a !important;
+  color: #ffffff !important;
+}
+
+/* Inline action buttons using the semantic danger token need dark text or a
+   sufficiently dark background; white text on the pale red token is unreadable. */
+button[style*='var(--badge-red)'] {
+  background: #b94f5a !important;
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] button:disabled,
+html.dark button:disabled,
+body.dark button:disabled,
+body.dark-mode button:disabled {
+  background: #1b322c !important;
+  border-color: #31584d !important;
+}
+
+[data-theme='light'] button:disabled,
+:root:not([data-theme='dark']) button:disabled {
+  background: #e8efed !important;
+  border-color: #cbdad5 !important;
+}
+
+/* Light-mode contrast: semantic colors use darker text on their tinted surfaces. */
+[data-theme='light'] .badge-status.success,
+[data-theme='light'] .badge-status.Normal,
+:root:not([data-theme='dark']) .badge-status.success,
+:root:not([data-theme='dark']) .badge-status.Normal {
+  background: #d8f1e8 !important;
+  color: #006b55 !important;
+  border: 1px solid #b8e2d3 !important;
+}
+
+[data-theme='light'] .badge-status.low,
+[data-theme='light'] .badge-status.warning,
+:root:not([data-theme='dark']) .badge-status.low,
+:root:not([data-theme='dark']) .badge-status.warning {
+  background: #f8edc8 !important;
+  color: #67520e !important;
+  border: 1px solid #eadb9d !important;
+}
+
+[data-theme='light'] .badge-status.out,
+[data-theme='light'] .badge-status.danger,
+:root:not([data-theme='dark']) .badge-status.out,
+:root:not([data-theme='dark']) .badge-status.danger {
+  background: #f9dfe2 !important;
+  color: #8f2633 !important;
+  border: 1px solid #efbcc3 !important;
+}
+
+[data-theme='light'] .badge-status.neutral,
+:root:not([data-theme='dark']) .badge-status.neutral {
+  background: #eef2f1 !important;
+  color: #475569 !important;
+  border-color: #cbdad5 !important;
+}
+
+[data-theme='light'] .brand-caption,
+[data-theme='light'] .nav-group-title,
+[data-theme='light'] .sidebar-account span,
+:root:not([data-theme='dark']) .brand-caption,
+:root:not([data-theme='dark']) .nav-group-title,
+:root:not([data-theme='dark']) .sidebar-account span {
+  color: #a8d3c5 !important;
+}
+
+[data-theme='light'] .nav-item,
+:root:not([data-theme='dark']) .nav-item {
+  color: #e0f4ee !important;
+}
+
+[data-theme='light'] .breadcrumb-divider,
+:root:not([data-theme='dark']) .breadcrumb-divider {
+  color: #64748b !important;
+}

@@ -19,7 +19,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
+  updatePassword: (password: string, currentPassword?: string) => Promise<void>;
+  reauthenticate: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -192,9 +193,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AuthService.requestPasswordReset(email);
   };
 
-  const updatePassword = async (password: string) => {
-    await AuthService.updatePassword(password);
+  const updatePassword = async (password: string, currentPassword?: string) => {
+    await AuthService.updatePassword(password, currentPassword);
     setIsPasswordRecovery(false);
+  };
+
+  const reauthenticate = async () => {
+    await AuthService.reauthenticate();
   };
 
   const role: UserRole | null =
@@ -225,7 +230,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signOut,
         requestPasswordReset,
-        updatePassword
+        updatePassword,
+        reauthenticate
       }}
     >
       {children}

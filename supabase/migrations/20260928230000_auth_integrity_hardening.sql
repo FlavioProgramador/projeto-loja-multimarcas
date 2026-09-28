@@ -81,12 +81,10 @@ AS $$
       SELECT 1
       FROM public.user_store_access usa
       JOIN public.profiles p ON p.id = usa.user_id
-      JOIN public.stores s2 ON s2.id = usa.store_id
       WHERE usa.user_id = auth.uid()
         AND usa.store_id = s.id
         AND usa.is_active = true
         AND p.is_active = true
-        AND s2.is_active = true
     )
   ORDER BY s.name;
 $$;

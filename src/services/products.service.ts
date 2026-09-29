@@ -53,7 +53,7 @@ export const ProductsService = {
 
     if (error) {
       console.error('Erro ao buscar produtos:', error);
-      return [];
+      throw error;
     }
 
     return ((data || []) as unknown as ProductListRow[])

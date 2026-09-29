@@ -23,7 +23,7 @@ import {
   INITIAL_NOTIFICATIONS
 } from '../data/initialData';
 import { hoje } from '../lib/utils';
-import { isSupabaseConfigured } from '../lib/supabase/client';
+import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
   ProductsService,
   InventoryService,
@@ -110,7 +110,7 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAuthorized } = useAuth();
+  const { user, session, isAuthorized, loading: authLoading } = useAuth();
   const previousUserId = useRef<string | null>(null);
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('erp_products');
@@ -226,10 +226,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Não sobrescreve dados válidos com arrays vazios causados por falta de contexto,
   // falha transitória ou consulta executada antes da definição do store_id.
   const refreshData = useCallback(async () => {
-    if (!isSupabaseConfigured || !isAuthorized) return;
+    if (!isSupabaseConfigured || !isAuthorized || authLoading || !session?.access_token) return;
 
     try {
       setIsLoading(true);
+
+      // O Supabase Auth mantém a sessão no storage customizado. Exigir uma
+      // sessão válida antes das consultas evita que o RLS devolva [] para o
+      // papel anon durante a transição de autenticação.
+      const { data: { session: verifiedSession }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!verifiedSession?.access_token || verifiedSession.user.id !== user?.id) {
+        throw new Error('Sessão autenticada indisponível para carregar os dados da loja.');
+      }
 
       const remoteStores = await storeService.getUserStores();
       if (!remoteStores.length) {
@@ -247,15 +256,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveStoreId(resolvedStoreId);
       }
 
-      const [
-        remoteProducts,
-        remoteTransactions,
-        remoteExpenses,
-        remoteMovements,
-        remoteCustomers,
-        remoteSuppliers,
-        remoteReturns
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         ProductsService.getAll(resolvedStoreId),
         FinanceService.getTransactions(resolvedStoreId),
         FinanceService.getFixedExpenses(resolvedStoreId),
@@ -265,27 +266,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ReturnsService.getAll(resolvedStoreId)
       ]);
 
-      // Uma consulta bem-sucedida pode retornar zero registros legitimamente.
-      // Atualizamos apenas quando a fonte realmente respondeu, sem usar [] como
-      // fallback silencioso nos próprios services.
-      setProducts(remoteProducts);
-      setTransactions(remoteTransactions);
-      setFixedExpenses(remoteExpenses);
-      setMovements(remoteMovements);
-      setCustomers(remoteCustomers);
-      setSuppliers(remoteSuppliers);
-      setReturns(remoteReturns);
+      const applyResult = <T,>(
+        result: PromiseSettledResult<T>,
+        setter: (value: T) => void,
+        source: string
+      ) => {
+        if (result.status === 'fulfilled') {
+          setter(result.value);
+        } else {
+          console.warn('Falha ao carregar ' + source + '; mantendo dados atuais.', result.reason);
+        }
+      };
+
+      // Uma falha isolada não pode zerar ou bloquear os demais módulos.
+      applyResult(results[0], setProducts, 'produtos/estoque');
+      applyResult(results[1], setTransactions, 'financeiro');
+      applyResult(results[2], setFixedExpenses, 'despesas fixas');
+      applyResult(results[3], setMovements, 'vendas do PDV');
+      applyResult(results[4], setCustomers, 'clientes');
+      applyResult(results[5], setSuppliers, 'fornecedores');
+      applyResult(results[6], setReturns, 'devoluções');
     } catch (err) {
       console.warn('Sincronização com Supabase falhou; mantendo estado atual.', err);
     } finally {
       setIsLoading(false);
     }
-  }, [activeStoreId, isAuthorized]);
+  }, [activeStoreId, isAuthorized, authLoading, session?.access_token, user?.id]);
 
   useEffect(() => {
-    if (!isAuthorized) return;
+    if (!isAuthorized || authLoading || !session?.access_token) return;
     refreshData();
-  }, [refreshData, isAuthorized]);
+  }, [refreshData, isAuthorized, authLoading, session?.access_token]);
 
   // Persistência no localStorage como fallback / cache
   useEffect(() => {

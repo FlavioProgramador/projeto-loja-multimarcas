@@ -1,229 +1,138 @@
-import React from 'react';
-import { FileSpreadsheet, Printer, TrendingUp, Trophy, CreditCard, DollarSign, ShoppingBag } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { BarChart3, Download, FileText, Package, RefreshCw, ShoppingBag, TrendingUp, WalletCards } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { useStore } from '../../contexts/StoreContext';
-import {
-  formatMoeda,
-  hoje,
-  mesAtual,
-  mesAnterior,
-  calcVariacao,
-  downloadCSV
-} from '../../lib/utils';
-import { StatCard } from '../ui/StatCard';
+import { formatMoeda } from '../../lib/utils';
+import { ReportsService } from '../../services/reports.service';
+import './reports.css';
+
+type PeriodPreset = '7d' | '30d' | '90d' | 'year' | 'custom';
+const pad = (v:number) => String(v).padStart(2,'0');
+const dateText = (d:Date) => d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+
+function presetRange(p:Exclude<PeriodPreset,'custom'>):[string,string] {
+  const end = new Date(); const start = new Date(end);
+  if (p === '7d') start.setDate(end.getDate()-6);
+  if (p === '30d') start.setDate(end.getDate()-29);
+  if (p === '90d') start.setDate(end.getDate()-89);
+  if (p === 'year') start.setMonth(0,1);
+  return [dateText(start),dateText(end)];
+}
 
 export const ReportsView: React.FC = () => {
-  const { transactions, movements } = useStore();
+  const { activeStoreId, userStores } = useStore();
+  const [preset,setPreset] = useState<PeriodPreset>('30d');
+  const [[startDate,endDate],setRange] = useState<[string,string]>(presetRange('30d'));
+  const [data,setData] = useState<Awaited<ReturnType<typeof ReportsService.getOverview>>|null>(null);
+  const [top,setTop] = useState<Awaited<ReturnType<typeof ReportsService.getTopProducts>>>([]);
+  const [products,setProducts] = useState<Awaited<ReturnType<typeof ReportsService.getProfitabilityByProduct>>>([]);
+  const [categories,setCategories] = useState<Awaited<ReturnType<typeof ReportsService.getProfitabilityByCategory>>>([]);
+  const [stock,setStock] = useState<Awaited<ReturnType<typeof ReportsService.getStockStatus>>>([]);
+  const [moves,setMoves] = useState<Awaited<ReturnType<typeof ReportsService.getMovementSummary>>>([]);
+  const [payments,setPayments] = useState<Awaited<ReturnType<typeof ReportsService.getPaymentBreakdown>>>([]);
+  const [series,setSeries] = useState<Awaited<ReturnType<typeof ReportsService.getMonthlySeries>>>([]);
+  const [loading,setLoading] = useState(false);
+  const [error,setError] = useState('');
 
-  const mesAtualStr = mesAtual();
-  const mesAntStr = mesAnterior();
-  const pertenceAoMes = (data: string | undefined, mes: string) =>
-    typeof data === 'string' && data.startsWith(mes);
+  const storeName = userStores.find(s=>s.store_id===activeStoreId)?.store_name || 'Loja ativa';
 
-  // Current month stats
-  const transacoesMes = transactions.filter(t => pertenceAoMes(t.data, mesAtualStr));
-  const totalVendasMes = transacoesMes
-    .filter(t => t.tipo === 'INCOME')
-    .reduce((acc, t) => acc + t.valor, 0);
-  const totalSaidasMes = transacoesMes
-    .filter(t => t.tipo === 'EXPENSE')
-    .reduce((acc, t) => acc + t.valor, 0);
-  const lucroMes = totalVendasMes - totalSaidasMes;
-  const qtdVendasMes = movements.filter(m => pertenceAoMes(m.data, mesAtualStr)).length;
-  const ticketMedioMes = qtdVendasMes > 0 ? totalVendasMes / qtdVendasMes : 0;
+  const load = useCallback(async()=>{
+    if(!activeStoreId || startDate>endDate) return;
+    setLoading(true); setError('');
+    try{
+      const [o,t,p,c,s,m,pay,ser] = await Promise.all([
+        ReportsService.getOverview(activeStoreId,startDate,endDate),
+        ReportsService.getTopProducts(activeStoreId,10),
+        ReportsService.getProfitabilityByProduct(activeStoreId,startDate,endDate),
+        ReportsService.getProfitabilityByCategory(activeStoreId,startDate,endDate),
+        ReportsService.getStockStatus(activeStoreId),
+        ReportsService.getMovementSummary(activeStoreId,startDate,endDate),
+        ReportsService.getPaymentBreakdown(activeStoreId,startDate,endDate),
+        ReportsService.getMonthlySeries(activeStoreId,startDate,endDate)
+      ]);
+      setData(o); setTop(t); setProducts(p); setCategories(c); setStock(s); setMoves(m); setPayments(pay); setSeries(ser);
+    }catch(e){ setError(e instanceof Error?e.message:'Erro ao carregar relatórios.'); }
+    finally{ setLoading(false); }
+  },[activeStoreId,startDate,endDate]);
 
-  // Previous month stats
-  const transacoesAnt = transactions.filter(t => pertenceAoMes(t.data, mesAntStr));
-  const totalVendasAnt = transacoesAnt
-    .filter(t => t.tipo === 'INCOME')
-    .reduce((acc, t) => acc + t.valor, 0);
-  const totalSaidasAnt = transacoesAnt
-    .filter(t => t.tipo === 'EXPENSE')
-    .reduce((acc, t) => acc + t.valor, 0);
-  const lucroAnt = totalVendasAnt - totalSaidasAnt;
-  const qtdVendasAnt = movements.filter(m => pertenceAoMes(m.data, mesAntStr)).length;
-  const ticketMedioAnt = qtdVendasAnt > 0 ? totalVendasAnt / qtdVendasAnt : 0;
+  useEffect(()=>{void load();},[load]);
 
-  // Comparisons
-  const compVendas = calcVariacao(totalVendasMes, totalVendasAnt);
-  const compLucro = calcVariacao(lucroMes, lucroAnt);
-  const compQtd = calcVariacao(qtdVendasMes, qtdVendasAnt);
-  const compTicket = calcVariacao(ticketMedioMes, ticketMedioAnt);
+  const lowStock = useMemo(()=>stock.filter(x=>x.status==='LOW_STOCK').length,[stock]);
+  const outStock = useMemo(()=>stock.filter(x=>x.status==='OUT_OF_STOCK').length,[stock]);
+  const totalIn = moves.filter(x=>['ENTRY','RETURN','TRANSFER_IN'].includes(x.movement_type)).reduce((s,x)=>s+x.total_quantity,0);
+  const totalOut = moves.filter(x=>['SALE','LOSS','TRANSFER_OUT','ADJUSTMENT','CORRECTION'].includes(x.movement_type)).reduce((s,x)=>s+x.total_quantity,0);
+  const maxRevenue = Math.max(...series.map(x=>x.revenue),1);
+  const bestMargins = useMemo(()=>[...products].sort((a,b)=>b.margin_value-a.margin_value).slice(0,8),[products]);
+  const bestCategories = useMemo(()=>[...categories].sort((a,b)=>b.margin_value-a.margin_value).slice(0,8),[categories]);
 
-  // Top products of the current month
-  const vendasPorProduto: Record<string, number> = {};
-  movements
-    .filter(m => pertenceAoMes(m.data, mesAtualStr))
-    .forEach(m => {
-      (m.produtos || '').split(',').forEach(item => {
-        const clean = item.trim();
-        if (!clean) return;
-        const nome = clean.split(' x')[0];
-        const qtd = parseInt(clean.split('x')[1]) || 1;
-        vendasPorProduto[nome] = (vendasPorProduto[nome] || 0) + qtd;
-      });
-    });
+  const presetClick = (p:PeriodPreset)=>{setPreset(p); if(p!=='custom') setRange(presetRange(p));};
 
-  const topProdutos = Object.entries(vendasPorProduto)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
-  const handleExportCSV = () => {
-    let csv = 'Data,Venda,Comprador,CPF,Valor,Pagamento,Produtos\n';
-    movements.forEach(m => {
-      csv += `"${m.data}","${m.vendaId}","${m.comprador}","${m.cpf}","${m.valor.toFixed(2).replace('.', ',')}","${m.formaPagamento}","${m.produtos.replace(/"/g, '""')}"\n`;
-    });
-    downloadCSV(`relatorio_vendas_${hoje()}.csv`, csv);
+  const exportPdf = async ()=>{
+    const element = document.getElementById('reports-print-area');
+    if(!element) return;
+    setLoading(true);
+    try{
+      const canvas = await html2canvas(element,{scale:2,useCORS:true,backgroundColor:null,logging:false});
+      const pdf = new jsPDF('p','mm','a4');
+      const margin = 8, pageWidth = 210, pageHeight = 297;
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      const pageContentHeight = pageHeight - margin * 2;
+      const image = canvas.toDataURL('image/png',1);
+      let offset = 0;
+      while(offset < imgHeight){
+        if(offset > 0) pdf.addPage();
+        pdf.addImage(image,'PNG',margin,margin-offset,imgWidth,imgHeight,'','FAST');
+        offset += pageContentHeight;
+      }
+      const safeStore = storeName.toLowerCase().replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'');
+      pdf.save('relatorio-'+safeStore+'-'+startDate+'-'+endDate+'.pdf');
+    }catch(e){ setError(e instanceof Error ? e.message : 'Não foi possível gerar o PDF.'); }
+    finally{ setLoading(false); }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const exportCsv = ()=>{
+    const rows = [
+      ['Relatório CoreSys',storeName],['Período',startDate+' a '+endDate],[],
+      ['Vendas',data?.salesCount||0],['Faturamento',data?.revenue||0],['Descontos',data?.discounts||0],
+      ['Despesas',data?.expenses||0],['Resultado',data?.operatingResult||0],['Ticket médio',data?.averageTicket||0],
+      ['Unidades em estoque',data?.inventoryUnits||0],[],['Produto','Quantidade','Receita'],
+      ...top.map(x=>[x.product_name,x.total_quantity_sold,x.total_revenue])
+    ];
+    const csv = rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a'); a.href=url; a.download='relatorio-'+startDate+'-'+endDate+'.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="module-fade">
-      {/* Page Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Relatórios & Inteligência de Vendas</h1>
-          <p className="page-subtitle">Comparativo mensal consolidado de faturamento, margem de lucro e canais de receita.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-outline" onClick={handlePrint}>
-            <Printer size={16} /> Imprimir Relatório
-          </button>
-          <button className="btn" onClick={handleExportCSV}>
-            <FileSpreadsheet size={16} /> Exportar CSV
-          </button>
-        </div>
-      </div>
+  if(!activeStoreId) return <div className="reports-empty">Nenhuma loja ativa disponível.</div>;
 
-      {/* Bento Grid: 4 Top KPI Cards */}
-      <div className="grid-cards">
-        <StatCard
-          label="Faturamento (Mês Atual)"
-          value={formatMoeda(totalVendasMes)}
-          icon={<DollarSign size={18} />}
-          iconBg="var(--badge-blue-bg)"
-          iconColor="var(--primary)"
-          delta={compVendas.texto}
-          deltaType={compVendas.classe === 'positivo' ? 'positive' : 'negative'}
-          deltaLabel={`vs ${mesAntStr}`}
-        />
-
-        <StatCard
-          label="Lucro Operacional"
-          value={formatMoeda(lucroMes)}
-          icon={<TrendingUp size={18} />}
-          iconBg={lucroMes >= 0 ? "var(--badge-green-bg)" : "var(--badge-red-bg)"}
-          iconColor={lucroMes >= 0 ? "var(--badge-green)" : "var(--badge-red)"}
-          delta={compLucro.texto}
-          deltaType={compLucro.classe === 'positivo' ? 'positive' : 'negative'}
-          deltaLabel={`vs ${mesAntStr}`}
-        />
-
-        <StatCard
-          label="Volume de Pedidos"
-          value={`${qtdVendasMes} vendas`}
-          icon={<ShoppingBag size={18} />}
-          iconBg="var(--bg-surface-subtle)"
-          iconColor="var(--text-secondary)"
-          delta={compQtd.texto}
-          deltaType={compQtd.classe === 'positivo' ? 'positive' : 'negative'}
-          deltaLabel={`vs ${mesAntStr}`}
-        />
-
-        <StatCard
-          label="Ticket Médio"
-          value={formatMoeda(ticketMedioMes)}
-          icon={<CreditCard size={18} />}
-          iconBg="var(--badge-blue-bg)"
-          iconColor="var(--primary)"
-          delta={compTicket.texto}
-          deltaType={compTicket.classe === 'positivo' ? 'positive' : 'negative'}
-          deltaLabel={`vs ${mesAntStr}`}
-        />
-      </div>
-
-      {/* Two Column Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
-        {/* Top Sold Products */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Trophy size={16} style={{ color: 'var(--badge-yellow)' }} /> Mais Vendidos no Mês
-            </h3>
-            <span className="badge-status neutral">{mesAtualStr}</span>
-          </div>
-
-          {topProdutos.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '16px 0', textAlign: 'center' }}>
-              Nenhuma venda registrada no mês atual.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {topProdutos.map(([nome, qtd], idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '8px 12px',
-                    background: 'var(--bg-surface-subtle)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)'
-                  }}
-                >
-                  <span style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)' }}>
-                    #{idx + 1} {nome}
-                  </span>
-                  <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--primary)', fontSize: '13px' }}>
-                    {qtd} un
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Payment Methods Breakdown */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CreditCard size={16} style={{ color: 'var(--primary)' }} /> Receita por Meio de Pagamento
-            </h3>
-            <span className="badge-status neutral">{mesAtualStr}</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {['PIX', 'Cartão', 'Dinheiro'].map(method => {
-              const total = movements
-                .filter(m => (m.formaPagamento || '').includes(method) && pertenceAoMes(m.data, mesAtualStr))
-                .reduce((acc, mov) => acc + mov.valor, 0);
-
-              return (
-                <div
-                  key={method}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 12px',
-                    background: 'var(--bg-surface-subtle)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)'
-                  }}
-                >
-                  <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{method}</span>
-                  <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--badge-green)', fontSize: '13.5px' }}>
-                    {formatMoeda(total)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <div id="reports-print-area" className="reports-page module-fade">
+    <header className="reports-header">
+      <div><div className="reports-eyebrow"><BarChart3 size={15}/> Inteligência comercial</div><h1 className="page-title">Relatórios</h1><p className="page-subtitle">Dados sincronizados com o backend de {storeName}.</p></div>
+      <div className="reports-actions"><button className="btn btn-outline" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/> Atualizar</button><button className="btn btn-outline" onClick={exportPdf} disabled={!data||loading}><FileText size={16}/> PDF</button><button className="btn" onClick={exportCsv} disabled={!data||loading}><Download size={16}/> CSV</button></div>
+    </header>
+    <section className="reports-filters card"><div className="reports-presets">
+      {(['7d','30d','90d','year','custom'] as PeriodPreset[]).map(p=><button key={p} onClick={()=>presetClick(p)} className={preset===p?'reports-preset active':'reports-preset'}>{p==='7d'?'7 dias':p==='30d'?'30 dias':p==='90d'?'90 dias':p==='year'?'Ano':'Personalizado'}</button>)}
+    </div>{preset==='custom'&&<div className="reports-date-fields"><label>Início<input type="date" value={startDate} onChange={e=>setRange([e.target.value,endDate])}/></label><label>Fim<input type="date" value={endDate} onChange={e=>setRange([startDate,e.target.value])}/></label></div>}</section>
+    {error&&<div className="reports-error">{error}</div>}
+    <section className="reports-kpis">
+      <div className="card reports-kpi"><span><ShoppingBag size={18}/> Vendas</span><strong>{data?.salesCount||0}</strong><small>Pedidos concluídos</small></div>
+      <div className="card reports-kpi"><span><WalletCards size={18}/> Faturamento</span><strong>{formatMoeda(data?.revenue||0)}</strong><small>Receita no período</small></div>
+      <div className="card reports-kpi"><span><TrendingUp size={18}/> Resultado</span><strong>{formatMoeda(data?.operatingResult||0)}</strong><small>Receita menos despesas</small></div>
+      <div className="card reports-kpi"><span><Package size={18}/> Estoque</span><strong>{data?.inventoryUnits||0}</strong><small>{lowStock} baixo · {outStock} sem estoque</small></div>
+    </section>
+    <section className="reports-grid two">
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Evolução de faturamento</h2><p>Vendas concluídas por mês.</p></div></div><div className="reports-series">{series.length?series.map(x=><div className="reports-series-row" key={x.label}><span>{x.label}</span><div className="reports-bar"><i style={{width:Math.max(4,x.revenue/maxRevenue*100)+'%'}}/></div><strong>{formatMoeda(x.revenue)}</strong></div>):<div className="reports-muted">Sem vendas no período.</div>}</div></div>
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Meios de pagamento</h2><p>Receita por método.</p></div></div><div className="reports-list">{payments.length?payments.map(x=><div className="reports-list-row" key={x.method}><span>{x.method}</span><strong>{formatMoeda(x.amount)}</strong></div>):<div className="reports-muted">Sem pagamentos no período.</div>}</div></div>
+    </section>
+    <section className="reports-grid two">
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Produtos mais vendidos</h2><p>Ranking calculado pelo banco.</p></div></div><div className="reports-table-wrap"><table><thead><tr><th>Produto</th><th>Qtd.</th><th>Receita</th></tr></thead><tbody>{top.map((x,i)=><tr key={x.product_id}><td><b>#{i+1}</b> {x.product_name}</td><td>{x.total_quantity_sold}</td><td>{formatMoeda(x.total_revenue)}</td></tr>)}{!top.length&&<tr><td colSpan={3} className="reports-muted">Sem vendas.</td></tr>}</tbody></table></div></div>
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Rentabilidade por produto</h2><p>Custo e margem vindos do backend.</p></div></div><div className="reports-table-wrap"><table><thead><tr><th>Produto</th><th>Receita</th><th>Margem</th></tr></thead><tbody>{bestMargins.map(x=><tr key={x.product_id}><td>{x.product_name}</td><td>{formatMoeda(x.total_revenue)}</td><td>{formatMoeda(x.margin_value)} · {x.margin_percentage.toFixed(1)}%</td></tr>)}{!bestMargins.length&&<tr><td colSpan={3} className="reports-muted">Sem dados.</td></tr>}</tbody></table></div></div>
+    </section>
+    <section className="reports-grid two">
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Rentabilidade por categoria</h2><p>Margem consolidada.</p></div></div><div className="reports-table-wrap"><table><thead><tr><th>Categoria</th><th>Receita</th><th>Margem</th></tr></thead><tbody>{bestCategories.map(x=><tr key={x.category_id||x.category_name}><td>{x.category_name}</td><td>{formatMoeda(x.total_revenue)}</td><td>{formatMoeda(x.margin_value)} · {x.margin_percentage.toFixed(1)}%</td></tr>)}{!bestCategories.length&&<tr><td colSpan={3} className="reports-muted">Sem dados.</td></tr>}</tbody></table></div></div>
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Movimentação de estoque</h2><p>Resumo do período.</p></div></div><div className="reports-stock-summary"><div><span>Entradas</span><strong>{totalIn}</strong></div><div><span>Saídas</span><strong>{totalOut}</strong></div><div><span>Saldo</span><strong>{totalIn-totalOut}</strong></div></div><div className="reports-list">{moves.map(x=><div className="reports-list-row" key={x.movement_type}><span>{x.movement_type}</span><strong>{x.total_quantity}</strong></div>)}</div></div>
+    </section>
+  </div>;
 };

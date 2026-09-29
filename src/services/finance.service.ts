@@ -45,7 +45,7 @@ export const FinanceService = {
     if (!isSupabaseConfigured || !storeId) return [];
     const {data,error}=await supabase.from('financial_transactions')
       .select('id,store_id,type,category,description,amount,status,reference_type,reference_id,due_date,paid_at,created_at,updated_at')
-      .eq('store_id',storeId).eq('is_active',true).order('created_at',{ascending:false});
+      .eq('store_id',storeId).order('created_at',{ascending:false});
     if (error) throw error;
     return ((data||[]) as TransactionRow[]).map(toTransaction);
   },

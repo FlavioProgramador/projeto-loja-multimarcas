@@ -11,7 +11,7 @@ export const storeService = {
       .select(`
         store_id,
         role,
-        stores ( name )
+        stores ( id, name, is_active )
       `)
       .eq('user_id', user.id)
       .eq('is_active', true);

@@ -142,7 +142,7 @@ export const SalesService = {
     const { data, error } = await query;
     if (error) {
       console.error('Erro ao buscar histórico de vendas:', error);
-      return [];
+      throw error;
     }
 
     return ((data || []) as unknown as SaleListRow[]).map((s, index) => {

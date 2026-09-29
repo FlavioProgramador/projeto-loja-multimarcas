@@ -7,6 +7,7 @@ import { goToLogin } from '../lib/auth-routing';
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   profile: ProfileRow | null;
   role: UserRole | null;
   stores: StoreAccessSummary[];
@@ -53,6 +54,7 @@ function isAppPath() {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [stores, setStores] = useState<StoreAccessSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,12 +63,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetState = useCallback(() => {
     setUser(null);
+    setSession(null);
     setProfile(null);
     setStores([]);
     setDenialReason(null);
   }, []);
 
   const applyAuthorizedSession = useCallback(async (session: Session | null, event?: string) => {
+    setSession(session);
+
     if (event === 'PASSWORD_RECOVERY') {
       setIsPasswordRecovery(true);
       if (!session?.user) {
@@ -216,6 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        session,
         profile,
         role,
         stores,

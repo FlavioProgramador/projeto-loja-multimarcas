@@ -1,0 +1,40 @@
+name: Database Tests (pgTAP)
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'supabase/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'supabase/**'
+
+jobs:
+  database-tests:
+    name: Migrations + pgTAP
+    runs-on: ubuntu-latest
+
+    # ATENÇÃO: este job ficará vermelho até a correção do achado C3 da auditoria
+    # (tabelas physical_inventories, returns etc. nunca criadas em migração ->
+    # `supabase db reset` falha). Quando C3 for resolvido, remover o
+    # continue-on-error abaixo para tornar o banco um portão obrigatório.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (aplica todas as migrações do zero)
+        run: supabase start
+
+      - name: Validate Migrations (db reset)
+        run: supabase db reset
+
+      - name: Run pgTAP Tests
+        run: supabase test db

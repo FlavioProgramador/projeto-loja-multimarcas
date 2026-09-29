@@ -127,7 +127,7 @@ export const PdvView: React.FC = () => {
     const skuIndex = skuSelections[productId] !== undefined ? skuSelections[productId] : 0;
     const result = addItem(prod, skuIndex);
     if (!result.success) {
-      showBanner(`⚠️ ${result.message || 'Stock insuficiente.'}`);
+      showBanner(`⚠️ ${result.message || 'Estoque insuficiente.'}`);
     }
   };
 
@@ -415,7 +415,7 @@ export const PdvView: React.FC = () => {
                     <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Produto</th>
                     <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Variação (SKU)</th>
                     <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Preço</th>
-                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Stock</th>
+                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Estoque</th>
                     <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Ação</th>
                   </tr>
                 </thead>

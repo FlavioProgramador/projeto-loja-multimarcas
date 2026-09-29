@@ -11,6 +11,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { RevenueChart } from './RevenueChart';
 import { TopProductsChart } from './TopProductsChart';
 import { useTheme } from '../../contexts/ThemeContext';
+import { formatPaymentMethod } from '../../lib/display-labels';
 
 const CHART_COLORS_DARK = ['#73E6CB', '#3EBB9E', '#7CC7B5', '#D8A85E', '#7EB6E6', '#D98282', '#A99BE8'];
 const CHART_COLORS_LIGHT = ['#00674F', '#159A7A', '#2B7A6A', '#B07D19', '#3D79A8', '#A94D4D', '#6B5AA6'];
@@ -122,6 +123,7 @@ function normalizePaymentMethod(raw: string): string {
     lower === 'debit_card'
   ) return lower === 'debit_card' || lower.startsWith('débito') || lower.startsWith('debito') ? 'Cartão de Débito' : 'Cartão de Crédito';
   if (lower.startsWith('dinheiro')) return 'Dinheiro';
+  if (lower === 'cash') return 'Dinheiro';
   if (lower.startsWith('boleto')) return 'Boleto';
   return raw || 'Não informado';
 }
@@ -563,7 +565,7 @@ export const DashboardView: React.FC = () => {
                       color: 'var(--text-secondary)',
                       whiteSpace: 'nowrap'
                     }}>
-                      {item.qty} und
+                      {item.qty} un.
                     </span>
                   </div>
                 );
@@ -732,7 +734,7 @@ export const DashboardView: React.FC = () => {
           <div className="card" style={{ background: 'var(--brand-deep)', color: 'var(--text-primary)', border: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
               <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '4px' }}>
-                Retail Intelligence
+                Inteligência Comercial
               </span>
             </div>
             <h4 style={{ fontSize: '15px', fontWeight: 700, lineHeight: 1.3, marginBottom: '6px' }}>

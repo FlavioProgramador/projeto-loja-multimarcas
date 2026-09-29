@@ -8,6 +8,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { MovementsService, MovementRecord } from '../../services/movements/movements.service';
 import { Modal } from '../ui/Modal';
 import './movements.css';
+import { formatPaymentMethod } from '../../lib/display-labels';
 
 type PeriodFilter = 'today' | '7d' | '30d' | 'all';
 type TypeFilter = 'ALL' | MovementRecord['type'];
@@ -428,7 +429,7 @@ const MovementDetails: React.FC<{ movement: MovementRecord }> = ({ movement }) =
               <span>Pagamentos</span>
               {movement.sale.payments.map((payment, index) => (
                 <div key={payment.method + '-' + index}>
-                  <strong>{payment.method}</strong>
+                  <strong>{formatPaymentMethod(payment.method)}</strong>
                   <span>{formatCurrency(payment.amount)}</span>
                   <small>{payment.installments > 1 ? payment.installments + 'x' : 'À vista'}</small>
                 </div>

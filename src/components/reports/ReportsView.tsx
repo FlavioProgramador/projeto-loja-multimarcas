@@ -5,6 +5,7 @@ import { formatMoeda } from '../../lib/utils';
 import { ReportsService } from '../../services/reports.service';
 import { SalesService } from '../../services/sales.service';
 import { downloadSalesReportPdf } from '../../lib/pdf/reports-pdf';
+import { formatMovementType, formatPaymentMethod } from '../../lib/display-labels';
 import './reports.css';
 
 type PeriodPreset = '7d' | '30d' | '90d' | 'year' | 'custom';
@@ -132,7 +133,7 @@ export const ReportsView: React.FC = () => {
     </section>
     <section className="reports-grid two">
       <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Evolução de faturamento</h2><p>Vendas concluídas por mês.</p></div></div><div className="reports-series">{series.length?series.map(x=><div className="reports-series-row" key={x.label}><span>{x.label}</span><div className="reports-bar"><i style={{width:Math.max(4,x.revenue/maxRevenue*100)+'%'}}/></div><strong>{formatMoeda(x.revenue)}</strong></div>):<div className="reports-muted">Sem vendas no período.</div>}</div></div>
-      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Meios de pagamento</h2><p>Receita por método.</p></div></div><div className="reports-list">{payments.length?payments.map(x=><div className="reports-list-row" key={x.method}><span>{x.method}</span><strong>{formatMoeda(x.amount)}</strong></div>):<div className="reports-muted">Sem pagamentos no período.</div>}</div></div>
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Meios de pagamento</h2><p>Receita por método.</p></div></div><div className="reports-list">{payments.length?payments.map(x=><div className="reports-list-row" key={x.method}><span>{formatPaymentMethod(x.method)}</span><strong>{formatMoeda(x.amount)}</strong></div>):<div className="reports-muted">Sem pagamentos no período.</div>}</div></div>
     </section>
     <section className="reports-grid two">
       <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Produtos mais vendidos</h2><p>Ranking calculado pelo banco.</p></div></div><div className="reports-table-wrap"><table><thead><tr><th>Produto</th><th>Qtd.</th><th>Receita</th></tr></thead><tbody>{top.map((x,i)=><tr key={x.product_id}><td><b>#{i+1}</b> {x.product_name}</td><td>{x.total_quantity_sold}</td><td>{formatMoeda(x.total_revenue)}</td></tr>)}{!top.length&&<tr><td colSpan={3} className="reports-muted">Sem vendas.</td></tr>}</tbody></table></div></div>
@@ -140,7 +141,7 @@ export const ReportsView: React.FC = () => {
     </section>
     <section className="reports-grid two">
       <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Rentabilidade por categoria</h2><p>Margem consolidada.</p></div></div><div className="reports-table-wrap"><table><thead><tr><th>Categoria</th><th>Receita</th><th>Margem</th></tr></thead><tbody>{bestCategories.map(x=><tr key={x.category_id||x.category_name}><td>{x.category_name}</td><td>{formatMoeda(x.total_revenue)}</td><td>{formatMoeda(x.margin_value)} · {x.margin_percentage.toFixed(1)}%</td></tr>)}{!bestCategories.length&&<tr><td colSpan={3} className="reports-muted">Sem dados.</td></tr>}</tbody></table></div></div>
-      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Movimentação de estoque</h2><p>Resumo do período.</p></div></div><div className="reports-stock-summary"><div><span>Entradas</span><strong>{totalIn}</strong></div><div><span>Saídas</span><strong>{totalOut}</strong></div><div><span>Saldo</span><strong>{totalIn-totalOut}</strong></div></div><div className="reports-list">{moves.map(x=><div className="reports-list-row" key={x.movement_type}><span>{x.movement_type}</span><strong>{x.total_quantity}</strong></div>)}</div></div>
+      <div className="card reports-panel"><div className="reports-panel-head"><div><h2>Movimentação de estoque</h2><p>Resumo do período.</p></div></div><div className="reports-stock-summary"><div><span>Entradas</span><strong>{totalIn}</strong></div><div><span>Saídas</span><strong>{totalOut}</strong></div><div><span>Saldo</span><strong>{totalIn-totalOut}</strong></div></div><div className="reports-list">{moves.map(x=><div className="reports-list-row" key={x.movement_type}><span>{formatMovementType(x.movement_type)}</span><strong>{x.total_quantity}</strong></div>)}</div></div>
     </section>
   </div>;
 };

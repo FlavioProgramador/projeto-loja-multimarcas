@@ -33,6 +33,7 @@ export interface Product {
   genero?: string;
   imagemUrl?: string;
   preco: number;
+  custo?: number;
   skus: ProductSku[];
 }
 

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
-import { AuthService, AuthDenialReason, StoreAccessSummary, VALID_ROLES } from '../services/auth.service';
+import { AuthService, AuthDenialReason, StoreAccessSummary, VALID_ROLES, PasswordUpdateOptions } from '../services/auth.service';
 import { ProfileRow, UserRole } from '../types/database';
 import { goToLogin } from '../lib/auth-routing';
 
@@ -19,7 +19,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (password: string, currentPassword?: string) => Promise<void>;
+  updatePassword: (options: PasswordUpdateOptions) => Promise<void>;
   reauthenticate: () => Promise<void>;
 }
 
@@ -69,6 +69,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const applyAuthorizedSession = useCallback(async (session: Session | null, event?: string) => {
     if (event === 'PASSWORD_RECOVERY') {
       setIsPasswordRecovery(true);
+      if (!session?.user) {
+        resetState();
+      } else {
+        setUser(session.user);
+      }
+      return;
     }
 
     if (!session?.user) {
@@ -78,19 +84,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { context, reason } = await AuthService.resolveAccessContext();
 
-    if (event === 'PASSWORD_RECOVERY') {
-      setUser(session.user);
-      setProfile(context?.profile ?? null);
-      setStores(context?.stores ?? []);
-      setDenialReason(null);
-      return;
-    }
-
     if (!context) {
       await AuthService.signOut().catch(() => undefined);
       resetState();
       setDenialReason(reason ?? 'no_profile');
       clearLocalCaches();
+      if (isAppPath()) goToLogin(true);
       return;
     }
 
@@ -131,8 +130,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const sequence = ++eventSequence;
 
-      // Supabase documents a known deadlock hazard when making async calls directly
-      // inside this callback. Defer session reconciliation until the callback returns.
       window.setTimeout(() => {
         if (cancelled || sequence !== eventSequence) return;
 
@@ -159,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               resetState();
               setDenialReason('unauthenticated');
               clearLocalCaches();
+              if (isAppPath()) goToLogin(true);
             }
           })
           .finally(() => {
@@ -193,8 +191,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AuthService.requestPasswordReset(email);
   };
 
-  const updatePassword = async (password: string, currentPassword?: string) => {
-    await AuthService.updatePassword(password, currentPassword);
+  const updatePassword = async (options: PasswordUpdateOptions) => {
+    await AuthService.updatePassword(options);
     setIsPasswordRecovery(false);
   };
 

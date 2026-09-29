@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, Download, Package, RefreshCw, ShoppingBag, TrendingUp, WalletCards } from 'lucide-react';
+import { BarChart3, Download, FileText, Package, RefreshCw, ShoppingBag, TrendingUp, WalletCards } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { useStore } from '../../contexts/StoreContext';
 import { formatMoeda } from '../../lib/utils';
 import { ReportsService } from '../../services/reports.service';
@@ -66,6 +68,30 @@ export const ReportsView: React.FC = () => {
 
   const presetClick = (p:PeriodPreset)=>{setPreset(p); if(p!=='custom') setRange(presetRange(p));};
 
+  const exportPdf = async ()=>{
+    const element = document.getElementById('reports-print-area');
+    if(!element) return;
+    setLoading(true);
+    try{
+      const canvas = await html2canvas(element,{scale:2,useCORS:true,backgroundColor:null,logging:false});
+      const pdf = new jsPDF('p','mm','a4');
+      const margin = 8, pageWidth = 210, pageHeight = 297;
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      const pageContentHeight = pageHeight - margin * 2;
+      const image = canvas.toDataURL('image/png',1);
+      let offset = 0;
+      while(offset < imgHeight){
+        if(offset > 0) pdf.addPage();
+        pdf.addImage(image,'PNG',margin,margin-offset,imgWidth,imgHeight,'','FAST');
+        offset += pageContentHeight;
+      }
+      const safeStore = storeName.toLowerCase().replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'');
+      pdf.save('relatorio-'+safeStore+'-'+startDate+'-'+endDate+'.pdf');
+    }catch(e){ setError(e instanceof Error ? e.message : 'Não foi possível gerar o PDF.'); }
+    finally{ setLoading(false); }
+  };
+
   const exportCsv = ()=>{
     const rows = [
       ['Relatório CoreSys',storeName],['Período',startDate+' a '+endDate],[],
@@ -81,10 +107,10 @@ export const ReportsView: React.FC = () => {
 
   if(!activeStoreId) return <div className="reports-empty">Nenhuma loja ativa disponível.</div>;
 
-  return <div className="reports-page module-fade">
+  return <div id="reports-print-area" className="reports-page module-fade">
     <header className="reports-header">
       <div><div className="reports-eyebrow"><BarChart3 size={15}/> Inteligência comercial</div><h1 className="page-title">Relatórios</h1><p className="page-subtitle">Dados sincronizados com o backend de {storeName}.</p></div>
-      <div className="reports-actions"><button className="btn btn-outline" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/> Atualizar</button><button className="btn" onClick={exportCsv} disabled={!data||loading}><Download size={16}/> Exportar CSV</button></div>
+      <div className="reports-actions"><button className="btn btn-outline" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/> Atualizar</button><button className="btn btn-outline" onClick={exportPdf} disabled={!data||loading}><FileText size={16}/> PDF</button><button className="btn" onClick={exportCsv} disabled={!data||loading}><Download size={16}/> CSV</button></div>
     </header>
     <section className="reports-filters card"><div className="reports-presets">
       {(['7d','30d','90d','year','custom'] as PeriodPreset[]).map(p=><button key={p} onClick={()=>presetClick(p)} className={preset===p?'reports-preset active':'reports-preset'}>{p==='7d'?'7 dias':p==='30d'?'30 dias':p==='90d'?'90 dias':p==='year'?'Ano':'Personalizado'}</button>)}

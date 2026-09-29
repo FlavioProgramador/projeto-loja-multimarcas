@@ -106,6 +106,17 @@ As funções como `mp-webhook` e `create-mp-pix` residem em `supabase/functions/
 - Os _secrets_ (como `MERCADOPAGO_ACCESS_TOKEN`) devem ser injetados **diretamente no painel de cada projeto Supabase** via CLI (`supabase secrets set`), e NUNCA devem ser colocados no `.env` do frontend ou versionados no Git.
 - O Frontend possui apenas credenciais públicas (`ANON_KEY`).
 
+## 🧪 Testes
+
+| Camada | Ferramenta | Comando | Localização |
+|---|---|---|---|
+| Unitários (regras de negócio, utils, contextos) | Vitest + Testing Library | `npm test` / `npm run test:coverage` | `src/**/*.test.{ts,tsx}` |
+| Banco de dados (schema, RLS, constraints) | pgTAP (`supabase test db`) | `npm run test:db` (requer Supabase local) | `supabase/tests/*.sql` |
+| Edge functions (assinatura do webhook MP etc.) | Deno test | `npm run test:functions` (requer Deno) | `supabase/functions/**/*_test.ts` |
+| Smoke/regressão com dados reais | SQL transacional (manual, staging) | ver `supabase/tests/README.md` | `supabase/tests/manual/` |
+
+CI: o workflow `Tests (Frontend + Edge Functions)` roda typecheck, testes unitários, build e Deno tests em `main`, `develop` e `release/*`. O workflow `Database Tests (pgTAP)` valida as migrações do zero — atualmente em modo informativo (`continue-on-error`) até a correção do débito de migrações não reproduzíveis (ver `docs/audits/AUDITORIA_GERAL_2026-09-29.md`, achado C3).
+
 ## 📝 Licença
 
 Desenvolvido para lojas de moda e multimarcas. Reservados todos os direitos ou conforme acordo com o cliente.

@@ -36,6 +36,12 @@ function isValidRole(role: unknown): role is UserRole {
   return typeof role === 'string' && VALID_ROLES.includes(role as UserRole);
 }
 
+export interface PasswordUpdateOptions {
+  newPassword: string;
+  currentPassword?: string;
+  nonce?: string;
+}
+
 export const AuthService = {
   async getSession(): Promise<Session | null> {
     if (!isSupabaseConfigured) return null;
@@ -91,7 +97,7 @@ export const AuthService = {
         store_name: row.stores?.name || 'Loja',
         store_active: row.stores?.is_active !== false
       }))
-      .filter(row => row.store_active)
+      .filter(row => row.store_active && isValidRole(row.role))
       .map(({ store_id, role, store_name }) => ({ store_id, role, store_name }));
   },
 
@@ -155,16 +161,22 @@ export const AuthService = {
 
   async signUp(email: string, password: string, fullName: string) {
     assertConfigured();
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = fullName.trim();
+
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
-          full_name: fullName
+          full_name: normalizedName
         }
       }
     });
+
     if (error) throw error;
+
     return data;
   },
 
@@ -176,10 +188,12 @@ export const AuthService = {
 
   async requestPasswordReset(email: string) {
     assertConfigured();
-    const redirectTo = `${window.location.origin}/reset-password`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const redirectTo = new URL('/reset-password', window.location.origin).toString();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
       redirectTo
     });
+
     if (error) throw error;
   },
 
@@ -189,18 +203,21 @@ export const AuthService = {
     if (error) throw error;
   },
 
-  async updatePassword(newPassword: string, currentPassword?: string) {
+  async updatePassword({ newPassword, currentPassword, nonce }: PasswordUpdateOptions) {
     assertConfigured();
 
-    const payload: { password: string; current_password?: string } = {
+    const attributes: {
+      password: string;
+      currentPassword?: string;
+      nonce?: string;
+    } = {
       password: newPassword
     };
 
-    if (currentPassword) {
-      payload.current_password = currentPassword;
-    }
+    if (currentPassword) attributes.currentPassword = currentPassword;
+    if (nonce) attributes.nonce = nonce;
 
-    const { error } = await supabase.auth.updateUser(payload);
+    const { error } = await supabase.auth.updateUser(attributes);
     if (error) throw error;
   },
 

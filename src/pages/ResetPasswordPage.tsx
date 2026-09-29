@@ -7,7 +7,7 @@ import { goToLogin } from '../lib/auth-routing';
 
 const hasLowercase = (value: string) => /[a-z]/.test(value);
 const hasUppercase = (value: string) => /[A-Z]/.test(value);
-const hasDigit = (value: string) => /d/.test(value);
+const hasDigit = (value: string) => /\d/.test(value);
 const hasSymbol = (value: string) => /[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./`~]/.test(value);
 
 function getPasswordStrength(value: string) {

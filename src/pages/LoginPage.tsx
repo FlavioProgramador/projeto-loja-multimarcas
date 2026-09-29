@@ -23,6 +23,15 @@ export const LoginPage: React.FC = () => {
 
   const denialMessage = useMemo(() => {
     if (denialReason === 'unauthenticated') return null;
+    if (denialReason === 'no_store_access') {
+      return 'Sua conta foi criada, mas ainda não está vinculada a uma loja ativa.';
+    }
+    if (denialReason === 'no_profile') {
+      return 'Sua conta foi autenticada, mas o perfil ainda não foi provisionado.';
+    }
+    if (denialReason === 'inactive_profile') {
+      return 'Seu perfil está inativo. Procure um administrador.';
+    }
     if (denialReason) return AUTH_ACCESS_DENIED;
     return null;
   }, [denialReason]);

@@ -364,6 +364,36 @@
   box-shadow: 0 2px 8px rgba(16,33,27,.06) !important;
 }
 
+/* Neutraliza o vazamento do reference-theme (background: #151515 !important)
+   na toolbar e nos controles do módulo de estoque quando o app está em modo
+   claro. Sem isto, o container do campo de busca fica escuro e o input claro
+   por cima deixa "manchas" escuras nas bordas (ícone à esquerda, corte à
+   direita), além de botões de filtro/paginação/ação escuros. */
+[data-theme='light'] .inventory-search-field,
+[data-theme='light'] .inventory-filter-button,
+[data-theme='light'] .inventory-view-toggle,
+[data-theme='light'] .inventory-pagination select,
+[data-theme='light'] .inventory-pagination button,
+[data-theme='light'] .inventory-icon-action,
+:root:not([data-theme='dark']) .inventory-search-field,
+:root:not([data-theme='dark']) .inventory-filter-button,
+:root:not([data-theme='dark']) .inventory-view-toggle,
+:root:not([data-theme='dark']) .inventory-pagination select,
+:root:not([data-theme='dark']) .inventory-pagination button,
+:root:not([data-theme='dark']) .inventory-icon-action {
+  background: #ffffff !important;
+  color: #52525b !important;
+  border-color: #d7e3df !important;
+}
+
+/* Foco do campo de busca com o verde do tema claro (reference-theme força
+   teal claro #73e6cb, de baixo contraste sobre fundo branco). */
+[data-theme='light'] .inventory-search-field:focus-within,
+:root:not([data-theme='dark']) .inventory-search-field:focus-within {
+  border-color: var(--primary, #00674f) !important;
+  box-shadow: 0 0 0 3px rgba(0, 103, 79, 0.08) !important;
+}
+
 /* ============================================================================
    Shared base tokens
    ============================================================================ */

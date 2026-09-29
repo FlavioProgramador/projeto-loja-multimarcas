@@ -3,15 +3,20 @@ import { AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { useAuth } from '../contexts/AuthContext';
 import { mapAuthError } from '../lib/auth-errors';
-import { goToApp, goToLogin } from '../lib/auth-routing';
+import { goToLogin } from '../lib/auth-routing';
+
+const hasLowercase = (value: string) => /[a-z]/.test(value);
+const hasUppercase = (value: string) => /[A-Z]/.test(value);
+const hasDigit = (value: string) => /d/.test(value);
+const hasSymbol = (value: string) => /[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./`~]/.test(value);
 
 function getPasswordStrength(value: string) {
   let score = 0;
   if (value.length >= 10) score++;
-  if (/[a-z]/.test(value)) score++;
-  if (/[A-Z]/.test(value)) score++;
-  if (/d/.test(value)) score++;
-  if (/[!@#$%^&*()_+-=[]{};':"\|<>?,./`~]/.test(value)) score++;
+  if (hasLowercase(value)) score++;
+  if (hasUppercase(value)) score++;
+  if (hasDigit(value)) score++;
+  if (hasSymbol(value)) score++;
   return score <= 1 ? 'Muito fraca' : score === 2 ? 'Fraca' : score === 3 ? 'Média' : 'Forte';
 }
 
@@ -31,7 +36,7 @@ export const ResetPasswordPage: React.FC = () => {
     event.preventDefault();
     setErrorMsg(null);
 
-    if (!isPasswordRecovery || !user) {
+    if (!canReset) {
       setErrorMsg('Esta sessão de recuperação é inválida ou expirou. Solicite um novo link.');
       return;
     }
@@ -41,7 +46,7 @@ export const ResetPasswordPage: React.FC = () => {
       return;
     }
 
-    if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/d/.test(password) || !/[!@#$%^&*()_+-=[]{};':"\|<>?,./`~]/.test(password)) {
+    if (!hasLowercase(password) || !hasUppercase(password) || !hasDigit(password) || !hasSymbol(password)) {
       setErrorMsg('A senha deve conter letras minúsculas, maiúsculas, números e símbolos.');
       return;
     }
@@ -69,7 +74,12 @@ export const ResetPasswordPage: React.FC = () => {
         <h2>Nova senha</h2>
         <p className="auth-lead">Defina uma nova senha para a sua conta.</p>
 
-        {done && <div className="auth-alert success" role="status"><CheckCircle2 size={16} /><span>Senha atualizada com sucesso.</span></div>}
+        {done && (
+          <div className="auth-alert success" role="status">
+            <CheckCircle2 size={16} />
+            <span>Senha atualizada com sucesso. Redirecionando para o login...</span>
+          </div>
+        )}
 
         {!canReset && !done && (
           <div className="auth-alert error" role="alert">

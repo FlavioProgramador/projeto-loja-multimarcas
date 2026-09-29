@@ -1,10 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
-import { AuthSuccessNotice } from './LoginPage';
 import { useAuth } from '../contexts/AuthContext';
 import { mapAuthError } from '../lib/auth-errors';
 import { goToApp, goToLogin } from '../lib/auth-routing';
+
+function getPasswordStrength(value: string) {
+  let score = 0;
+  if (value.length >= 10) score++;
+  if (/[a-z]/.test(value)) score++;
+  if (/[A-Z]/.test(value)) score++;
+  if (/d/.test(value)) score++;
+  if (/[!@#$%^&*()_+-=[]{};':"\|<>?,./`~]/.test(value)) score++;
+  return score <= 1 ? 'Muito fraca' : score === 2 ? 'Fraca' : score === 3 ? 'Média' : 'Forte';
+}
 
 export const ResetPasswordPage: React.FC = () => {
   const { updatePassword, isPasswordRecovery, user, signOut } = useAuth();
@@ -15,27 +24,28 @@ export const ResetPasswordPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const strength = useMemo(() => {
-    let score = 0;
-    if (password.length >= 10) score++;
-    if (/[a-z]/.test(password)) score++;
-    if (/[A-Z]/.test(password)) score++;
-    if (/\d/.test(password)) score++;
-    if (/[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./`~]/.test(password)) score++;
-    return score <= 1 ? 'Muito fraca' : score === 2 ? 'Fraca' : score === 3 ? 'Média' : 'Forte';
-  }, [password]);
-
-  const isAuthenticatedPasswordChange = Boolean(user && !isPasswordRecovery);
-  const canReset = Boolean(user && (isPasswordRecovery || isAuthenticatedPasswordChange));
+  const strength = useMemo(() => getPasswordStrength(password), [password]);
+  const canReset = Boolean(user && isPasswordRecovery);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setErrorMsg(null);
 
+    if (!isPasswordRecovery || !user) {
+      setErrorMsg('Esta sessão de recuperação é inválida ou expirou. Solicite um novo link.');
+      return;
+    }
+
     if (password.length < 10) {
       setErrorMsg('A nova senha deve ter pelo menos 10 caracteres.');
       return;
     }
+
+    if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/d/.test(password) || !/[!@#$%^&*()_+-=[]{};':"\|<>?,./`~]/.test(password)) {
+      setErrorMsg('A senha deve conter letras minúsculas, maiúsculas, números e símbolos.');
+      return;
+    }
+
     if (password !== confirm) {
       setErrorMsg('As senhas não coincidem.');
       return;
@@ -43,9 +53,9 @@ export const ResetPasswordPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await updatePassword(password);
+      await updatePassword({ newPassword: password });
       setDone(true);
-      window.setTimeout(() => goToApp(true), 800);
+      await signOut();
     } catch (err) {
       setErrorMsg(mapAuthError(err));
     } finally {
@@ -59,7 +69,7 @@ export const ResetPasswordPage: React.FC = () => {
         <h2>Nova senha</h2>
         <p className="auth-lead">Defina uma nova senha para a sua conta.</p>
 
-        {done && <AuthSuccessNotice>Senha atualizada. Redirecionando...</AuthSuccessNotice>}
+        {done && <div className="auth-alert success" role="status"><CheckCircle2 size={16} /><span>Senha atualizada com sucesso.</span></div>}
 
         {!canReset && !done && (
           <div className="auth-alert error" role="alert">
@@ -76,24 +86,35 @@ export const ResetPasswordPage: React.FC = () => {
         )}
 
         {canReset && !done && (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <div className="auth-field">
               <label htmlFor="new-password">Nova senha</label>
-              <input
-                id="new-password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                disabled={loading}
-                aria-describedby="reset-password-help"
-              />
+              <div className="auth-password-wrap">
+                <input
+                  id="new-password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  disabled={loading}
+                  aria-describedby="reset-password-help"
+                />
+                <button
+                  type="button"
+                  className="auth-password-toggle"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               <div id="reset-password-help" className="auth-password-help">
-                <span>Mínimo de 10 caracteres.</span>
+                <span>10+ caracteres, com maiúscula, minúscula, número e símbolo.</span>
                 {password && <strong>{strength}</strong>}
               </div>
             </div>
+
             <div className="auth-field">
               <label htmlFor="confirm-password">Confirmar senha</label>
               <input
@@ -106,16 +127,7 @@ export const ResetPasswordPage: React.FC = () => {
                 disabled={loading}
               />
             </div>
-            <div className="auth-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={e => setShowPassword(e.target.checked)}
-                />
-                Mostrar senha
-              </label>
-            </div>
+
             <button type="submit" className="auth-submit" disabled={loading}>
               {loading ? <span className="auth-spinner" aria-hidden="true" /> : null}
               {loading ? 'Salvando...' : 'Salvar senha'}
@@ -127,9 +139,13 @@ export const ResetPasswordPage: React.FC = () => {
           <button
             type="button"
             className="auth-link"
+            disabled={loading}
             onClick={() => {
-              if (user) signOut();
-              else goToLogin(true);
+              if (user) {
+                void signOut();
+              } else {
+                goToLogin(true);
+              }
             }}
           >
             Voltar ao login

@@ -222,12 +222,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     previousUserId.current = user?.id ?? null;
   }, [isAuthorized, user?.id]);
 
-  // Carregar dados reais do Supabase na inicialização
+  // Carregar dados reais do Supabase somente depois de resolver a loja ativa.
+  // Não sobrescreve dados válidos com arrays vazios causados por falta de contexto,
+  // falha transitória ou consulta executada antes da definição do store_id.
   const refreshData = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured || !isAuthorized) return;
 
     try {
       setIsLoading(true);
+
+      const remoteStores = await storeService.getUserStores();
+      if (!remoteStores.length) {
+        throw new Error('Nenhuma loja disponível para o usuário autenticado.');
+      }
+
+      setUserStores(remoteStores);
+
+      const resolvedStoreId =
+        activeStoreId && remoteStores.some(store => store.store_id === activeStoreId)
+          ? activeStoreId
+          : remoteStores[0].store_id;
+
+      if (resolvedStoreId !== activeStoreId) {
+        setActiveStoreId(resolvedStoreId);
+      }
+
       const [
         remoteProducts,
         remoteTransactions,
@@ -235,57 +254,38 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         remoteMovements,
         remoteCustomers,
         remoteSuppliers,
-        remoteReturns,
-        remoteStores
+        remoteReturns
       ] = await Promise.all([
-        ProductsService.getAll(activeStoreId || undefined),
-        FinanceService.getTransactions(activeStoreId || undefined),
-        FinanceService.getFixedExpenses(activeStoreId || undefined),
-        SalesService.getMovements(activeStoreId || undefined),
+        ProductsService.getAll(resolvedStoreId),
+        FinanceService.getTransactions(resolvedStoreId),
+        FinanceService.getFixedExpenses(resolvedStoreId),
+        SalesService.getMovements(resolvedStoreId),
         CustomersService.getAll(),
         SuppliersService.getAll(),
-        ReturnsService.getAll(activeStoreId || undefined),
-        storeService.getUserStores().catch(() => [])
+        ReturnsService.getAll(resolvedStoreId)
       ]);
 
-      if (remoteStores && remoteStores.length > 0) {
-        setUserStores(remoteStores);
-        if (!activeStoreId || !remoteStores.find(s => s.store_id === activeStoreId)) {
-          setActiveStoreId(remoteStores[0].store_id);
-        }
-      }
-
-      if (remoteProducts) {
-        setProducts(remoteProducts);
-      }
-      if (remoteTransactions) {
-        setTransactions(remoteTransactions);
-      }
-      if (remoteExpenses) {
-        setFixedExpenses(remoteExpenses);
-      }
-      if (remoteMovements) {
-        setMovements(remoteMovements);
-      }
-      if (remoteCustomers) {
-        setCustomers(remoteCustomers);
-      }
-      if (remoteSuppliers) {
-        setSuppliers(remoteSuppliers);
-      }
-      if (remoteReturns) {
-        setReturns(remoteReturns);
-      }
+      // Uma consulta bem-sucedida pode retornar zero registros legitimamente.
+      // Atualizamos apenas quando a fonte realmente respondeu, sem usar [] como
+      // fallback silencioso nos próprios services.
+      setProducts(remoteProducts);
+      setTransactions(remoteTransactions);
+      setFixedExpenses(remoteExpenses);
+      setMovements(remoteMovements);
+      setCustomers(remoteCustomers);
+      setSuppliers(remoteSuppliers);
+      setReturns(remoteReturns);
     } catch (err) {
-      console.warn('Sincronização com Supabase: mantendo cache local.', err);
+      console.warn('Sincronização com Supabase falhou; mantendo estado atual.', err);
     } finally {
       setIsLoading(false);
     }
-  }, [activeStoreId]);
+  }, [activeStoreId, isAuthorized]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     refreshData();
-  }, [refreshData]);
+  }, [refreshData, isAuthorized]);
 
   // Persistência no localStorage como fallback / cache
   useEffect(() => {

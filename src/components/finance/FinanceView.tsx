@@ -1,204 +1,111 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, CreditCard, Filter, Inbox, RefreshCw, Search, Wallet, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { formatMoeda } from '../../lib/utils';
-import { ArrowDownLeft, ArrowUpRight, Wallet, Check, RotateCcw, Calendar, FileText } from 'lucide-react';
-import { StatCard } from '../ui/StatCard';
-import { StatusBadge } from '../ui/StatusBadge';
+import { FinanceService, FinanceFixedExpense, FinanceTransaction } from '../../services/finance.service';
+import { calculateFinanceSummary, filterFinanceTransactions } from '../../services/finance/finance.model';
+import './finance.css';
 
-export const FinanceView: React.FC = () => {
-  const { transactions, fixedExpenses, toggleExpensePaid } = useStore();
+type Period = 'today' | '7d' | '30d' | 'all';
+type Status = 'ALL' | 'PENDING' | 'PAID' | 'CANCELLED';
+type Type = 'ALL' | 'INCOME' | 'EXPENSE';
+const PAGE_SIZE = 15;
 
-  const entradas = transactions.filter(t => t.tipo === 'INCOME');
-  const saidas = transactions.filter(t => t.tipo === 'EXPENSE');
+const money = (value:number) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(value);
+const dateTime = (value:string) => new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(value));
+const dateOnly = (value:string) => new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(value));
+const num = (value:number) => new Intl.NumberFormat('pt-BR').format(value);
 
-  const totalEntradas = entradas.reduce((a, t) => a + t.valor, 0);
-  const totalSaidas = saidas.reduce((a, t) => a + t.valor, 0);
-  const saldo = totalEntradas - totalSaidas;
+function startDate(period:Period){ const d=new Date(); if(period==='all') return null; if(period==='today'){d.setHours(0,0,0,0);return d;} d.setDate(d.getDate()-(period==='7d'?6:29)); d.setHours(0,0,0,0); return d; }
+function statusLabel(status:Status){ return status==='ALL'?'Todos os status':status==='PAID'?'Pago':status==='PENDING'?'Pendente':'Cancelado'; }
 
-  const sortedTransactions = [...transactions].sort(
-    (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
-  );
+export const FinanceView:React.FC = () => {
+  const { activeStoreId } = useStore();
+  const [transactions,setTransactions]=useState<FinanceTransaction[]>([]);
+  const [expenses,setExpenses]=useState<FinanceFixedExpense[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [query,setQuery]=useState('');
+  const [period,setPeriod]=useState<Period>('30d');
+  const [type,setType]=useState<Type>('ALL');
+  const [status,setStatus]=useState<Status>('ALL');
+  const [page,setPage]=useState(1);
+  const [selected,setSelected]=useState<FinanceTransaction|null>(null);
 
-  return (
-    <div className="module-fade">
-      {/* Page Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Financeiro & Fluxo de Caixa</h1>
-          <p className="page-subtitle">Acompanhe entradas de vendas, despesas operacionais, contas a pagar e saldo consolidado.</p>
-        </div>
-      </div>
+  const load=async()=>{
+    if(!activeStoreId){setTransactions([]);setExpenses([]);setLoading(false);return;}
+    setLoading(true);
+    try{
+      const [tx,fx]=await Promise.all([FinanceService.getTransactionRecords(activeStoreId),FinanceService.getExpenseRecords(activeStoreId)]);
+      setTransactions(tx); setExpenses(fx);
+    } catch(error){ console.error('Erro ao sincronizar financeiro:',error); setTransactions([]);setExpenses([]); }
+    finally{setLoading(false);}
+  };
+  useEffect(()=>{void load();},[activeStoreId]);
 
-      {/* 3 Metric Cards */}
-      <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-        <StatCard
-          label="Total de Entradas"
-          value={formatMoeda(totalEntradas)}
-          icon={<ArrowDownLeft size={18} />}
-          iconBg="var(--badge-green-bg)"
-          iconColor="var(--badge-green)"
-          delta={`${entradas.length} vendas registradas`}
-          deltaType="positive"
-          deltaLabel="fluxo de caixa"
-        />
+  const filtered=useMemo(()=>filterFinanceTransactions(transactions,{
+    type,status,query,startDate:startDate(period),
+  }),[transactions,period,type,status,query]);
 
-        <StatCard
-          label="Total de Saídas"
-          value={formatMoeda(totalSaidas)}
-          icon={<ArrowUpRight size={18} />}
-          iconBg="var(--badge-red-bg)"
-          iconColor="var(--badge-red)"
-          delta={`${saidas.length} despesas/custos`}
-          deltaType="negative"
-          deltaLabel="saídas liquidadas"
-        />
+  useEffect(()=>setPage(1),[period,type,status,query]);
+  const pages=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));
+  const rows=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
+  useEffect(()=>{if(page>pages)setPage(pages);},[page,pages]);
 
-        <StatCard
-          label="Saldo Operacional"
-          value={formatMoeda(saldo)}
-          icon={<Wallet size={18} />}
-          iconBg={saldo >= 0 ? "var(--badge-blue-bg)" : "var(--badge-red-bg)"}
-          iconColor={saldo >= 0 ? "var(--primary)" : "var(--badge-red)"}
-          delta={saldo >= 0 ? "Balanço positivo" : "Atenção ao fluxo"}
-          deltaType={saldo >= 0 ? "positive" : "negative"}
-          deltaLabel="resultado líquido"
-        />
-      </div>
+  const summary=useMemo(()=>calculateFinanceSummary(filtered),[filtered]);
+  const due=useMemo(()=>expenses.filter(e=>!e.paid).reduce((s,e)=>s+e.amount,0),[expenses]);
 
-      {/* Extrato Table */}
-      <div className="table-wrap" style={{ marginBottom: '20px' }}>
-        <div className="table-header-bar">
-          <div>
-            <span className="table-header-title">Extrato Financeiro Unificado</span>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Histórico em tempo real de entradas e saídas de caixa</p>
-          </div>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
-            {sortedTransactions.length} movimentações
-          </span>
-        </div>
+  return <div className="finance-page module-fade">
+    <header className="finance-hero">
+      <div><div className="finance-eyebrow"><Wallet size={14}/>Visão financeira</div><h1 className="page-title">Financeiro</h1><p className="page-subtitle">Fluxo de caixa, lançamentos e contas da loja em uma única visão.</p></div>
+      <button className="btn btn-outline finance-refresh" onClick={()=>void load()} disabled={loading}><RefreshCw size={15} className={loading?'spin':''}/>Atualizar</button>
+    </header>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Data / Horário</th>
-              <th>Tipo</th>
-              <th>Origem / Descrição</th>
-              <th style={{ textAlign: 'right' }}>Valor Líquido</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedTransactions.length === 0 ? (
-              <tr>
-                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '28px' }}>
-                  Nenhuma transação registrada no período.
-                </td>
-              </tr>
-            ) : (
-              sortedTransactions.map(t => {
-                const isEntrada = t.tipo === 'INCOME';
-                return (
-                  <tr key={t.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{t.data}</td>
-                    <td>
-                      <StatusBadge status={isEntrada ? 'Entrada' : 'Saída'} />
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t.descricao}</div>
-                    </td>
-                    <td
-                      style={{
-                        textAlign: 'right',
-                        fontWeight: 600,
-                        fontFamily: 'var(--font-mono)',
-                        color: isEntrada ? 'var(--badge-green)' : 'var(--badge-red)'
-                      }}
-                    >
-                      {isEntrada ? '+' : '-'} {formatMoeda(t.valor)}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+    <section className="finance-kpis">
+      <Metric icon={<ArrowDownLeft size={18}/>} label="Entradas pagas" value={money(summary.income)} hint="Somente lançamentos liquidados" tone="in"/>
+      <Metric icon={<ArrowUpRight size={18}/>} label="Saídas pagas" value={money(summary.expense)} hint="Custos e despesas liquidados" tone="out"/>
+      <Metric icon={<CircleDollarSign size={18}/>} label="Saldo operacional" value={money(summary.balance)} hint={summary.balance>=0?'Resultado do período':'Resultado negativo no período'} tone={summary.balance>=0?'neutral':'out'}/>
+      <Metric icon={<CalendarDays size={18}/>} label="Contas pendentes" value={money(due+summary.pending)} hint={num(expenses.filter(e=>!e.paid).length)+' despesas fixas + lançamentos pendentes'} tone="neutral"/>
+    </section>
 
-      {/* Despesas Fixas & Contas a Receber */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Despesas Fixas & Recorrentes
-            </h3>
-            <span className="badge-status neutral">{fixedExpenses.length} contas</span>
-          </div>
+    <section className="finance-toolbar">
+      <div className="finance-search"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar descrição, categoria, referência ou ID..."/>{query&&<button onClick={()=>setQuery('')} aria-label="Limpar busca"><X size={15}/></button>}</div>
+      <FilterControl icon={<CalendarDays size={14}/>} value={period} onChange={v=>setPeriod(v as Period)} options={[['today','Hoje'],['7d','7 dias'],['30d','30 dias'],['all','Todo período']]}/>
+      <FilterControl icon={<ArrowDownLeft size={14}/>} value={type} onChange={v=>setType(v as Type)} options={[['ALL','Tipos'],['INCOME','Entradas'],['EXPENSE','Saídas']]}/>
+      <FilterControl icon={<CreditCard size={14}/>} value={status} onChange={v=>setStatus(v as Status)} options={[[ 'ALL','Status'],['PAID','Pagos'],['PENDING','Pendentes'],['CANCELLED','Cancelados']]}/>
+    </section>
 
-          {fixedExpenses.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', padding: '16px 0', textAlign: 'center' }}>
-              Nenhuma despesa fixa cadastrada no sistema.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {fixedExpenses.map(d => (
-                <div
-                  key={d.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 12px',
-                    background: 'var(--bg-surface-subtle)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    gap: '8px'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{d.descricao}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Vencimento: dia {d.dataVencimento} • {d.categoria}
-                    </div>
-                  </div>
+    <section className="finance-table-card">
+      <div className="finance-table-head"><div><strong>Lançamentos financeiros</strong><p>Registros sincronizados diretamente com a loja ativa.</p></div><span>{num(filtered.length)} resultados</span></div>
+      {loading?<TableSkeleton/>:rows.length===0?<EmptyState/>:<>
+        <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Status</th><th>Referência</th><th className="align-right">Valor</th></tr></thead>
+        <tbody>{rows.map(t=><tr key={t.id} onClick={()=>setSelected(t)}>
+          <td><strong>{dateOnly(t.createdAt)}</strong><small>{dateTime(t.createdAt).split(', ')[1]}</small></td>
+          <td><span className={'finance-type '+(t.type==='INCOME'?'income':'expense')}>{t.type==='INCOME'?<ArrowDownLeft size={14}/>:<ArrowUpRight size={14}/>} {t.type==='INCOME'?'Entrada':'Saída'}</span></td>
+          <td><strong>{t.description}</strong><small>{t.paidAt?'Liquidado em '+dateTime(t.paidAt):t.dueDate?'Vencimento '+dateOnly(t.dueDate):'Sem vencimento informado'}</small></td>
+          <td><span className="finance-category">{t.category||'Sem categoria'}</span></td>
+          <td><span className={'finance-status '+t.status.toLowerCase()}>{statusLabel(t.status)}</span></td>
+          <td><span className="finance-reference">{t.referenceType||'—'}</span></td>
+          <td className={'finance-value '+(t.type==='INCOME'?'income':'expense')}>{t.type==='INCOME'?'+':'-'} {money(t.amount)}</td>
+        </tr>)}</tbody></table></div>
+        <div className="finance-pagination"><span>Exibindo {((page-1)*PAGE_SIZE)+1}–{Math.min(page*PAGE_SIZE,filtered.length)} de {filtered.length}</span><div><button disabled={page===1} onClick={()=>setPage(v=>v-1)}><ChevronLeft size={16}/></button><strong>{page}/{pages}</strong><button disabled={page===pages} onClick={()=>setPage(v=>v+1)}><ChevronRight size={16}/></button></div></div>
+      </>}
+    </section>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
-                      {formatMoeda(d.valor)}
-                    </span>
-                    <StatusBadge status={d.pago ? 'Pago' : 'Pendente'} />
-                    <button
-                      className={`btn btn-sm ${d.pago ? 'btn-outline' : 'btn-success'}`}
-                      onClick={() => toggleExpensePaid(d.id)}
-                      style={{ padding: '4px 8px', fontSize: '11.5px' }}
-                    >
-                      {d.pago ? (
-                        <>
-                          <RotateCcw size={12} /> Desfazer
-                        </>
-                      ) : (
-                        <>
-                          <Check size={12} /> Pagar
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+    <section className="finance-expenses"><div className="finance-section-head"><div><strong>Despesas fixas</strong><p>Contas recorrentes da loja e seus vencimentos.</p></div><span>{num(expenses.length)} contas</span></div>
+      {expenses.length===0?<EmptyState compact/>:<div className="finance-expense-list">{expenses.slice(0,8).map(e=><ExpenseRow key={e.id} expense={e} onToggle={async()=>{try{const updated=await FinanceService.toggleExpensePaid(e.id,e.paid);setExpenses(prev=>prev.map(x=>x.id===updated.id?updated:x));}catch(error){console.error(error);}}}/>)}</div>}
+    </section>
 
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Contas a Receber (Varejo)
-            </h3>
-            <StatusBadge status="Normal" />
-          </div>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.5, padding: '8px 0' }}>
-            Todas as transações realizadas no PDV (PIX, Dinheiro e Cartão de Crédito/Débito) estão liquidadas e sincronizadas com a adquirente.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    {selected&&<FinanceDetails transaction={selected} onClose={()=>setSelected(null)}/>}
+  </div>;
 };
+const Metric:React.FC<{icon:React.ReactNode;label:string;value:string;hint:string;tone:'in'|'out'|'neutral'}>=({icon,label,value,hint,tone})=><article className="finance-kpi"><div className={'finance-kpi-icon '+tone}>{icon}</div><div><span>{label}</span><strong>{value}</strong><small>{hint}</small></div></article>;
+
+const FilterControl:React.FC<{icon:React.ReactNode;value:string;onChange:(v:string)=>void;options:string[][]}>=({icon,value,onChange,options})=><label className="finance-filter">{icon}<select value={value} onChange={e=>onChange(e.target.value)}>{options.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>;
+
+const ExpenseRow:React.FC<{expense:FinanceFixedExpense;onToggle:()=>Promise<void>}>=({expense,onToggle})=><div className="finance-expense-row"><div className="finance-expense-icon"><CalendarDays size={16}/></div><div className="finance-expense-main"><strong>{expense.description}</strong><span>Dia {new Date(expense.dueDate+'T12:00:00').getDate()} · {expense.category||'Sem categoria'}{expense.recurring?' · Recorrente':''}</span></div><strong className="finance-expense-value">{money(expense.amount)}</strong><span className={'finance-status '+(expense.paid?'paid':'pending')}>{expense.paid?'Pago':'Pendente'}</span><button className="btn btn-outline btn-sm" onClick={()=>void onToggle()}>{expense.paid?'Desfazer':'Marcar pago'}</button></div>;
+
+const FinanceDetails:React.FC<{transaction:FinanceTransaction;onClose:()=>void}>=({transaction,onClose})=><div className="finance-detail-backdrop" onClick={onClose}><div className="finance-detail" onClick={e=>e.stopPropagation()}><div className="finance-detail-head"><div><span>Lançamento financeiro</span><h2>{transaction.description}</h2></div><button onClick={onClose} aria-label="Fechar"><X size={18}/></button></div><div className="finance-detail-grid"><Detail label="Tipo" value={transaction.type==='INCOME'?'Entrada':'Saída'}/><Detail label="Valor" value={money(transaction.amount)}/><Detail label="Status" value={statusLabel(transaction.status)}/><Detail label="Categoria" value={transaction.category||'Sem categoria'}/><Detail label="Criado em" value={dateTime(transaction.createdAt)}/><Detail label="Pago em" value={transaction.paidAt?dateTime(transaction.paidAt):'—'}/><Detail label="Vencimento" value={transaction.dueDate?dateOnly(transaction.dueDate):'—'}/><Detail label="Referência" value={transaction.referenceType||'—'}/></div><div className="finance-detail-id"><span>ID</span><code>{transaction.id}</code></div></div></div>;
+
+const Detail:React.FC<{label:string;value:string}>=({label,value})=><div className="finance-detail-item"><span>{label}</span><strong>{value}</strong></div>;
+
+const TableSkeleton:React.FC=()=> <div className="finance-skeleton">{Array.from({length:7}).map((_,i)=><div key={i}><span/><span/><span/><span/><span/></div>)}</div>;
+const EmptyState:React.FC<{compact?:boolean}>=({compact})=><div className={'finance-empty '+(compact?'compact':'')}><div><Inbox size={22}/></div><strong>Nenhum registro encontrado</strong>{!compact&&<p>Altere os filtros ou aguarde uma nova sincronização.</p>}</div>;

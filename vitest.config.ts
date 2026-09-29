@@ -10,6 +10,18 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     clearMocks: true,
+    setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      include: ['src/lib/**', 'src/contexts/**', 'src/services/**'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test/**'],
+    },
+    env: {
+      // Garante que o .env real não influencie os testes
+      VITE_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: '',
+    },
   },
 });

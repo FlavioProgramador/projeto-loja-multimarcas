@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import {
+  isTimestampFresh,
+  parseSignatureHeader,
+  verifySignature,
+} from "../_shared/mp_signature.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN');
 
@@ -60,40 +65,18 @@ serve(async (req) => {
       });
     }
 
-    const ts = xSignature
-      .split(',')
-      .map(part => part.trim())
-      .find(part => part.startsWith('ts='))
-      ?.slice(3) || '';
+    const signature = parseSignatureHeader(xSignature);
 
-    const v1 = xSignature
-      .split(',')
-      .map(part => part.trim())
-      .find(part => part.startsWith('v1='))
-      ?.slice(3) || '';
-
-    const timestamp = Number(ts);
-
-    if (!ts || !v1 || !Number.isFinite(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 600) {
+    if (!signature || !isTimestampFresh(signature.timestamp)) {
       return new Response('Invalid or expired webhook signature', { status: 403, headers });
     }
 
-    const normalizedDataId = String(dataId).toLowerCase();
-    const manifest = `id:${normalizedDataId};request-id:${xRequestId};ts:${ts};`;
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(webhookSecret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
-
-    const hex = v1.match(/.{1,2}/g);
-    const signatureBytes = new Uint8Array(hex?.map(byte => parseInt(byte, 16)) || []);
-    const validSignature =
-      signatureBytes.length === 32 &&
-      await crypto.subtle.verify('HMAC', key, signatureBytes, encoder.encode(manifest));
+    const validSignature = await verifySignature({
+      secret: webhookSecret,
+      dataId,
+      requestId: xRequestId,
+      signature,
+    });
 
     if (!validSignature) {
       return new Response('Invalid webhook signature', { status: 403, headers });
@@ -108,7 +91,7 @@ serve(async (req) => {
       .insert({
         request_id: xRequestId,
         provider_payment_id: String(dataId),
-        signature_ts: timestamp
+        signature_ts: signature.timestamp
       });
 
     if (replayInsertError) {

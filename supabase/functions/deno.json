@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "test": "deno test --allow-all"
+  },
+  "test": {
+    "include": ["**/*_test.ts"]
+  },
+  "exclude": ["**/node_modules"]
+}

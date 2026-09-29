@@ -504,21 +504,49 @@ export const PdvView: React.FC = () => {
               {cart.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '13px' }}>Nenhum item adicionado.<br /><span style={{ fontSize: '11.5px', opacity: 0.8 }}>Selecione produtos na tabela ao lado.</span></div>
               ) : (
-                cart.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.tamanho} / {item.cor} • {formatMoeda(item.preco)}</div>
+                cart.map((item, idx) => {
+                  const isMaxStockReached = item.maxStock !== undefined && item.qtd >= item.maxStock;
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                        <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nome}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.tamanho} / {item.cor} • {formatMoeda(item.preco)}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => updateQuantity(idx, -1)}
+                          style={{ border: '1px solid var(--border-color)', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Diminuir quantidade"
+                        >
+                          -
+                        </button>
+                        <span style={{ fontSize: '12px', fontWeight: 600, minWidth: '16px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qtd}</span>
+                        <button
+                          onClick={() => updateQuantity(idx, 1)}
+                          disabled={isMaxStockReached}
+                          title={isMaxStockReached ? `Estoque máximo atingido (${item.maxStock} un)` : 'Aumentar quantidade'}
+                          style={{
+                            border: '1px solid var(--border-color)',
+                            background: isMaxStockReached ? 'var(--bg-surface-subtle)' : 'var(--bg-canvas)',
+                            opacity: isMaxStockReached ? 0.5 : 1,
+                            borderRadius: 'var(--radius-sm)',
+                            width: '22px',
+                            height: '22px',
+                            cursor: isMaxStockReached ? 'not-allowed' : 'pointer',
+                            fontSize: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          +
+                        </button>
+                        <span style={{ fontSize: '12.5px', fontWeight: 700, minWidth: '60px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoeda(item.preco * item.qtd)}</span>
+                        <button onClick={() => removeItem(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }} title="Remover"><Trash2 size={14} /></button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                      <button onClick={() => updateQuantity(idx, -1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                      <span style={{ fontSize: '12px', fontWeight: 600, minWidth: '16px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qtd}</span>
-                      <button onClick={() => updateQuantity(idx, 1)} style={{ border: '1px solid var(--border-color)', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                      <span style={{ fontSize: '12.5px', fontWeight: 700, minWidth: '60px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoeda(item.preco * item.qtd)}</span>
-                      <button onClick={() => removeItem(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }} title="Remover"><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

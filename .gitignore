@@ -13,3 +13,4 @@ test_fase0.cjs
 
 delete_test_users.cjs
 supabase/schema-producao-real.sql
+supabase/.temp/

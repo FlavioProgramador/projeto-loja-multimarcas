@@ -1,5 +1,7 @@
 import { jsPDF } from 'jspdf';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 type PdfMetric = {
   label: string;
   value: string;
@@ -26,239 +28,388 @@ export interface SalesReportPdfData {
   sales: PdfSaleRow[];
 }
 
-const PAGE = { width: 210, height: 297, margin: 14 };
-const COLORS = {
-  text: [31, 41, 55] as const,
-  muted: [107, 114, 128] as const,
-  primary: [22, 101, 148] as const,
-  primarySoft: [239, 246, 255] as const,
-  border: [229, 231, 235] as const,
-  surface: [249, 250, 251] as const,
-  success: [22, 163, 74] as const,
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PAGE   = { width: 210, height: 297, margin: 14 };
+const INNER  = PAGE.width - PAGE.margin * 2;
+
+/** CoreSys brand palette — no blues */
+const C = {
+  primary:     [0, 103, 79]    as const, // #00674F  dark green (headers, accents)
+  secondary:   [62, 187, 158]  as const, // #3EBB9E  teal accent
+  deep:        [10, 60, 48]    as const, // #0A3C30  very dark green (stripe)
+  text:        [18, 24, 22]    as const, // near-black body text
+  muted:       [95, 110, 104]  as const, // subdued labels
+  border:      [205, 222, 216] as const, // subtle green-gray border
+  surface:     [243, 249, 246] as const, // alternate row / card bg
+  softGreen:   [218, 242, 234] as const, // light green card tint
+  white:       [255, 255, 255] as const,
+  black:       [0,   0,   0]   as const,
+  danger:      [198,  54,  54] as const, // red for negatives
+  amber:       [180, 130,  30] as const, // amber for warnings
 };
 
-function money(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(Number(value) || 0);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Strip Portuguese accented chars — jsPDF uses Latin-1 internally */
+function norm(s: string): string {
+  return (s ?? '')
+    .replace(/[àáâãä]/g,'a').replace(/[ÀÁÂÃÄ]/g,'A')
+    .replace(/[èéêë]/g, 'e').replace(/[ÈÉÊË]/g, 'E')
+    .replace(/[ìíîï]/g, 'i').replace(/[ÌÍÎÏ]/g, 'I')
+    .replace(/[òóôõö]/g,'o').replace(/[ÒÓÔÕÖ]/g,'O')
+    .replace(/[ùúûü]/g, 'u').replace(/[ÙÚÛÜ]/g, 'U')
+    .replace(/[ç]/g,'c').replace(/[Ç]/g,'C')
+    .replace(/[ñ]/g,'n').replace(/[Ñ]/g,'N');
 }
 
-function dateBr(value: string): string {
-  if (!value) return '-';
-  const [year, month, day] = value.slice(0, 10).split('-');
-  return year && month && day ? `${day}/${month}/${year}` : value;
+function money(v: number): string {
+  return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)||0);
 }
 
-function monthBr(value: string): string {
-  const [year, month] = value.split('-');
-  if (!year || !month) return value;
-  const date = new Date(Number(year), Number(month) - 1, 1);
-  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
+function dateBr(v: string): string {
+  if (!v) return '-';
+  const [y,m,d] = v.slice(0,10).split('-');
+  return y&&m&&d ? `${d}/${m}/${y}` : v;
 }
 
-function text(doc: jsPDF, value: string, x: number, y: number, size = 9, bold = false, color: readonly [number, number, number] = COLORS.text) {
+function monthBr(v: string): string {
+  const [y,m] = v.split('-');
+  if (!y||!m) return v;
+  return norm(new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(new Date(+y,+m-1,1)));
+}
+
+type RGB = readonly [number,number,number];
+
+function t(
+  doc: jsPDF, value: string,
+  x: number, y: number,
+  size = 9, bold = false,
+  color: RGB = C.text,
+  align: 'left'|'right'|'center' = 'left',
+) {
   doc.setFont('helvetica', bold ? 'bold' : 'normal');
   doc.setFontSize(size);
   doc.setTextColor(...color);
-  doc.text(value, x, y);
+  doc.text(norm(value), x, y, { align });
 }
 
-function wrapText(doc: jsPDF, value: string, width: number, size = 8): string[] {
-  doc.setFont('helvetica', 'normal');
+function wrap(doc: jsPDF, value: string, width: number, size = 8): string[] {
+  doc.setFont('helvetica','normal');
   doc.setFontSize(size);
-  return doc.splitTextToSize(value || '-', width) as string[];
+  return doc.splitTextToSize(norm(value)||'-', width) as string[];
 }
 
-function roundedBox(doc: jsPDF, x: number, y: number, w: number, h: number, fill: readonly [number, number, number]) {
+function fillRect(doc: jsPDF, x:number, y:number, w:number, h:number, fill: RGB, draw?: RGB) {
   doc.setFillColor(...fill);
-  doc.setDrawColor(...COLORS.border);
-  doc.roundedRect(x, y, w, h, 3, 3, 'FD');
+  if (draw) { doc.setDrawColor(...draw); doc.rect(x,y,w,h,'FD'); }
+  else       { doc.rect(x,y,w,h,'F'); }
 }
 
-function drawHeader(doc: jsPDF, data: SalesReportPdfData, pageNumber: number) {
-  doc.setFillColor(...COLORS.primary);
-  doc.rect(0, 0, PAGE.width, 26, 'F');
-
-  text(doc, 'COREsys', PAGE.margin, 10, 9, true, [255, 255, 255]);
-  text(doc, 'Relatorio de Vendas', PAGE.margin, 19, 16, true, [255, 255, 255]);
-  text(doc, data.storeName, PAGE.width - PAGE.margin, 10, 8, false, [255, 255, 255]);
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(255, 255, 255);
-  doc.text(`Pagina ${pageNumber}`, PAGE.width - PAGE.margin, 19, { align: 'right' });
-
-  text(doc, `Periodo: ${monthBr(data.currentMonth)}`, PAGE.margin, 35, 8.5, true);
-  text(doc, `Comparativo: ${monthBr(data.previousMonth)}`, PAGE.margin, 41, 8, false, COLORS.muted);
-  text(doc, `Gerado em ${data.generatedAt}`, PAGE.width - PAGE.margin, 35, 8, false, COLORS.muted);
-  doc.text('Documento gerado diretamente a partir dos dados do ERP.', PAGE.width - PAGE.margin, 41, { align: 'right' });
+function roundBox(doc:jsPDF, x:number, y:number, w:number, h:number, fill:RGB, draw?: RGB) {
+  doc.setFillColor(...fill);
+  doc.setDrawColor(...(draw ?? C.border));
+  doc.roundedRect(x,y,w,h,3,3, draw ? 'FD' : 'F');
 }
 
-function drawFooter(doc: jsPDF) {
-  const y = PAGE.height - 9;
-  doc.setDrawColor(...COLORS.border);
-  doc.line(PAGE.margin, y - 3, PAGE.width - PAGE.margin, y - 3);
-  text(doc, 'COREsys - Relatorio operacional', PAGE.margin, y, 7, false, COLORS.muted);
+function hline(doc:jsPDF, y:number, color: RGB = C.border) {
+  doc.setDrawColor(...color);
+  doc.line(PAGE.margin, y, PAGE.width-PAGE.margin, y);
 }
+
+// ─── Page chrome ─────────────────────────────────────────────────────────────
+
+function drawHeader(doc:jsPDF, data:SalesReportPdfData, pageNumber:number) {
+  // Background bar
+  fillRect(doc, 0, 0, PAGE.width, 28, C.primary);
+  // Bottom accent stripe
+  fillRect(doc, 0, 26, PAGE.width, 2, C.secondary);
+
+  // Brand + title (left)
+  t(doc,'CoreSys',  PAGE.margin, 10, 8,  true,  C.secondary);
+  t(doc,'Relatorio de Vendas', PAGE.margin, 20, 17, true, C.white);
+
+  // Store + page (right)
+  t(doc, norm(data.storeName), PAGE.width-PAGE.margin, 10, 8, false, C.white, 'right');
+  t(doc, `Pagina ${pageNumber}`,  PAGE.width-PAGE.margin, 20, 8, false, [200,230,220], 'right');
+
+  // Sub-header band (light)
+  fillRect(doc, 0, 30, PAGE.width, 14, C.softGreen);
+  t(doc, `Periodo: ${monthBr(data.currentMonth)}`,                PAGE.margin, 38, 8, true, C.primary);
+  t(doc, `Comparativo: ${monthBr(data.previousMonth)}`,            PAGE.margin+80, 38, 7.5, false, C.muted);
+  t(doc, `Gerado em ${norm(data.generatedAt)}`, PAGE.width-PAGE.margin, 38, 7.5, false, C.muted, 'right');
+}
+
+function drawFooter(doc:jsPDF) {
+  const fy = PAGE.height - 10;
+  fillRect(doc, 0, fy-4, PAGE.width, 14, C.softGreen);
+  t(doc,'CoreSys ERP - Relatorio de Vendas', PAGE.margin, fy+3, 7, false, C.primary);
+  t(doc,'Documento confidencial. Uso interno.', PAGE.width-PAGE.margin, fy+3, 7, false, C.muted, 'right');
+}
+
+// ─── Section heading ─────────────────────────────────────────────────────────
+
+function sectionTitle(doc:jsPDF, label:string, y:number) {
+  // Left accent bar
+  fillRect(doc, PAGE.margin, y-4, 3, 7, C.secondary);
+  t(doc, label, PAGE.margin+6, y+1, 11, true, C.primary);
+  return y + 7;
+}
+
+// ─── KPI cards ───────────────────────────────────────────────────────────────
+
+function drawMetricCards(doc:jsPDF, metrics:PdfMetric[], startY:number): number {
+  const gap  = 4;
+  const cardW = (INNER - gap) / 2;
+  const cardH = 28;
+
+  metrics.forEach((m, i) => {
+    const col   = i % 2;
+    const row   = Math.floor(i / 2);
+    const x     = PAGE.margin + col * (cardW + gap);
+    const y     = startY + row * (cardH + gap);
+
+    roundBox(doc, x, y, cardW, cardH, C.surface, C.border);
+    // Left accent dot
+    fillRect(doc, x, y, 3, cardH, C.secondary);
+    t(doc, norm(m.label),      x+7,  y+8,  7.5, true,  C.muted);
+    t(doc, norm(m.value),      x+7,  y+18, 13,  true,  C.primary);
+    t(doc, norm(m.comparison), x+7,  y+25, 6.8, false, C.muted);
+  });
+
+  const rows = Math.ceil(metrics.length / 2);
+  return startY + rows * (cardH + gap) + 2;
+}
+
+// ─── Bar chart (horizontal) ───────────────────────────────────────────────────
+
+function drawHorizontalBar(
+  doc: jsPDF,
+  rows: Array<{ label: string; value: number; valueLabel: string }>,
+  startY: number,
+  maxValue: number,
+  barColor: RGB = C.secondary,
+  trackColor: RGB = C.softGreen,
+): number {
+  const barAreaW = INNER * 0.55;
+  const labelW   = INNER * 0.30;
+  const valW     = INNER * 0.15;
+  const rowH     = 9;
+
+  rows.forEach((row, i) => {
+    const y   = startY + i * rowH;
+    const bg  = i % 2 === 0 ? C.white : C.surface;
+    fillRect(doc, PAGE.margin, y, INNER, rowH, bg);
+
+    // Row label
+    t(doc, norm(row.label), PAGE.margin+2, y+6.5, 7, false, C.text);
+
+    // Track
+    const bx = PAGE.margin + labelW + 2;
+    const bw = barAreaW - 4;
+    const bh = 4;
+    const by = y + (rowH - bh) / 2;
+    fillRect(doc, bx, by, bw, bh, trackColor);
+
+    // Bar fill
+    const fillW = maxValue > 0 ? (row.value / maxValue) * bw : 0;
+    if (fillW > 0) fillRect(doc, bx, by, fillW, bh, barColor);
+
+    // Value label
+    t(doc, row.valueLabel, PAGE.margin + labelW + barAreaW + valW - 2, y+6.5, 7, true, C.primary, 'right');
+  });
+
+  return startY + rows.length * rowH + 3;
+}
+
+// ─── Table ───────────────────────────────────────────────────────────────────
+
+type ColDef = { label: string; x: number; w: number; align?: 'left'|'right'|'center' };
+
+function drawTableHeader(doc:jsPDF, cols:ColDef[], y:number): number {
+  fillRect(doc, PAGE.margin, y, INNER, 9, C.primary);
+  cols.forEach(c => t(doc, c.label, c.align==='right' ? c.x+c.w : c.x, y+6, 6.7, true, C.white, c.align));
+  return y + 9;
+}
+
+// ─── Main export ─────────────────────────────────────────────────────────────
 
 export function downloadSalesReportPdf(data: SalesReportPdfData): void {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+  const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait', compress:true });
   let page = 1;
-  let y = 51;
+  let y    = 49; // below header (28px header + 14px sub-band + 7px gap)
 
   const newPage = () => {
     drawFooter(doc);
     doc.addPage();
-    page += 1;
+    page++;
     drawHeader(doc, data, page);
-    y = 51;
+    y = 49;
   };
 
-  const ensureSpace = (height: number) => {
-    if (y + height > PAGE.height - 17) newPage();
-  };
+  const need = (h: number) => { if (y + h > PAGE.height - 18) newPage(); };
 
+  // ─── Page 1 ───────────────────────────────────────────────────────────────
   drawHeader(doc, data, page);
 
-  text(doc, 'Resumo executivo', PAGE.margin, y, 11, true);
-  y += 5;
+  // 1. Resumo executivo
+  y = sectionTitle(doc, 'Resumo executivo', y);
+  y = drawMetricCards(doc, data.metrics, y);
+  y += 4;
 
-  const gap = 4;
-  const cardW = (PAGE.width - PAGE.margin * 2 - gap) / 2;
-  const cardH = 28;
+  // 2. Receita por meio de pagamento
+  need(50);
+  y = sectionTitle(doc, 'Receita por meio de pagamento', y);
 
-  data.metrics.forEach((metric, index) => {
-    const col = index % 2;
-    const row = Math.floor(index / 2);
-    const x = PAGE.margin + col * (cardW + gap);
-    const cardY = y + row * (cardH + gap);
-    roundedBox(doc, x, cardY, cardW, cardH, COLORS.surface);
-    text(doc, metric.label, x + 5, cardY + 8, 7.5, true, COLORS.muted);
-    text(doc, metric.value, x + 5, cardY + 17, 12, true);
-    text(doc, metric.comparison, x + 5, cardY + 24, 7, false, COLORS.primary);
-  });
+  const totalPay = data.revenueByPayment.reduce((s,r)=>s+r.amount, 0);
+  if (data.revenueByPayment.length === 0) {
+    roundBox(doc, PAGE.margin, y, INNER, 12, C.surface, C.border);
+    t(doc, 'Nenhum registro de pagamento no periodo.', PAGE.margin+6, y+8, 8, false, C.muted);
+    y += 16;
+  } else {
+    // Table header
+    const payH = 9 + data.revenueByPayment.length * 9 + 4;
+    roundBox(doc, PAGE.margin, y, INNER, payH, C.white, C.border);
+    // Header row
+    fillRect(doc, PAGE.margin, y, INNER, 9, C.softGreen);
+    t(doc,'Forma de pagamento', PAGE.margin+6, y+6.5, 7, true, C.primary);
+    t(doc,'Valor',              PAGE.margin+INNER*0.55, y+6.5, 7, true, C.primary);
+    t(doc,'Participacao',       PAGE.width-PAGE.margin-6, y+6.5, 7, true, C.primary, 'right');
+    y += 9;
 
-  y += 2 * (cardH + gap) + 2;
-  ensureSpace(42);
+    data.revenueByPayment.forEach((row, i) => {
+      const bg = i%2===0 ? C.white : C.surface;
+      fillRect(doc, PAGE.margin, y, INNER, 9, bg);
 
-  text(doc, 'Receita por meio de pagamento', PAGE.margin, y, 11, true);
-  y += 5;
+      // Mini bar
+      const bx = PAGE.margin+INNER*0.52;
+      const bw = INNER*0.28;
+      const bh = 3;
+      const by = y + 3;
+      fillRect(doc, bx, by, bw, bh, C.softGreen);
+      const pct = totalPay > 0 ? row.amount/totalPay : 0;
+      if (pct > 0) fillRect(doc, bx, by, bw*pct, bh, C.secondary);
 
-  const paymentRows = data.revenueByPayment.length
-    ? data.revenueByPayment
-    : [{ method: 'Nenhum registro', amount: 0 }];
+      t(doc, norm(row.method),             PAGE.margin+6,             y+6.5, 8, true,  C.text);
+      t(doc, money(row.amount),            PAGE.margin+INNER*0.55,    y+6.5, 8, false, C.primary);
+      t(doc, `${(pct*100).toFixed(1)}%`,   PAGE.width-PAGE.margin-6,  y+6.5, 8, true,  C.secondary, 'right');
+      y += 9;
+    });
 
-  roundedBox(doc, PAGE.margin, y, PAGE.width - PAGE.margin * 2, 8 + paymentRows.length * 8, [255, 255, 255]);
-  paymentRows.forEach((row, index) => {
-    const rowY = y + 7 + index * 8;
-    if (index > 0) {
-      doc.setDrawColor(...COLORS.border);
-      doc.line(PAGE.margin + 4, rowY - 4, PAGE.width - PAGE.margin - 4, rowY - 4);
-    }
-    text(doc, row.method, PAGE.margin + 6, rowY, 8, true);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...COLORS.success);
-    doc.text(money(row.amount), PAGE.width - PAGE.margin - 6, rowY, { align: 'right' });
-  });
-  y += 14 + paymentRows.length * 8;
+    // Total row
+    fillRect(doc, PAGE.margin, y, INNER, 9, C.primary);
+    t(doc,'Total',       PAGE.margin+6,           y+6.5, 8, true, C.white);
+    t(doc, money(totalPay), PAGE.margin+INNER*0.55, y+6.5, 8, true, C.secondary);
+    y += 13;
+  }
 
-  ensureSpace(54);
-  text(doc, 'Produtos mais vendidos', PAGE.margin, y, 11, true);
-  y += 5;
+  // 3. Produtos mais vendidos
+  need(60);
+  y = sectionTitle(doc, 'Produtos mais vendidos', y);
 
-  const productRows = data.topProducts.length
-    ? data.topProducts
-    : [{ name: 'Nenhuma venda registrada no periodo', quantity: 0 }];
+  if (data.topProducts.length === 0) {
+    roundBox(doc, PAGE.margin, y, INNER, 12, C.surface, C.border);
+    t(doc,'Nenhuma venda no periodo.', PAGE.margin+6, y+8, 8, false, C.muted);
+    y += 16;
+  } else {
+    const maxQty = Math.max(...data.topProducts.map(r=>r.quantity), 1);
 
-  roundedBox(doc, PAGE.margin, y, PAGE.width - PAGE.margin * 2, 10 + productRows.length * 8, [255, 255, 255]);
-  text(doc, '#', PAGE.margin + 6, y + 7, 7, true, COLORS.muted);
-  text(doc, 'Produto', PAGE.margin + 15, y + 7, 7, true, COLORS.muted);
-  text(doc, 'Quantidade', PAGE.width - PAGE.margin - 6, y + 7, 7, true, COLORS.muted);
-  productRows.forEach((row, index) => {
-    const rowY = y + 14 + index * 8;
-    if (index > 0) {
-      doc.setDrawColor(...COLORS.border);
-      doc.line(PAGE.margin + 4, rowY - 5, PAGE.width - PAGE.margin - 4, rowY - 5);
-    }
-    text(doc, `${index + 1}`, PAGE.margin + 6, rowY, 8, true);
-    text(doc, wrapText(doc, row.name, 127, 8)[0], PAGE.margin + 15, rowY, 8);
-    text(doc, `${row.quantity} un`, PAGE.width - PAGE.margin - 6, rowY, 8, true);
-  });
-  y += 16 + productRows.length * 8;
+    // Column headers
+    fillRect(doc, PAGE.margin, y, INNER, 8, C.softGreen);
+    t(doc,'#',          PAGE.margin+4,          y+5.5, 6.5, true, C.primary);
+    t(doc,'Produto',    PAGE.margin+12,          y+5.5, 6.5, true, C.primary);
+    t(doc,'Volume',     PAGE.margin+INNER*0.44,  y+5.5, 6.5, true, C.primary);
+    t(doc,'Qtd',        PAGE.width-PAGE.margin-4, y+5.5, 6.5, true, C.primary, 'right');
+    y += 8;
 
+    data.topProducts.slice(0,12).forEach((row,i) => {
+      const bg = i%2===0 ? C.white : C.surface;
+      fillRect(doc, PAGE.margin, y, INNER, 9, bg);
+
+      t(doc,`${i+1}`,          PAGE.margin+4,            y+6.5, 7,   true,  i===0?C.secondary:C.muted);
+      t(doc, wrap(doc,row.name,78,7.5)[0], PAGE.margin+12, y+6.5, 7.5, false, C.text);
+
+      // Bar
+      const bx = PAGE.margin+INNER*0.44;
+      const bw = INNER*0.44;
+      const bh = 3; const by = y+3;
+      fillRect(doc, bx, by, bw, bh, C.softGreen);
+      const fill = (row.quantity/maxQty)*bw;
+      if (fill>0) fillRect(doc, bx, by, fill, bh, i===0?C.secondary:C.primary);
+
+      t(doc,`${row.quantity} un`, PAGE.width-PAGE.margin-4, y+6.5, 7.5, true, C.primary, 'right');
+      y += 9;
+    });
+
+    // Border around block
+    doc.setDrawColor(...C.border);
+    doc.rect(PAGE.margin, y - 9*Math.min(data.topProducts.length,12) - 8, INNER, 9*Math.min(data.topProducts.length,12)+8, 'S');
+    y += 6;
+  }
+
+  // ─── Page 2: Vendas detalhadas ────────────────────────────────────────────
   newPage();
+  y = sectionTitle(doc, 'Vendas detalhadas', y);
 
-  text(doc, 'Vendas detalhadas', PAGE.margin, y, 11, true);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...COLORS.muted);
-  doc.text(`${data.sales.length} venda(s) no periodo`, PAGE.width - PAGE.margin, y, { align: 'right' });
-  y += 5;
+  // Counter
+  t(doc,`${data.sales.length} venda(s) no periodo`, PAGE.width-PAGE.margin, y-2, 8, false, C.muted, 'right');
 
-  const columns = [
-    { label: 'Data', x: PAGE.margin + 2, w: 18 },
-    { label: 'Venda', x: PAGE.margin + 21, w: 24 },
-    { label: 'Cliente', x: PAGE.margin + 46, w: 35 },
-    { label: 'Pagamento', x: PAGE.margin + 82, w: 30 },
-    { label: 'Valor', x: PAGE.margin + 113, w: 24 },
-    { label: 'Produtos', x: PAGE.margin + 138, w: 44 },
+  const cols: ColDef[] = [
+    { label:'Data',      x: PAGE.margin+2,    w:18 },
+    { label:'Venda',     x: PAGE.margin+21,   w:24 },
+    { label:'Cliente',   x: PAGE.margin+46,   w:35 },
+    { label:'Pagamento', x: PAGE.margin+82,   w:28 },
+    { label:'Valor',     x: PAGE.margin+111,  w:24, align:'right' },
+    { label:'Produtos',  x: PAGE.margin+136,  w:46 },
   ];
 
-  const drawTableHeader = () => {
-    doc.setFillColor(...COLORS.primarySoft);
-    doc.setDrawColor(...COLORS.border);
-    doc.rect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, 9, 'FD');
-    columns.forEach(col => text(doc, col.label, col.x, y + 6, 6.7, true, COLORS.primary));
-    y += 9;
-  };
+  const tblHeader = () => { y = drawTableHeader(doc, cols, y); };
+  tblHeader();
 
-  drawTableHeader();
+  if (data.sales.length === 0) {
+    fillRect(doc, PAGE.margin, y, INNER, 14, C.surface);
+    t(doc,'Nenhuma venda registrada no periodo selecionado.', PAGE.margin+INNER/2, y+9, 8, false, C.muted, 'center');
+    y += 14;
+  } else {
+    data.sales.forEach((sale, index) => {
+      const custLines = wrap(doc, sale.customer, cols[2].w, 7);
+      const prodLines = wrap(doc, sale.products,  cols[5].w, 6.5);
+      const lines     = Math.max(custLines.length, prodLines.length, 1);
+      const rowH      = Math.max(10, Math.min(24, 4+lines*4));
 
-  data.sales.forEach((sale, index) => {
-    const customerLines = wrapText(doc, sale.customer, columns[2].w, 7);
-    const productLines = wrapText(doc, sale.products, columns[5].w, 6.8);
-    const lines = Math.max(customerLines.length, productLines.length, 1);
-    const rowH = Math.max(10, Math.min(23, 4 + lines * 4));
+      if (y + rowH > PAGE.height - 18) {
+        newPage();
+        t(doc,'Vendas detalhadas (cont.)', PAGE.margin, y, 10, true, C.primary);
+        y += 6;
+        tblHeader();
+      }
 
-    if (y + rowH > PAGE.height - 18) {
-      newPage();
-      text(doc, 'Vendas detalhadas - continuacao', PAGE.margin, y, 10, true);
-      y += 5;
-      drawTableHeader();
-    }
+      const bg: RGB = index%2===0 ? C.white : C.surface;
+      fillRect(doc, PAGE.margin, y, INNER, rowH, bg, C.border);
 
-    if (index % 2 === 1) {
-      doc.setFillColor(...COLORS.surface);
-      doc.rect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, rowH, 'F');
-    }
-    doc.setDrawColor(...COLORS.border);
-    doc.rect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, rowH, 'S');
+      t(doc, dateBr(sale.date),    cols[0].x, y+6.5, 6.8);
+      t(doc, norm(sale.sale),      cols[1].x, y+6.5, 6.8, true);
+      custLines.slice(0,3).forEach((l,li)=>t(doc,l, cols[2].x, y+5.5+li*3.7, 6.5));
+      t(doc, norm(sale.payment),   cols[3].x, y+6.5, 6.5);
+      // Value right-aligned
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.8); doc.setTextColor(...C.primary);
+      doc.text(money(sale.amount), cols[4].x+cols[4].w, y+6.5, { align:'right' });
+      prodLines.slice(0,3).forEach((l,li)=>t(doc,l, cols[5].x, y+5.5+li*3.7, 6.2, false, C.muted));
 
-    text(doc, dateBr(sale.date), columns[0].x, y + 6, 6.8);
-    text(doc, sale.sale, columns[1].x, y + 6, 6.8, true);
-    customerLines.slice(0, 4).forEach((line, lineIndex) => text(doc, line, columns[2].x, y + 5 + lineIndex * 3.7, 6.6));
-    text(doc, sale.payment, columns[3].x, y + 6, 6.6);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.8);
-    doc.setTextColor(...COLORS.text);
-    doc.text(money(sale.amount), columns[4].x + columns[4].w, y + 6, { align: 'right' });
-    productLines.slice(0, 4).forEach((line, lineIndex) => text(doc, line, columns[5].x, y + 5 + lineIndex * 3.7, 6.2));
+      y += rowH;
+    });
+  }
 
-    y += rowH;
-  });
-
-  ensureSpace(18);
+  // ─── Total footer row ─────────────────────────────────────────────────────
+  need(18);
   y += 5;
-  roundedBox(doc, PAGE.margin, y, PAGE.width - PAGE.margin * 2, 14, COLORS.primarySoft);
-  text(doc, 'Total de vendas no periodo', PAGE.margin + 6, y + 9, 8, true, COLORS.primary);
-  const total = data.sales.reduce((sum, sale) => sum + sale.amount, 0);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...COLORS.primary);
-  doc.text(money(total), PAGE.width - PAGE.margin - 6, y + 9, { align: 'right' });
+  fillRect(doc, PAGE.margin, y, INNER, 14, C.primary);
+  t(doc,'Total do periodo', PAGE.margin+6, y+9.5, 9, true, C.white);
+  const total = data.sales.reduce((s,x)=>s+x.amount, 0);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...C.secondary);
+  doc.text(money(total), PAGE.width-PAGE.margin-6, y+9.5, { align:'right' });
+  y += 18;
 
   drawFooter(doc);
-  const filename = `relatorio-vendas-${data.currentMonth}-${new Date().toISOString().slice(0, 10)}.pdf`;
-  doc.save(filename);
+  doc.save(`relatorio-vendas-${data.currentMonth}-${new Date().toISOString().slice(0,10)}.pdf`);
 }

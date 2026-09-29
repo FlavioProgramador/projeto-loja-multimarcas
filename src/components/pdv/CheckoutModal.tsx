@@ -130,7 +130,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </span>
         </div>
 
-        {/* Change Calculator (Cash only) */}
+        {/* Calculadora de troco (somente dinheiro) */}
         {paymentMethod === 'Dinheiro' && (
           <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

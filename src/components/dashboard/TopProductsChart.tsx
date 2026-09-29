@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
 import { useTheme } from '../../contexts/ThemeContext';
+import { resolveCssColor } from '../../lib/utils';
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
@@ -13,16 +14,13 @@ export interface TopProductsChartProps {
 }
 
 const DEFAULT_COLORS = [
-  '#00674f',
-  '#3ebb9e',
   '#73E6CB',
-  '#0a3c30',
-  '#8ab8ac',
-  '#5f8f83',
-  '#bfeee1',
-  '#71817c',
-  '#45534f',
-  '#d7e3df'
+  '#3EBB9E',
+  '#7CC7B5',
+  '#D8A85E',
+  '#7EB6E6',
+  '#D98282',
+  '#A99BE8'
 ];
 
 export const TopProductsChart: React.FC<TopProductsChartProps> = ({
@@ -47,7 +45,11 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
     if (!ctx) return;
 
     const isDark = theme === 'dark';
-    const textColor = 'var(--text-secondary)';
+    const textColor = resolveCssColor('var(--text-secondary)', isDark ? '#c1d1cb' : '#52525b');
+    const surfaceColor = resolveCssColor('var(--bg-surface)', isDark ? '#0d211b' : '#ffffff');
+    const tooltipSurfaceColor = resolveCssColor('var(--bg-surface-subtle)', isDark ? '#123028' : '#eef5f2');
+    const primaryTextColor = resolveCssColor('var(--text-primary)', isDark ? '#f2f8f5' : '#18181b');
+    const borderColor = resolveCssColor('var(--border-color)', isDark ? '#25463d' : '#d7e3df');
 
     chartInstance.current = new Chart(ctx, {
       type: 'doughnut',
@@ -58,7 +60,7 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
             data: data.length ? data : [1],
             backgroundColor: (data.length ? data : [1]).map((_, i) => colors[i % colors.length]),
             borderWidth: 2,
-            borderColor: 'var(--bg-surface)'
+            borderColor: surfaceColor
           }
         ]
       },
@@ -81,10 +83,10 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
             }
           },
           tooltip: {
-            backgroundColor: isDark ? 'var(--bg-surface-subtle)' : '#ffffff',
-            titleColor: isDark ? 'var(--text-primary)' : 'var(--text-primary)',
-            bodyColor: 'var(--text-secondary)',
-            borderColor: 'var(--border-color)',
+            backgroundColor: tooltipSurfaceColor,
+            titleColor: primaryTextColor,
+            bodyColor: textColor,
+            borderColor,
             borderWidth: 1,
             padding: 8,
             cornerRadius: 6
@@ -112,4 +114,3 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
     </div>
   );
 };
-

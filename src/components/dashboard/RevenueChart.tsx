@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { useTheme } from '../../contexts/ThemeContext';
+import { resolveCssColor } from '../../lib/utils';
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -36,8 +37,12 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
     if (!ctx) return;
 
     const isDark = theme === 'dark';
-    const textColor = isDark ? 'var(--text-muted)' : 'var(--text-muted)';
-    const gridColor = isDark ? 'rgba(115,230,203,0.09)' : 'rgba(10,60,48,0.07)';
+    const textColor = resolveCssColor('var(--text-secondary)', isDark ? '#c1d1cb' : '#52525b');
+    const mutedColor = resolveCssColor('var(--text-muted)', isDark ? '#9eb1aa' : '#71717a');
+    const surfaceColor = resolveCssColor('var(--bg-surface-subtle)', isDark ? '#123028' : '#eef5f2');
+    const borderColor = resolveCssColor('var(--border-color)', isDark ? '#25463d' : '#d7e3df');
+    const primaryColor = resolveCssColor('var(--brand-primary)', isDark ? '#00A887' : '#00674f');
+    const gridColor = isDark ? 'rgba(115,230,203,0.14)' : 'rgba(10,60,48,0.12)';
 
     chartInstance.current = new Chart(ctx, {
       type: 'bar',
@@ -47,8 +52,8 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
           {
             label: 'Faturamento',
             data: data.length ? data : [0],
-            backgroundColor: color,
-            hoverBackgroundColor: color,
+            backgroundColor: color || primaryColor,
+            hoverBackgroundColor: color || primaryColor,
             borderRadius: 6
           }
         ]
@@ -61,10 +66,10 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
             display: false
           },
           tooltip: {
-            backgroundColor: isDark ? 'var(--bg-surface-subtle)' : 'var(--bg-surface)',
-            titleColor: isDark ? '#ffffff' : 'var(--text-primary)',
-            bodyColor: 'var(--brand-primary)',
-            borderColor: isDark ? 'var(--border-color)' : 'var(--border-color)',
+            backgroundColor: surfaceColor,
+            titleColor: resolveCssColor('var(--text-primary)', isDark ? '#f2f8f5' : '#18181b'),
+            bodyColor: primaryColor,
+            borderColor,
             borderWidth: 1,
             padding: 8,
             cornerRadius: 6,
@@ -79,7 +84,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
               display: false
             },
             ticks: {
-              color: textColor,
+              color: mutedColor,
               font: { size: 11, family: 'Inter' }
             }
           },
@@ -103,7 +108,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
         chartInstance.current.destroy();
       }
     };
-  }, [theme, labels, data]);
+  }, [theme, labels, data, color]);
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '280px', overflow: 'hidden' }}>

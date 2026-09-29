@@ -12,8 +12,8 @@ import { RevenueChart } from './RevenueChart';
 import { TopProductsChart } from './TopProductsChart';
 import { useTheme } from '../../contexts/ThemeContext';
 
-const CHART_COLORS_DARK = ['#3ebb9e', '#73E6CB', '#00674f', '#0a3c30'];
-const CHART_COLORS_LIGHT = ['#00674f', '#3ebb9e', '#0a3c30', '#73E6CB'];
+const CHART_COLORS_DARK = ['#73E6CB', '#3EBB9E', '#7CC7B5', '#D8A85E', '#7EB6E6', '#D98282', '#A99BE8'];
+const CHART_COLORS_LIGHT = ['#00674F', '#159A7A', '#2B7A6A', '#B07D19', '#3D79A8', '#A94D4D', '#6B5AA6'];
 
 // ─── Date Period Helpers ────────────────────────────────────────────────────────
 
@@ -109,12 +109,21 @@ function extractBaseProductName(entry: string): string {
 // ─── Normalize payment method ──────────────────────────────────────────────────
 
 function normalizePaymentMethod(raw: string): string {
-  const lower = raw.toLowerCase();
+  const lower = raw.trim().toLowerCase();
   if (lower.startsWith('pix')) return 'PIX';
-  if (lower.startsWith('cartão') || lower.startsWith('cartao') || lower.startsWith('crédito') || lower.startsWith('débito') || lower.startsWith('credito') || lower.startsWith('debito')) return 'Cartão';
+  if (
+    lower.startsWith('cartão') ||
+    lower.startsWith('cartao') ||
+    lower.startsWith('crédito') ||
+    lower.startsWith('débito') ||
+    lower.startsWith('credito') ||
+    lower.startsWith('debito') ||
+    lower === 'credit_card' ||
+    lower === 'debit_card'
+  ) return lower === 'debit_card' || lower.startsWith('débito') || lower.startsWith('debito') ? 'Cartão de Débito' : 'Cartão de Crédito';
   if (lower.startsWith('dinheiro')) return 'Dinheiro';
   if (lower.startsWith('boleto')) return 'Boleto';
-  return raw.split(' ')[0]; // First word as fallback
+  return raw || 'Não informado';
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────────
@@ -363,7 +372,7 @@ export const DashboardView: React.FC = () => {
       </div>
 
       {/* KPI Cards - 5 cards */}
-      <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+      <div className="grid-cards dashboard-kpi-grid">
         <StatCard
           label="Faturamento no Período"
           value={formatMoeda(kpis.income)}

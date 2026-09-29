@@ -4,6 +4,19 @@ export function formatMoeda(v: number): string {
   return 'R$ ' + (v || 0).toFixed(2).replace('.', ',');
 }
 
+export function resolveCssColor(value: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+
+  const match = value.match(/^var\((--[^),]+)(?:,\s*([^)]+))?\)$/);
+  if (!match) return value;
+
+  const resolved = getComputedStyle(document.documentElement)
+    .getPropertyValue(match[1])
+    .trim();
+
+  return resolved || match[2]?.trim() || fallback;
+}
+
 export function totalEstoque(prod: Product): number {
   return prod.skus.reduce((acc, s) => acc + s.qtd, 0);
 }

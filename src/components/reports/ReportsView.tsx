@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, Download, FileText, Package, RefreshCw, ShoppingBag, TrendingUp, WalletCards } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { useStore } from '../../contexts/StoreContext';
 import { formatMoeda } from '../../lib/utils';
 import { ReportsService } from '../../services/reports.service';
+import { SalesService } from '../../services/sales.service';
+import { downloadSalesReportPdf } from '../../lib/pdf/reports-pdf';
 import './reports.css';
 
 type PeriodPreset = '7d' | '30d' | '90d' | 'year' | 'custom';
@@ -32,6 +32,7 @@ export const ReportsView: React.FC = () => {
   const [moves,setMoves] = useState<Awaited<ReturnType<typeof ReportsService.getMovementSummary>>>([]);
   const [payments,setPayments] = useState<Awaited<ReturnType<typeof ReportsService.getPaymentBreakdown>>>([]);
   const [series,setSeries] = useState<Awaited<ReturnType<typeof ReportsService.getMonthlySeries>>>([]);
+  const [sales,setSales] = useState<Awaited<ReturnType<typeof SalesService.getMovements>>>([]);
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState('');
 
@@ -41,7 +42,7 @@ export const ReportsView: React.FC = () => {
     if(!activeStoreId || startDate>endDate) return;
     setLoading(true); setError('');
     try{
-      const [o,t,p,c,s,m,pay,ser] = await Promise.all([
+      const [o,t,p,c,s,m,pay,ser,salesRows] = await Promise.all([
         ReportsService.getOverview(activeStoreId,startDate,endDate),
         ReportsService.getTopProducts(activeStoreId,10),
         ReportsService.getProfitabilityByProduct(activeStoreId,startDate,endDate),
@@ -49,9 +50,10 @@ export const ReportsView: React.FC = () => {
         ReportsService.getStockStatus(activeStoreId),
         ReportsService.getMovementSummary(activeStoreId,startDate,endDate),
         ReportsService.getPaymentBreakdown(activeStoreId,startDate,endDate),
-        ReportsService.getMonthlySeries(activeStoreId,startDate,endDate)
+        ReportsService.getMonthlySeries(activeStoreId,startDate,endDate),
+        SalesService.getMovements(activeStoreId)
       ]);
-      setData(o); setTop(t); setProducts(p); setCategories(c); setStock(s); setMoves(m); setPayments(pay); setSeries(ser);
+      setData(o); setTop(t); setProducts(p); setCategories(c); setStock(s); setMoves(m); setPayments(pay); setSeries(ser); setSales(salesRows);
     }catch(e){ setError(e instanceof Error?e.message:'Erro ao carregar relatórios.'); }
     finally{ setLoading(false); }
   },[activeStoreId,startDate,endDate]);
@@ -68,28 +70,34 @@ export const ReportsView: React.FC = () => {
 
   const presetClick = (p:PeriodPreset)=>{setPreset(p); if(p!=='custom') setRange(presetRange(p));};
 
-  const exportPdf = async ()=>{
-    const element = document.getElementById('reports-print-area');
-    if(!element) return;
+  const exportPdf = () => {
+    if (!data) return;
     setLoading(true);
-    try{
-      const canvas = await html2canvas(element,{scale:2,useCORS:true,backgroundColor:null,logging:false});
-      const pdf = new jsPDF('p','mm','a4');
-      const margin = 8, pageWidth = 210, pageHeight = 297;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = canvas.height * imgWidth / canvas.width;
-      const pageContentHeight = pageHeight - margin * 2;
-      const image = canvas.toDataURL('image/png',1);
-      let offset = 0;
-      while(offset < imgHeight){
-        if(offset > 0) pdf.addPage();
-        pdf.addImage(image,'PNG',margin,margin-offset,imgWidth,imgHeight,'','FAST');
-        offset += pageContentHeight;
-      }
-      const safeStore = storeName.toLowerCase().replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'');
-      pdf.save('relatorio-'+safeStore+'-'+startDate+'-'+endDate+'.pdf');
-    }catch(e){ setError(e instanceof Error ? e.message : 'Não foi possível gerar o PDF.'); }
-    finally{ setLoading(false); }
+    try {
+      const currentMonth = startDate.slice(0, 7);
+      const previous = new Date(Number(currentMonth.slice(0, 4)), Number(currentMonth.slice(5, 7)) - 2, 1);
+      const previousMonth = previous.getFullYear() + '-' + String(previous.getMonth() + 1).padStart(2, '0');
+      downloadSalesReportPdf({
+        storeName, currentMonth, previousMonth,
+        generatedAt: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date()),
+        metrics: [
+          { label: 'Faturamento', value: formatMoeda(data.revenue), comparison: `${data.salesCount} vendas concluÃ­das` },
+          { label: 'Ticket mÃ©dio', value: formatMoeda(data.averageTicket), comparison: `${data.salesCount} pedidos no perÃ­odo` },
+          { label: 'Resultado operacional', value: formatMoeda(data.operatingResult), comparison: `Despesas: ${formatMoeda(data.expenses)}` },
+          { label: 'Estoque disponÃ­vel', value: `${data.inventoryUnits} un.`, comparison: `${lowStock} baixo estoque Â· ${outStock} sem estoque` },
+        ],
+        revenueByPayment: payments.map(x => ({ method: x.method, amount: x.amount })),
+        topProducts: top.map(x => ({ name: x.product_name, quantity: x.total_quantity_sold })),
+        sales: sales
+          .filter(x => x.tipo === 'INCOME')
+          .filter(x => !x.data || (x.data >= startDate && x.data <= endDate))
+          .map(x => ({ date: x.data, sale: x.vendaId, customer: x.comprador, payment: x.formaPagamento, amount: x.valor, products: x.produtos })),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'NÃ£o foi possÃ­vel gerar o PDF.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exportCsv = ()=>{

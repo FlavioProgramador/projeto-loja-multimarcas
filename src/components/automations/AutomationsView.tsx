@@ -1,223 +1,172 @@
-import React, { useState } from 'react';
-import { Bot, RefreshCw, FileText, CheckCircle2, AlertTriangle, XCircle, DollarSign, Zap } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Bot, CheckCircle2, Clock3, FileText, History, Pause, Play, Plus, RefreshCw, Settings2, ShieldCheck, TriangleAlert, XCircle, Zap } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { formatMoeda, hoje } from '../../lib/utils';
-import { StatusBadge } from '../ui/StatusBadge';
+import { AutomationsService, AutomationRule, AutomationRun, AUTOMATION_PRESETS } from '../../services/automations';
+import { AutomationBuilder } from './AutomationBuilder';
+import { can } from '../../lib/permissions';
+import { useAuth } from '../../contexts/AuthContext';
+
+const categoryLabels: Record<string, string> = {
+  ESTOQUE: 'Estoque', VENDAS: 'Vendas', FINANCEIRO: 'Financeiro', CLIENTES: 'Clientes',
+  PRODUTOS: 'Produtos', SISTEMA: 'Sistema', RELATORIOS: 'Relatórios',
+};
+const triggerLabels: Record<string, string> = {
+  LOW_STOCK: 'Estoque abaixo do mínimo', OUT_OF_STOCK: 'Produto esgotado',
+  EXPENSE_DUE: 'Despesa próxima do vencimento', EXPENSE_OVERDUE: 'Despesa vencida',
+  SALE_COMPLETED: 'Venda concluída', SALE_CANCELLED: 'Venda cancelada',
+  RETURN_COMPLETED: 'Troca ou devolução concluída', CUSTOMER_INACTIVE: 'Cliente sem compra',
+  PRODUCT_INACTIVE: 'Produto sem giro', REPORT_DAILY: 'Fechamento diário',
+  REPORT_WEEKLY: 'Resumo semanal', REPORT_MONTHLY: 'Resumo mensal',
+};
 
 export const AutomationsView: React.FC = () => {
-  const { products, fixedExpenses, transactions, movements, customers, checkAlerts } = useStore();
-  const [showAutoReport, setShowAutoReport] = useState(false);
-  const [lastCheckMessage, setLastCheckMessage] = useState<string | null>(null);
+  const { activeStoreId } = useStore();
+  const { profile } = useAuth();
+  const canManage = can(profile?.role, 'automations.manage');
+  const canView = can(profile?.role, 'automations.view');
+  const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [runs, setRuns] = useState<AutomationRun[]>([]);
+  const [events, setEvents] = useState<Awaited<ReturnType<typeof AutomationsService.listEvents>>>([]);
+  const [tab, setTab] = useState<'overview' | 'rules' | 'runs' | 'alerts' | 'settings'>('overview');
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [editing, setEditing] = useState<AutomationRule | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [workingId, setWorkingId] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const alertas: { type: 'warning' | 'danger' | 'finance'; text: string }[] = [];
+  const load = useCallback(async () => {
+    if (!activeStoreId || !canView) return;
+    setLoading(true);
+    try {
+      const [nextRules, nextRuns, nextEvents] = await Promise.all([
+        AutomationsService.list(activeStoreId),
+        AutomationsService.listRuns(activeStoreId, 100),
+        AutomationsService.listEvents(activeStoreId, 100),
+      ]);
+      setRules(nextRules);
+      setRuns(nextRuns);
+      setEvents(nextEvents);
+      setMessage(null);
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Não foi possível carregar as automações.' });
+    } finally {
+      setLoading(false);
+    }
+  }, [activeStoreId, canView]);
 
-  products.forEach(p => {
-    p.skus.forEach(s => {
-      if (s.qtd <= 2 && s.qtd > 0) {
-        alertas.push({
-          type: 'warning',
-          text: `${p.nome} (${s.tamanho}/${s.cor}) - Baixo estoque: ${s.qtd} un restantes`
-        });
-      }
-      if (s.qtd === 0) {
-        alertas.push({
-          type: 'danger',
-          text: `${p.nome} (${s.tamanho}/${s.cor}) - ESGOTADO (Reposição necessária)`
-        });
-      }
-    });
-  });
+  useEffect(() => { void load(); }, [load]);
 
-  fixedExpenses
-    .filter(d => !d.pago)
-    .forEach(d => {
-      const dias = Math.ceil(
-        (new Date(d.dataVencimento).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (dias <= 3 && dias >= 0) {
-        alertas.push({
-          type: 'finance',
-          text: `Conta a pagar: ${d.descricao} vence em ${dias} dias - ${formatMoeda(d.valor)}`
-        });
-      }
-    });
+  const stats = useMemo(() => ({
+    active: rules.filter(r => r.status === 'ACTIVE').length,
+    failed: runs.filter(r => r.status === 'FAILED').length,
+    today: runs.filter(r => r.started_at.slice(0, 10) === new Date().toISOString().slice(0, 10)).length,
+    completed: runs.filter(r => r.status === 'COMPLETED').length,
+    alerts: events.filter(e => ['ALERT', 'NOTIFICATION', 'INTERVENTION'].includes(e.event_type)).length,
+  }), [rules, runs, events]);
 
-  const totalVendas = transactions
-    .filter(t => t.tipo === 'INCOME')
-    .reduce((acc, t) => acc + t.valor, 0);
-  const lucro =
-    totalVendas -
-    transactions.filter(t => t.tipo === 'EXPENSE').reduce((acc, t) => acc + t.valor, 0);
-
-  const handleVerify = () => {
-    checkAlerts();
-    setLastCheckMessage('Verificação preditiva concluída. Alertas sincronizados.');
-    setTimeout(() => setLastCheckMessage(null), 4000);
+  const saveRule = async (input: Parameters<typeof AutomationsService.create>[1]) => {
+    if (!activeStoreId || !canManage) return;
+    if (editing) await AutomationsService.update(activeStoreId, editing.id, input);
+    else await AutomationsService.create(activeStoreId, input);
+    setBuilderOpen(false);
+    setEditing(null);
+    setMessage({ type: 'success', text: editing ? 'Automação atualizada.' : 'Automação criada como pausada. Ative-a quando estiver pronta.' });
+    await load();
   };
 
+  const setStatus = async (rule: AutomationRule) => {
+    if (!activeStoreId || !canManage || workingId) return;
+    setWorkingId(rule.id);
+    try {
+      await AutomationsService.setStatus(activeStoreId, rule.id, rule.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE');
+      await load();
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Não foi possível alterar o status.' });
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
+  const testRule = async (rule: AutomationRule) => {
+    if (!activeStoreId || !canManage || workingId) return;
+    setWorkingId(rule.id);
+    try {
+      const result = await AutomationsService.test(activeStoreId, rule.id);
+      setMessage({ type: 'success', text: result.message || 'Teste concluído. Nenhuma ação operacional foi executada.' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Falha no teste.' });
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
+  if (!canView) {
+    return <div className="module-fade"><div className="card automation-access-denied">
+      <ShieldCheck size={24} /><h2>Acesso não disponível</h2>
+      <p>Seu perfil não possui permissão para consultar as automações desta loja.</p>
+    </div></div>;
+  }
+
   return (
-    <div className="module-fade">
-      {/* Page Header */}
+    <div className="module-fade automation-module">
       <div className="page-header">
-        <div>
-          <h1 className="page-title">Automações & Inteligência Preditiva</h1>
-          <p className="page-subtitle">Monitoramento de estoque mínimo, vencimento de duplicatas e relatórios executivos.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-outline" onClick={handleVerify}>
-            <RefreshCw size={16} /> Sincronizar Regras
-          </button>
-          <button className="btn" onClick={() => setShowAutoReport(prev => !prev)}>
-            <FileText size={16} /> {showAutoReport ? 'Ocultar Relatório' : 'Relatório Executivo'}
-          </button>
+        <div><h1 className="page-title">Automações</h1><p className="page-subtitle">Configure regras para acompanhar a operação da loja e agir no momento certo.</p></div>
+        <div className="automation-header-actions">
+          <button className="btn btn-outline" onClick={() => void load()} disabled={loading}><RefreshCw size={16} /> Atualizar</button>
+          {canManage && <button className="btn" onClick={() => { setEditing(null); setBuilderOpen(true); }}><Plus size={16} /> Nova automação</button>}
         </div>
       </div>
 
-      {lastCheckMessage && (
-        <div
-          style={{
-            background: 'var(--badge-green)',
-            color: '#ffffff',
-            padding: '12px 16px',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '16px',
-            fontSize: '13px',
-            fontWeight: 600
-          }}
-        >
-          {lastCheckMessage}
-        </div>
-      )}
+      {message && <div className={'automation-message ' + message.type}>{message.type === 'success' ? <CheckCircle2 size={16} /> : <TriangleAlert size={16} />}<span>{message.text}</span><button onClick={() => setMessage(null)} aria-label="Fechar mensagem">×</button></div>}
 
-      {/* Main Card */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Bot size={18} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Fila de Alertas & Diagnósticos
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Regras ativas de verificação contínua</p>
-            </div>
-          </div>
-          <span className="badge-status neutral">{alertas.length} avisos</span>
-        </div>
-
-        <div>
-          {alertas.length === 0 ? (
-            <div
-              style={{
-                color: 'var(--badge-green)',
-                padding: '24px 0',
-                fontSize: '13.5px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <CheckCircle2 size={18} /> Excelente! Todos os produtos e pagamentos estão 100% regulares.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {alertas.map((a, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: '12px 14px',
-                    border: '1px solid var(--border-color)',
-                    background: 'var(--bg-surface-subtle)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '13px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}
-                >
-                  {a.type === 'warning' && (
-                    <AlertTriangle size={16} style={{ color: 'var(--badge-yellow)', flexShrink: 0 }} />
-                  )}
-                  {a.type === 'danger' && (
-                    <XCircle size={16} style={{ color: 'var(--badge-red)', flexShrink: 0 }} />
-                  )}
-                  {a.type === 'finance' && (
-                    <DollarSign size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                  )}
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{a.text}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="automation-stat-grid">
+        <div className="automation-stat"><div><span>Automações ativas</span><strong>{stats.active}</strong></div><Play size={18} /></div>
+        <div className="automation-stat"><div><span>Execuções hoje</span><strong>{stats.today}</strong></div><Clock3 size={18} /></div>
+        <div className="automation-stat"><div><span>Falhas</span><strong>{stats.failed}</strong></div><XCircle size={18} /></div>
+        <div className="automation-stat"><div><span>Concluídas</span><strong>{stats.completed}</strong></div><CheckCircle2 size={18} /></div>
       </div>
 
-      {/* Auto Executive Report */}
-      {showAutoReport && (
-        <div
-          className="card"
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--primary)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '20px',
-            boxShadow: 'var(--shadow-md)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-            <Zap size={18} style={{ color: 'var(--primary)' }} />
-            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Relatório Executivo Automático — {hoje()}
-            </h3>
-          </div>
+      <div className="automation-tabs" role="tablist">
+        {([['overview', 'Visão geral'], ['rules', 'Automações'], ['runs', 'Execuções'], ['alerts', 'Alertas'], ['settings', 'Configurações']] as const).map(([value, label]) =>
+          <button key={value} className={tab === value ? 'active' : ''} onClick={() => setTab(value)} role="tab">{label}</button>
+        )}
+      </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '12px'
-            }}
-          >
-            <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Faturamento Total</span>
-              <div style={{ fontWeight: 700, fontSize: '18px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginTop: '2px' }}>
-                {formatMoeda(totalVendas)}
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Lucro Líquido</span>
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: '18px',
-                  fontFamily: 'var(--font-mono)',
-                  color: lucro >= 0 ? 'var(--badge-green)' : 'var(--badge-red)',
-                  marginTop: '2px'
-                }}
-              >
-                {formatMoeda(lucro)}
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Total de Pedidos</span>
-              <div style={{ fontWeight: 700, fontSize: '18px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', marginTop: '2px' }}>
-                {movements.length} vendas
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Base de Clientes</span>
-              <div style={{ fontWeight: 700, fontSize: '18px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginTop: '2px' }}>
-                {customers.length} cadastrados
-              </div>
-            </div>
-          </div>
+      {tab === 'overview' && <div className="automation-overview-grid">
+        <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Operação automatizada</h2><p>Visão rápida das regras disponíveis.</p></div><Bot size={20} /></div>
+          <div className="automation-category-list">{Object.entries(categoryLabels).map(([key, label]) => <div key={key}><span>{label}</span><strong>{rules.filter(r => r.category === key).length}</strong></div>)}</div>
         </div>
-      )}
+        <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Modelos prontos</h2><p>Comece com uma configuração predefinida.</p></div><Settings2 size={20} /></div>
+          <div className="automation-preset-grid">{AUTOMATION_PRESETS.slice(0, 4).map(p => <button key={p.name} onClick={() => { setEditing(null); setBuilderOpen(true); }}><strong>{p.name}</strong><span>{p.description}</span></button>)}</div>
+        </div>
+        <div className="card automation-panel full"><div className="automation-panel-head"><div><h2>Últimas execuções</h2><p>Processamento recente das regras.</p></div><History size={20} /></div>
+          <div className="automation-run-list">{runs.slice(0, 8).map(run => <div key={run.id}><span>{triggerLabels[run.event_type] || run.event_type}</span><strong className={'run-status ' + run.status.toLowerCase()}>{run.status}</strong><time>{new Date(run.started_at).toLocaleString('pt-BR')}</time></div>)}{!runs.length && <div className="automation-empty">Ainda não existem execuções registradas.</div>}</div>
+        </div>
+      </div>}
+
+      {tab === 'rules' && <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Suas automações</h2><p>Ative, pause e teste suas regras.</p></div>{canManage && <button className="btn" onClick={() => { setEditing(null); setBuilderOpen(true); }}><Plus size={16} /> Nova</button>}</div>
+        <div className="automation-table-wrap"><table><thead><tr><th>Automação</th><th>Categoria</th><th>Gatilho</th><th>Status</th><th>Execuções</th><th>Ações</th></tr></thead>
+          <tbody>{rules.map(rule => <tr key={rule.id}><td><strong>{rule.name}</strong><small>{rule.description || 'Sem descrição'}</small></td><td>{categoryLabels[rule.category] || rule.category}</td><td>{triggerLabels[rule.trigger] || rule.trigger}</td><td><span className={'automation-status ' + rule.status.toLowerCase()}>{rule.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}</span></td><td>{rule.execution_count}</td><td><div className="automation-row-actions">{canManage && <><button title="Editar" onClick={() => { setEditing(rule); setBuilderOpen(true); }}><Settings2 size={15} /></button><button title={rule.status === 'ACTIVE' ? 'Pausar' : 'Ativar'} onClick={() => void setStatus(rule)} disabled={workingId === rule.id}>{rule.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}</button><button title="Testar" onClick={() => void testRule(rule)} disabled={workingId === rule.id}><Zap size={15} /></button></>}</div></td></tr>)}{!rules.length && <tr><td colSpan={6} className="automation-empty">Nenhuma automação cadastrada.</td></tr>}</tbody>
+        </table></div>
+      </div>}
+
+      {tab === 'runs' && <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Histórico de execuções</h2><p>Resultados e falhas das automações.</p></div><History size={20} /></div>
+        <div className="automation-table-wrap"><table><thead><tr><th>Data</th><th>Evento</th><th>Status</th><th>Duração</th><th>Erro</th></tr></thead>
+          <tbody>{runs.map(run => <tr key={run.id}><td>{new Date(run.started_at).toLocaleString('pt-BR')}</td><td>{triggerLabels[run.event_type] || run.event_type}</td><td><span className={'run-status ' + run.status.toLowerCase()}>{run.status}</span></td><td>{run.duration_ms ? run.duration_ms + ' ms' : '—'}</td><td>{run.error_message || '—'}</td></tr>)}{!runs.length && <tr><td colSpan={5} className="automation-empty">Nenhuma execução registrada.</td></tr>}</tbody>
+        </table></div>
+      </div>}
+
+      {tab === 'alerts' && <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Alertas operacionais</h2><p>Eventos registrados pelas automações da loja.</p></div><TriangleAlert size={20} /></div>
+        <div className="automation-alert-list">{events.filter(event => ['ALERT', 'NOTIFICATION', 'INTERVENTION'].includes(event.event_type)).map(event => <div key={event.id}><div><strong>{String(event.payload.title || event.event_type)}</strong><span>{String(event.payload.message || 'Evento registrado')}</span></div><time>{new Date(event.created_at).toLocaleString('pt-BR')}</time></div>)}{!events.filter(event => ['ALERT', 'NOTIFICATION', 'INTERVENTION'].includes(event.event_type)).length && <div className="automation-empty">Nenhum alerta registrado.</div>}</div>
+      </div>}
+
+      {tab === 'settings' && <div className="automation-settings-grid"><div className="card automation-panel"><div className="automation-panel-head"><div><h2>Configurações do módulo</h2><p>Princípios aplicados à operação das automações.</p></div><Settings2 size={20} /></div>
+        <div className="automation-setting-row"><span>Execução crítica no navegador</span><strong>Desativada</strong></div><div className="automation-setting-row"><span>Ações destrutivas automáticas</span><strong>Bloqueadas</strong></div><div className="automation-setting-row"><span>Isolamento por loja</span><strong>Obrigatório</strong></div>
+      </div><div className="card automation-panel"><div className="automation-panel-head"><div><h2>Modelos disponíveis</h2><p>{AUTOMATION_PRESETS.length} modelos iniciais.</p></div><FileText size={20} /></div>
+        <div className="automation-preset-list">{AUTOMATION_PRESETS.map(p => <div key={p.name}><strong>{p.name}</strong><span>{categoryLabels[p.category]}</span></div>)}</div>
+      </div></div>}
+
+      {builderOpen && <AutomationBuilder initial={editing} onClose={() => { setBuilderOpen(false); setEditing(null); }} onSave={saveRule} />}
     </div>
   );
 };

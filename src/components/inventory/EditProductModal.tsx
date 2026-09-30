@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Plus, X, Boxes } from 'lucide-react';
+import { Edit2, Plus, X, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 import { Product, ProductSku } from '../../types';
@@ -8,9 +8,10 @@ interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product | null;
+  onSuccess?: (message: string) => void;
 }
 
-export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, product }) => {
+export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, product, onSuccess }) => {
   const { updateProduct } = useStore();
 
   const [nome, setNome] = useState('');
@@ -18,6 +19,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
   const [categoria, setCategoria] = useState('');
   const [preco, setPreco] = useState('');
   const [skus, setSkus] = useState<ProductSku[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (product) {
@@ -26,24 +28,28 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
       setCategoria(product.categoria);
       setPreco(product.preco.toString());
       setSkus(product.skus.map(s => ({ ...s })));
+      setError(null);
     }
   }, [product]);
 
   if (!product) return null;
 
   const handleAddSku = () => {
+    setError(null);
     setSkus(prev => [...prev, { tamanho: 'M', cor: 'Padrão', qtd: 0 }]);
   };
 
   const handleRemoveSku = (index: number) => {
     if (skus.length <= 1) {
-      alert('Mantenha pelo menos uma variação cadastrada.');
+      setError('Mantenha pelo menos uma variação cadastrada.');
       return;
     }
+    setError(null);
     setSkus(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSkuChange = (index: number, field: keyof ProductSku, val: string | number) => {
+    setError(null);
     setSkus(prev => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: val };
@@ -52,14 +58,28 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
   };
 
   const handleSave = () => {
+    setError(null);
+    if (!nome.trim()) {
+      setError('O nome do produto é obrigatório.');
+      return;
+    }
+    if (!marca.trim()) {
+      setError('A marca do produto é obrigatória.');
+      return;
+    }
+    if (!categoria.trim()) {
+      setError('A categoria do produto é obrigatória.');
+      return;
+    }
+
     const numPreco = parseFloat(preco);
-    if (!nome.trim() || !marca.trim() || !categoria.trim() || isNaN(numPreco) || numPreco <= 0) {
-      alert('Preencha todos os campos obrigatórios.');
+    if (isNaN(numPreco) || numPreco <= 0) {
+      setError('Informe um preço de venda válido maior que R$ 0,00.');
       return;
     }
 
     if (skus.length === 0) {
-      alert('Adicione pelo menos uma variação.');
+      setError('Adicione pelo menos uma variação.');
       return;
     }
 
@@ -77,8 +97,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
       }))
     });
 
+    if (onSuccess) {
+      onSuccess(`✅ Produto "${nome.trim()}" atualizado com sucesso!`);
+    }
     onClose();
-    alert('Produto atualizado com sucesso!');
   };
 
   return (
@@ -93,6 +115,28 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
       }
       maxWidth="540px"
     >
+      {error && (
+        <div
+          role="alert"
+          style={{
+            background: 'var(--badge-red-bg, rgba(239, 68, 68, 0.1))',
+            color: 'var(--badge-red, #ef4444)',
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '14px',
+            fontSize: '13px',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            border: '1px solid var(--border-color, rgba(239, 68, 68, 0.2))'
+          }}
+        >
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div className="form-group">
         <label>Nome do Produto *</label>
         <input value={nome} onChange={e => setNome(e.target.value)} />

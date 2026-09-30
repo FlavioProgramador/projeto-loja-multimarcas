@@ -104,6 +104,13 @@ export const AutomationsService = {
     });
   },
 
+  async remove(storeId: string, id: string): Promise<AutomationMutationResult> {
+    return rpc<AutomationMutationResult>('delete_automation_rule', {
+      p_store_id: storeId,
+      p_automation_id: id,
+    });
+  },
+
   async test(storeId: string, id: string): Promise<AutomationMutationResult> {
     return rpc<AutomationMutationResult>('test_automation_rule', {
       p_store_id: storeId,

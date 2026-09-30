@@ -26,6 +26,7 @@ import { hoje } from '../lib/utils';
 import { useCustomersDomain } from '../hooks/domains/useCustomersDomain';
 import { useProductsDomain } from '../hooks/domains/useProductsDomain';
 import { useSuppliersDomain } from '../hooks/domains/useSuppliersDomain';
+import { useFinanceDomain } from '../hooks/domains/useFinanceDomain';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
   ProductsService,
@@ -326,6 +327,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const suppliersDomain = useSuppliersDomain(suppliers, setSuppliers, refreshData);
+  const financeDomain = useFinanceDomain(fixedExpenses, setFixedExpenses);
 
   const registerStockEntry = async (params: {
     productName: string;
@@ -665,19 +667,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
     return { success: true, message: `Troca/Devolução #${returnCode} processada com sucesso!`, returnRecord: newReturnRecord };
   };
-  const toggleExpensePaid = async (id: number) => {
-    const exp = fixedExpenses.find(e => e.id === id);
-    if (!exp) return;
-
-    setFixedExpenses(prev =>
-      prev.map(e => (e.id === id ? { ...e, pago: !e.pago } : e))
-    );
-
-    if (isSupabaseConfigured && exp.uuid) {
-      await FinanceService.toggleExpensePaid(exp.uuid, exp.pago);
-    }
-  };
-
   const checkAlerts = () => {
     const alerts: string[] = [];
     products.forEach(p => {
@@ -725,7 +714,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         registerStockEntry,
         processSale,
         processReturn,
-        toggleExpensePaid,
+        toggleExpensePaid: financeDomain.toggleExpensePaid,
         addCustomer: customersDomain.addCustomer,
         updateCustomer: customersDomain.updateCustomer,
         deleteCustomer: customersDomain.deleteCustomer,

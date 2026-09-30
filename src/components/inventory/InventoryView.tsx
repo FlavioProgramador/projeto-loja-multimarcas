@@ -60,6 +60,13 @@ export const InventoryView: React.FC = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
+
+  const showBanner = (message: string) => {
+    setNotificationBanner(message);
+    setTimeout(() => setNotificationBanner(null), 4000);
+  };
 
   const brands = useMemo(
     () => Array.from(new Set(products.map(product => product.marca).filter(Boolean))).sort(),
@@ -140,10 +147,15 @@ export const InventoryView: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleDelete = (id: number, name: string) => {
-    if (window.confirm(`Tem certeza que deseja remover o produto "${name}" permanentemente?`)) {
-      deleteProduct(id);
-    }
+  const handleDelete = (product: Product) => {
+    setDeletingProduct(product);
+  };
+
+  const confirmDeleteProduct = () => {
+    if (!deletingProduct) return;
+    deleteProduct(deletingProduct.id);
+    showBanner(`🗑️ Produto "${deletingProduct.nome}" foi removido com sucesso.`);
+    setDeletingProduct(null);
   };
 
   const clearFilters = () => {
@@ -176,11 +188,11 @@ export const InventoryView: React.FC = () => {
       </button>
       <button
         className="inventory-icon-action"
-        onClick={() => handleDelete(product.id, product.nome)}
+        onClick={() => handleDelete(product)}
         title="Remover produto"
         aria-label={`Remover ${product.nome}`}
       >
-        <MoreHorizontal size={17} />
+        <Trash2 size={15} />
       </button>
     </div>
   );
@@ -220,6 +232,23 @@ export const InventoryView: React.FC = () => {
 
   return (
     <div className="module-fade inventory-page">
+      {notificationBanner && (
+        <div
+          style={{
+            background: notificationBanner.includes('🗑️') ? 'var(--badge-red)' : 'var(--badge-green)',
+            color: '#fff',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-lg)',
+            marginBottom: '16px',
+            fontSize: '13.5px',
+            fontWeight: 600,
+            boxShadow: 'var(--shadow-md)'
+          }}
+        >
+          {notificationBanner}
+        </div>
+      )}
+
       <div className="inventory-breadcrumbs">
         <span>Produtos</span>
         <ChevronRight size={13} />
@@ -419,7 +448,68 @@ export const InventoryView: React.FC = () => {
 
       <NewProductModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} />
       <StockEntryModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} />
-      <EditProductModal isOpen={!!editingProduct} onClose={() => setEditingProduct(null)} product={editingProduct} />
+      <EditProductModal
+        isOpen={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        product={editingProduct}
+        onSuccess={msg => showBanner(msg)}
+      />
+
+      {/* Modal de Confirmação para Remoção de Produto */}
+      {deletingProduct && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '400px',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Remover Produto
+            </h3>
+            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              Tem certeza que deseja remover o produto <strong>"{deletingProduct.nome}"</strong> permanentemente? Esta ação não pode ser desfeita.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setDeletingProduct(null)}
+                style={{ fontSize: '13px', padding: '8px 14px' }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={confirmDeleteProduct}
+                style={{ fontSize: '13px', padding: '8px 14px', background: 'var(--badge-red)', color: '#fff', border: 'none' }}
+              >
+                Sim, remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -25,6 +25,7 @@ import {
 import { hoje } from '../lib/utils';
 import { useCustomersDomain } from '../hooks/domains/useCustomersDomain';
 import { useProductsDomain } from '../hooks/domains/useProductsDomain';
+import { useSuppliersDomain } from '../hooks/domains/useSuppliersDomain';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
   ProductsService,
@@ -323,6 +324,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     refreshData,
     isSupabaseConfigured,
   });
+
+  const suppliersDomain = useSuppliersDomain(suppliers, setSuppliers, refreshData);
 
   const registerStockEntry = async (params: {
     productName: string;
@@ -675,29 +678,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const addSupplier = async (data: Omit<Supplier, 'id' | 'produtos'>) => {
-    if(isSupabaseConfigured){await SuppliersService.create(data);await refreshData();return;}
-    const nextId=suppliers.reduce((max,s)=>Math.max(max,s.id),0)+1;
-    setSuppliers(prev=>[...prev,{id:nextId,...data,produtos:[]}]);
-  };
-
-  const updateSupplier = async (id:number|string,data:Partial<Supplier>) => {
-    const target=suppliers.find(s=>String(s.id)===String(id)); if(!target)return;
-    const snapshot=suppliers; setSuppliers(prev=>prev.map(s=>String(s.id)===String(id)?{...s,...data}:s));
-    if(isSupabaseConfigured){
-      if(!target.uuid){setSuppliers(snapshot);throw new Error('Fornecedor sem UUID do Supabase. Atualização cancelada.');}
-      try{await SuppliersService.update(target.uuid,data);await refreshData();}catch(err){setSuppliers(snapshot);throw err;}
-    }
-  };
-
-  const deleteSupplier = async (id:number|string) => {
-    const target=suppliers.find(s=>String(s.id)===String(id)); if(!target)return;
-    const snapshot=suppliers; setSuppliers(prev=>prev.filter(s=>String(s.id)!==String(id)));
-    if(isSupabaseConfigured){
-      if(!target.uuid){setSuppliers(snapshot);throw new Error('Fornecedor sem UUID do Supabase. Exclusão cancelada.');}
-      try{await SuppliersService.remove(target.uuid);await refreshData();}catch(err){setSuppliers(snapshot);throw err;}
-    }
-  };
   const checkAlerts = () => {
     const alerts: string[] = [];
     products.forEach(p => {
@@ -749,9 +729,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addCustomer: customersDomain.addCustomer,
         updateCustomer: customersDomain.updateCustomer,
         deleteCustomer: customersDomain.deleteCustomer,
-        addSupplier,
-        updateSupplier,
-        deleteSupplier,
+        addSupplier: suppliersDomain.addSupplier,
+        updateSupplier: suppliersDomain.updateSupplier,
+        deleteSupplier: suppliersDomain.deleteSupplier,
         checkAlerts,
         refreshData
       }}

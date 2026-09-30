@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   DollarSign, ShoppingBag, TrendingUp, AlertTriangle,
   ArrowRight, Plus, Calendar, Trophy, CreditCard,
@@ -131,9 +131,35 @@ function normalizePaymentMethod(raw: string): string {
 // ─── Component ──────────────────────────────────────────────────────────────────
 
 export const DashboardView: React.FC = () => {
-  const { transactions, movements, products, notifications } = useStore();
+  const { transactions, movements, products, notifications, refreshData } = useStore();
   const { theme } = useTheme();
   const [period, setPeriod] = useState<PeriodKey>('mes');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date>(new Date());
+
+  const refreshDashboard = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+      setLastUpdatedAt(new Date());
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshData, isRefreshing]);
+
+  useEffect(() => {
+    const initialSync = window.setTimeout(() => {
+      void refreshDashboard();
+    }, 500);
+    const interval = window.setInterval(() => {
+      void refreshDashboard();
+    }, 60000);
+    return () => {
+      window.clearTimeout(initialSync);
+      window.clearInterval(interval);
+    };
+  }, [refreshDashboard]);
 
   const activeColors = theme === 'dark' ? CHART_COLORS_DARK : CHART_COLORS_LIGHT;
 
@@ -329,7 +355,13 @@ export const DashboardView: React.FC = () => {
           <h1 className="page-title">Visão Geral</h1>
           <p className="page-subtitle">Acompanhe os principais indicadores da sua operação varejista em tempo real.</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            Atualizado às {lastUpdatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <button className="btn btn-outline" onClick={() => void refreshDashboard()} disabled={isRefreshing}>
+            {isRefreshing ? 'Atualizando...' : 'Atualizar'}
+          </button>
           {/* Period Selector */}
           <div style={{
             display: 'flex',

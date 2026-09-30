@@ -23,6 +23,7 @@ import {
   INITIAL_NOTIFICATIONS
 } from '../data/initialData';
 import { hoje } from '../lib/utils';
+import { useCustomersDomain } from '../hooks/domains/useCustomersDomain';
 import { useProductsDomain } from '../hooks/domains/useProductsDomain';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
@@ -312,6 +313,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!isAuthorized) return;
     localStorage.setItem('erp_notifications', JSON.stringify(notifications));
   }, [isAuthorized, notifications]);
+
+  const customersDomain = useCustomersDomain(customers, setCustomers, activeStoreId, refreshData);
 
   const { addProduct, updateProduct, deleteProduct } = useProductsDomain({
     products,
@@ -672,35 +675,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const addCustomer = async (data: Omit<Customer, 'id' | 'historico'>) => {
-    if (isSupabaseConfigured) {
-      if (!activeStoreId) throw new Error('Nenhuma loja ativa selecionada.');
-      await CustomersService.create(data, activeStoreId);
-      await refreshData();
-      return;
-    }
-    const nextId = customers.reduce((max,c)=>Math.max(max,c.id),0)+1;
-    setCustomers(prev=>[...prev,{ id: nextId, ...data, saldoCredito: 0, historico: [] }]);
-  };
-
-  const updateCustomer = async (id: number | string, data: Partial<Customer>) => {
-    const target=customers.find(c=>String(c.id)===String(id)); if(!target) return;
-    const snapshot=customers; setCustomers(prev=>prev.map(c=>String(c.id)===String(id)?{...c,...data}:c));
-    if(isSupabaseConfigured){
-      if(!target.uuid){setCustomers(snapshot);throw new Error('Cliente sem UUID do Supabase. Atualização cancelada.');}
-      try{await CustomersService.update(target.uuid,data);await refreshData();}catch(err){setCustomers(snapshot);throw err;}
-    }
-  };
-
-  const deleteCustomer = async (id: number | string) => {
-    const target=customers.find(c=>String(c.id)===String(id)); if(!target) return;
-    const snapshot=customers; setCustomers(prev=>prev.filter(c=>String(c.id)!==String(id)));
-    if(isSupabaseConfigured){
-      if(!target.uuid){setCustomers(snapshot);throw new Error('Cliente sem UUID do Supabase. Exclusão cancelada.');}
-      try{await CustomersService.remove(target.uuid);await refreshData();}catch(err){setCustomers(snapshot);throw err;}
-    }
-  };
-
   const addSupplier = async (data: Omit<Supplier, 'id' | 'produtos'>) => {
     if(isSupabaseConfigured){await SuppliersService.create(data);await refreshData();return;}
     const nextId=suppliers.reduce((max,s)=>Math.max(max,s.id),0)+1;
@@ -772,9 +746,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         processSale,
         processReturn,
         toggleExpensePaid,
-        addCustomer,
-        updateCustomer,
-        deleteCustomer,
+        addCustomer: customersDomain.addCustomer,
+        updateCustomer: customersDomain.updateCustomer,
+        deleteCustomer: customersDomain.deleteCustomer,
         addSupplier,
         updateSupplier,
         deleteSupplier,

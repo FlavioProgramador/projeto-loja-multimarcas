@@ -27,6 +27,8 @@ import { useCustomersDomain } from '../hooks/domains/useCustomersDomain';
 import { useProductsDomain } from '../hooks/domains/useProductsDomain';
 import { useSuppliersDomain } from '../hooks/domains/useSuppliersDomain';
 import { useFinanceDomain } from '../hooks/domains/useFinanceDomain';
+import { useReturnsDomain } from '../hooks/domains/useReturnsDomain';
+import { useSalesDomain } from '../hooks/domains/useSalesDomain';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
   ProductsService,
@@ -407,62 +409,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ]);
   };
 
-  const processSale = useSalesDomain({
-    activeStoreId,
-    isSupabaseConfigured,
-    movements,
-    transactions,
-    setProducts,
-    setMovements,
-    setCustomers,
-    setTransactions,
-    checkAlerts,
-    refreshData,
-  }).processSale;
-
-  const processReturn = async ({
-    clienteNome, clienteCpf, vendaOriginalId, itens, tipoResolucao, observacoes
-  }: {
-    clienteNome: string; clienteCpf: string; vendaOriginalId?: string; itens: ReturnItem[];
-    tipoResolucao: 'credito_cliente' | 'vale_troca' | 'estorno_dinheiro'; observacoes?: string;
-  }): Promise<{ success: boolean; message: string; returnRecord: ReturnRecord }> => {
-    if (itens.length === 0) return { success: false, message: 'Nenhum item informado.', returnRecord: {} as ReturnRecord };
-    const normalizedItems = itens.map(item => ({ ...item, qtd: Number(item.qtd), precoUnitario: Number(item.precoUnitario) }));
-    if (normalizedItems.some(item => !Number.isInteger(item.qtd) || item.qtd <= 0))
-      return { success: false, message: 'Quantidade de devolução inválida.', returnRecord: {} as ReturnRecord };
-
-    if (isSupabaseConfigured) {
-      if (!activeStoreId) return { success: false, message: 'Nenhuma loja ativa selecionada.', returnRecord: {} as ReturnRecord };
-      if (!vendaOriginalId || !/^[0-9a-f-]{36}$/i.test(vendaOriginalId))
-        return { success: false, message: 'Em produção, a devolução deve estar vinculada ao UUID da venda original.', returnRecord: {} as ReturnRecord };
-      try {
-        const result = await ReturnsService.processReturn({
-          storeId: activeStoreId, originalSaleId: vendaOriginalId, customerName: clienteNome, customerCpf: clienteCpf,
-          items: normalizedItems, resolutionType: tipoResolucao, observations: observacoes
-        });
-        if (!result.success) return { success: false, message: result.message, returnRecord: {} as ReturnRecord };
-        await refreshData();
-        return { success: true, message: result.message, returnRecord: result.returnRecord };
-      } catch (err) {
-        console.error('Erro ao processar devolução no Supabase:', err);
-        return { success: false, message: err instanceof Error ? err.message : 'Erro ao processar devolução.', returnRecord: {} as ReturnRecord };
-      }
-    }
-
-    const totalReturnAmount = normalizedItems.reduce((sum, item) => sum + item.precoUnitario * item.qtd, 0);
-    const returnIdNum = returns.length + 1001; const returnCode = `DEV-${returnIdNum}`; const currentDate = hoje();
-    const newReturnRecord: ReturnRecord = { id: returnIdNum, codigo: returnCode, data: currentDate, vendaOriginalId,
-      clienteNome: clienteNome.trim() || 'Consumidor Final', clienteCpf: clienteCpf.trim() || 'Não informado',
-      itens: normalizedItems, valorTotal: totalReturnAmount, tipoResolucao, status: 'CONCLUIDO',
-      dataValidade: new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10), observacoes };
-    setReturns(prev => [newReturnRecord, ...prev]);
-    setProducts(prev => prev.map(prod => {
-      const items = normalizedItems.filter(i => i.produtoId === prod.id || (prod.uuid && i.productUuid === prod.uuid));
-      if (!items.length) return prod;
-      return { ...prod, skus: prod.skus.map(sku => { const match=items.find(i => i.tamanho.trim().toLowerCase()===sku.tamanho.trim().toLowerCase() && i.cor.trim().toLowerCase()===sku.cor.trim().toLowerCase()); return match ? { ...sku, qtd: sku.qtd + match.qtd } : sku; }) };
-    }));
-    return { success: true, message: `Troca/Devolução #${returnCode} processada com sucesso!`, returnRecord: newReturnRecord };
-  };
   const checkAlerts = () => {
     const alerts: string[] = [];
     products.forEach(p => {
@@ -488,6 +434,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setNotifications(prev => Array.from(new Set([...prev, ...alerts])));
   };
+
+  const processSale = useSalesDomain({
+    activeStoreId,
+    isSupabaseConfigured,
+    movements,
+    transactions,
+    setProducts,
+    setMovements,
+    setCustomers,
+    setTransactions,
+    checkAlerts,
+    refreshData,
+  }).processSale;
+
+
+  const processReturn = useReturnsDomain({
+    activeStoreId,
+    isSupabaseConfigured,
+    returns,
+    setReturns,
+    setProducts,
+    refreshData,
+  }).processReturn;
+
 
   return (
     <StoreContext.Provider

@@ -115,7 +115,7 @@ export const SuppliersView: React.FC = () => {
         <div>
           <div className="breadcrumb-overline">CADASTROS / FORNECEDORES</div>
           <h1 className="page-title">Fornecedores</h1>
-          <p className="page-subtitle">Cadastro, contatos e informações comerciais sincronizados com o banco da loja.</p>
+          <p className="page-subtitle">Cadastro, contatos e informações comerciais organizados para sua operação.</p>
         </div>
         <div className="suppliers-head-actions">
           <button className="btn btn-outline btn-sm" onClick={() => refreshData()} disabled={isLoading}>
@@ -128,11 +128,11 @@ export const SuppliersView: React.FC = () => {
         <article className="supplier-stat-card"><span className="supplier-stat-icon"><Truck size={18} /></span><div><small>Fornecedores</small><strong>{metrics.total}</strong><span>na base ativa</span></div></article>
         <article className="supplier-stat-card"><span className="supplier-stat-icon"><Mail size={18} /></span><div><small>Com e-mail</small><strong>{metrics.withEmail}</strong><span>contatos comerciais</span></div></article>
         <article className="supplier-stat-card"><span className="supplier-stat-icon"><Phone size={18} /></span><div><small>Com telefone</small><strong>{metrics.withPhone}</strong><span>contatos disponíveis</span></div></article>
-        <article className="supplier-stat-card"><span className="supplier-stat-icon"><Building2 size={18} /></span><div><small>Contexto</small><strong>{activeStoreId ? 'Loja ativa' : 'Aguardando'}</strong><span>fonte Supabase</span></div></article>
+        <article className="supplier-stat-card"><span className="supplier-stat-icon"><Building2 size={18} /></span><div><small>Contexto</small><strong>{activeStoreId ? 'Loja ativa' : 'Aguardando'}</strong><span>operação atual</span></div></article>
       </section>
       <section className="card suppliers-list-card">
         <div className="suppliers-list-heading">
-          <div><strong><UsersRound size={16} /> Base de fornecedores</strong><span>UUID do Supabase preservado; escopo de loja preparado para a evolução multi-tenant.</span></div>
+          <div><strong><UsersRound size={16} /> Base de fornecedores</strong><span>Dados organizados para a operação da loja ativa.</span></div>
           <span className="suppliers-result-count">{filteredSuppliers.length} de {suppliers.length}</span>
         </div>
         <div className="suppliers-toolbar">

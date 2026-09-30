@@ -76,7 +76,7 @@ export const SupplierForm: React.FC<Props> = ({ isOpen, supplier, saving = false
     <form className="supplier-form" onSubmit={submit}>
       <div className="supplier-form-intro">
         <strong>{supplier ? 'Atualize os dados comerciais' : 'Cadastre um fornecedor'}</strong>
-        <span>Os dados são persistidos no Supabase e o UUID do banco é preservado.</span>
+        <span>Os dados são salvos com segurança e ficam disponíveis para a loja ativa.</span>
       </div>
       <div className="supplier-form-section">
         <h3><Building2 size={15} /> Empresa</h3>

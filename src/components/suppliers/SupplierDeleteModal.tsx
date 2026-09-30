@@ -17,7 +17,7 @@ export const SupplierDeleteModal: React.FC<Props> = ({ supplier, deleting = fals
     <div className="supplier-delete-dialog">
       <div className="supplier-delete-icon"><XCircle size={22} /></div>
       <h3>Arquivar {supplier.nome}?</h3>
-      <p>O fornecedor ficará inativo e sairá da lista atual. O registro no Supabase será preservado com exclusão lógica.</p>
+      <p>O fornecedor ficará inativo e sairá da lista atual. O histórico do cadastro será preservado.</p>
       {error && <div className="supplier-form-error">{error}</div>}
       <div className="supplier-form-actions">
         <button className="btn btn-outline" onClick={onClose} disabled={deleting}>Cancelar</button>

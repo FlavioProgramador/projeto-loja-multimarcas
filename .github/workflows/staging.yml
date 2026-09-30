@@ -30,12 +30,14 @@ jobs:
         with:
           deno-version: v2.x
 
-
       - name: Type Check
         run: npm run typecheck
 
       - name: Edge Functions Check
         run: npm run check:functions
+
+      - name: Unit Tests
+        run: npm test
 
       - name: Build
         run: npm run build

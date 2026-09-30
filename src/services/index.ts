@@ -10,4 +10,5 @@ export * from './returns.service';
 export * from './finance.service';
 export * from './dashboard.service';
 export * from './reports.service';
+export * from './automations';
 export * from './storage.service';

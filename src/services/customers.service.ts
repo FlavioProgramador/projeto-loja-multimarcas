@@ -5,7 +5,7 @@ export const CustomersService = {
   async getAll(storeId?: string): Promise<Customer[]> {
     if (!isSupabaseConfigured) return [];
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('customers')
       .select(`
         id,
@@ -36,8 +36,15 @@ export const CustomersService = {
           reference_id
         )
       `)
-      .eq('is_active', true)
-      .eq('store_id', storeId || '')
+.eq('is_active', true);
+
+    if (!storeId) {
+      throw new Error('Loja ativa é obrigatória para carregar clientes.');
+    }
+
+    query = query.eq('store_id', storeId);
+
+    const { data, error } = await query
       .order('name', { ascending: true });
 
     if (error) {

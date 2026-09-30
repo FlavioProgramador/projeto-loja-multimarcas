@@ -754,7 +754,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addCustomer = async (data: Omit<Customer, 'id' | 'historico'>) => {
-    if (isSupabaseConfigured) { await CustomersService.create(data, activeStoreId || undefined); await refreshData(); return; }
+    if (isSupabaseConfigured) {
+      if (!activeStoreId) throw new Error('Nenhuma loja ativa selecionada.');
+      await CustomersService.create(data, activeStoreId);
+      await refreshData();
+      return;
+    }
     const nextId = customers.reduce((max,c)=>Math.max(max,c.id),0)+1;
     setCustomers(prev=>[...prev,{ id: nextId, ...data, saldoCredito: 0, historico: [] }]);
   };

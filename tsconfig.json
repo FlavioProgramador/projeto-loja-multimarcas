@@ -22,7 +22,8 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "strictNullChecks": true
   },
   "exclude": [
     "node_modules",

@@ -123,16 +123,18 @@ serve(async (req) => {
       if (cleanCpf.length === 11) identification = { type: 'CPF', number: cleanCpf };
     }
 
+    const payerName = typeof customerName === 'string' ? customerName.trim() : '';
+    const payerFirstName = (payerName || 'Cliente').split(/\s+/)[0].slice(0, 50) || 'Cliente';
     const mpPayload = {
       transaction_amount: Number(total),
-      description: `Venda ${sale_number} - CoreSys`,
+      description: `Venda ${sale_number} - CoreSys`.slice(0, 255),
       payment_method_id: 'pix',
       payer: {
-        email: 'financeiro@vestra.com.br',
-        first_name: customerName || 'Cliente',
+        email: 'financeiro@coresys.com.br',
+        first_name: payerFirstName,
         ...(Object.keys(identification).length > 0 ? { identification } : {})
       },
-      external_reference: sale_id,
+      external_reference: String(sale_id),
       notification_url: notificationUrl
     };
 
@@ -148,13 +150,15 @@ serve(async (req) => {
     const mpData = await mpResponse.json().catch(() => null);
 
     if (!mpResponse.ok) {
-      console.error('Mercado Pago request rejected:', mpResponse.status, mpData?.error ?? mpData?.message ?? 'provider_error');
+      console.error('Mercado Pago request rejected:', mpResponse.status, JSON.stringify(mpData ?? {}));
       const { data: cancelResult, error: cancelRpcError } = await serviceSupabase.rpc('cancel_mp_pix_sale', { p_sale_id: sale_id });
       if (cancelRpcError || cancelResult?.success !== true) {
         console.error('Rollback after Mercado Pago rejection failed:', cancelRpcError?.code ?? 'unknown');
         return errorResponse('O provedor recusou o pagamento e o pedido não pôde ser revertido automaticamente.', 500, origin);
       }
-      return errorResponse('O provedor de pagamento recusou a cobrança.', 400, origin);
+      const providerMessage =
+        mpData?.cause?.[0]?.description ?? mpData?.message ?? mpData?.error ?? 'O provedor de pagamento recusou a cobrança.';
+      return errorResponse(providerMessage, 400, origin);
     }
 
     const { error: paymentUpdateError } = await serviceSupabase

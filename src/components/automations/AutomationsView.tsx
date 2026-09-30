@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, CheckCircle2, Clock3, FileText, History, Pause, Play, Plus, RefreshCw, Settings2, ShieldCheck, TriangleAlert, XCircle, Zap } from 'lucide-react';
+import { Bot, CheckCircle2, Clock3, FileText, History, Pause, Play, Plus, RefreshCw, Settings2, ShieldCheck, Trash2, TriangleAlert, XCircle, Zap } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { AutomationsService, AutomationRule, AutomationRun, AUTOMATION_PRESETS } from '../../services/automations';
 import { AutomationBuilder } from './AutomationBuilder';
@@ -100,6 +100,22 @@ export const AutomationsView: React.FC = () => {
     }
   };
 
+  const deleteRule = async (rule: AutomationRule) => {
+    if (!activeStoreId || !canManage || workingId) return;
+    const confirmed = window.confirm(`Excluir a automação "${rule.name}"? O histórico de execuções relacionado também será removido.`);
+    if (!confirmed) return;
+    setWorkingId(rule.id);
+    try {
+      await AutomationsService.remove(activeStoreId, rule.id);
+      setMessage({ type: 'success', text: 'Automação excluída.' });
+      await load();
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Não foi possível excluir a automação.' });
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
   if (!canView) {
     return <div className="module-fade"><div className="card automation-access-denied">
       <ShieldCheck size={24} /><h2>Acesso não disponível</h2>
@@ -146,7 +162,7 @@ export const AutomationsView: React.FC = () => {
 
       {tab === 'rules' && <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Suas automações</h2><p>Ative, pause e teste suas regras.</p></div>{canManage && <button className="btn" onClick={() => { setEditing(null); setBuilderOpen(true); }}><Plus size={16} /> Nova</button>}</div>
         <div className="automation-table-wrap"><table><thead><tr><th>Automação</th><th>Categoria</th><th>Gatilho</th><th>Status</th><th>Execuções</th><th>Ações</th></tr></thead>
-          <tbody>{rules.map(rule => <tr key={rule.id}><td><strong>{rule.name}</strong><small>{rule.description || 'Sem descrição'}</small></td><td>{categoryLabels[rule.category] || rule.category}</td><td>{triggerLabels[rule.trigger] || rule.trigger}</td><td><span className={'automation-status ' + rule.status.toLowerCase()}>{rule.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}</span></td><td>{rule.execution_count}</td><td><div className="automation-row-actions">{canManage && <><button title="Editar" onClick={() => { setEditing(rule); setBuilderOpen(true); }}><Settings2 size={15} /></button><button title={rule.status === 'ACTIVE' ? 'Pausar' : 'Ativar'} onClick={() => void setStatus(rule)} disabled={workingId === rule.id}>{rule.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}</button><button title="Testar" onClick={() => void testRule(rule)} disabled={workingId === rule.id}><Zap size={15} /></button></>}</div></td></tr>)}{!rules.length && <tr><td colSpan={6} className="automation-empty">Nenhuma automação cadastrada.</td></tr>}</tbody>
+          <tbody>{rules.map(rule => <tr key={rule.id}><td><strong>{rule.name}</strong><small>{rule.description || 'Sem descrição'}</small></td><td>{categoryLabels[rule.category] || rule.category}</td><td>{triggerLabels[rule.trigger] || rule.trigger}</td><td><span className={'automation-status ' + rule.status.toLowerCase()}>{rule.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}</span></td><td>{rule.execution_count}</td><td><div className="automation-row-actions">{canManage && <><button title="Editar" onClick={() => { setEditing(rule); setBuilderOpen(true); }}><Settings2 size={15} /></button><button title={rule.status === 'ACTIVE' ? 'Pausar' : 'Ativar'} onClick={() => void setStatus(rule)} disabled={workingId === rule.id}>{rule.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}</button><button title="Testar" onClick={() => void testRule(rule)} disabled={workingId === rule.id}><Zap size={15} /></button><button title="Excluir" onClick={() => void deleteRule(rule)} disabled={workingId === rule.id}><Trash2 size={15} /></button></>}</div></td></tr>)}{!rules.length && <tr><td colSpan={6} className="automation-empty">Nenhuma automação cadastrada.</td></tr>}</tbody>
         </table></div>
       </div>}
 

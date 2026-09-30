@@ -9,7 +9,7 @@ type Props = {
   onSave: (input: {
     name: string; description: string; category: AutomationCategory; trigger: AutomationTrigger;
     conditions: Record<string, unknown>[]; actions: Record<string, unknown>[];
-    priority: number; cooldown_minutes: number; schedule: string | null;
+    priority: number; cooldown_minutes: number; schedule: string | null; timezone: string;
   }) => Promise<void>;
   onPreset?: (preset: typeof AUTOMATION_PRESETS[number]) => void;
 };
@@ -66,6 +66,8 @@ export const AutomationBuilder: React.FC<Props> = ({ initial, onClose, onSave, o
     setPreset(String(index)); setName(selected.name); setDescription(selected.description);
     setCategory(selected.category); setTrigger(selected.trigger);
     setCooldown(String(selected.cooldown_minutes));
+    setSchedule('');
+    setTimezone('America/Sao_Paulo');
     setThreshold(typeof selected.conditions[0]?.value === 'number' ? String(selected.conditions[0].value) : '');
     onPreset?.(selected);
   };

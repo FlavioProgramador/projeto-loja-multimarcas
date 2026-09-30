@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { SalesService } from '../../services';
 import { CartItem, Customer, FinancialTransaction, Product, SaleMovement } from '../../types';
 import { hoje } from '../../lib/utils';
+import { generateIdempotencyKey } from '../../lib/idempotency';
 
 type SaleParams = {
   cartItems: CartItem[];
@@ -58,7 +59,7 @@ export function useSalesDomain({
         const rpcResult = await SalesService.completeSale({
           storeId: activeStoreId, cartItems, buyerName, cpf, paymentMethod,
           installments, discountValue: discountValue + creditUsed,
-          discountPercent, idempotencyKey: crypto.randomUUID(),
+          discountPercent, idempotencyKey: generateIdempotencyKey(),
         });
 
         if (rpcResult.success) {

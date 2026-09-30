@@ -9,6 +9,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { NewReturnModal } from '../returns/NewReturnModal';
 import { NewCustomerModal } from '../customers/NewCustomerModal';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
+import { generateIdempotencyKey } from '../../lib/idempotency';
 
 export const PdvView: React.FC = () => {
   const { products, customers, processSale, activeStoreId } = useStore();
@@ -203,7 +204,7 @@ export const PdvView: React.FC = () => {
       }
       setIsGeneratingPix(true);
       try {
-        const idempotencyKey = pixIdempotencyKey || crypto.randomUUID();
+        const idempotencyKey = pixIdempotencyKey || generateIdempotencyKey();
         setPixIdempotencyKey(idempotencyKey);
         const rpcItems = cart.map(item => ({
           variant_id: (item as any).variantId || (item as any).id,

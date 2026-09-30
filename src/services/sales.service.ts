@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { CartItem, SaleMovement } from '../types';
+import { generateIdempotencyKey } from '../lib/idempotency';
 
 interface CompleteSaleRpcResult {
   success?: boolean;
@@ -65,7 +66,7 @@ export const SalesService = {
     }
 
     const signature = getCheckoutSignature(params);
-    const effectiveIdempotencyKey = pendingCheckoutKeys.get(signature) || params.idempotencyKey || crypto.randomUUID();
+    const effectiveIdempotencyKey = pendingCheckoutKeys.get(signature) || params.idempotencyKey || generateIdempotencyKey();
     pendingCheckoutKeys.set(signature, effectiveIdempotencyKey);
 
     try {

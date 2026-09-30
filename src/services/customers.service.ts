@@ -36,16 +36,15 @@ export const CustomersService = {
           reference_id
         )
       `)
-<<<<<<< HEAD
-      .eq('is_active', true)
-      .eq('store_id', storeId || '')
-=======
-      .eq('is_active', true);
+.eq('is_active', true);
 
-    if (storeId) query = query.eq('store_id', storeId);
+    if (!storeId) {
+      throw new Error('Loja ativa é obrigatória para carregar clientes.');
+    }
+
+    query = query.eq('store_id', storeId);
 
     const { data, error } = await query
->>>>>>> 8f63c92 ( fix: restaurar acesso multi-loja e carregamento de dados)
       .order('name', { ascending: true });
 
     if (error) {

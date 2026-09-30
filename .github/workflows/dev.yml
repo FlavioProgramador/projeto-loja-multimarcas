@@ -20,13 +20,24 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.22.2'
 
       - name: Install Dependencies
         run: npm ci
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       - name: Type Check
         run: npm run typecheck
+
+      - name: Edge Functions Check
+        run: npm run check:functions
+
+      - name: Unit Tests
+        run: npm test
 
       - name: Build
         run: npm run build

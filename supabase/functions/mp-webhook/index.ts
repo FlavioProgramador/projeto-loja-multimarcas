@@ -18,6 +18,7 @@ function corsHeaders() {
 
 serve(async (req) => {
   const headers = corsHeaders();
+  const xRequestId = req.headers.get('x-request-id');
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers, status: 204 });
@@ -35,7 +36,6 @@ serve(async (req) => {
     }
 
     const xSignature = req.headers.get('x-signature');
-    const xRequestId = req.headers.get('x-request-id');
 
     if (!xSignature || !xRequestId) {
       return new Response('Missing signature headers', { status: 403, headers });
@@ -182,7 +182,7 @@ serve(async (req) => {
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-      if (supabaseUrl && supabaseServiceKey) {
+      if (xRequestId && supabaseUrl && supabaseServiceKey) {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
         await supabase.rpc('fail_mp_webhook_event', {
           p_request_id: xRequestId,

@@ -35,7 +35,8 @@ import {
   InventoryService,
   CustomersService,
   SuppliersService,
-  FinanceService
+  FinanceService,
+  SalesService
 } from '../services';
 import { ReturnsService } from '../services/returns.service';
 import { storeService } from '../services/store.service';

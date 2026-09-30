@@ -22,18 +22,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Estoque insuficiente para este item.' };
     }
 
+    const existingItem = cart.find(
+      item => item.produtoId === product.id && item.skuIndex === skuIndex
+    );
+    const currentQty = existingItem ? existingItem.qtd : 0;
+
+    if (currentQty + 1 > sku.qtd) {
+      return { success: false, message: `Estoque máximo atingido para este item (${sku.qtd} un).` };
+    }
+
     setCart(prev => {
       const existingIdx = prev.findIndex(
         item => item.produtoId === product.id && item.skuIndex === skuIndex
       );
 
       if (existingIdx >= 0) {
-        const currentQty = prev[existingIdx].qtd;
-        if (currentQty + 1 > sku.qtd) {
-          return prev;
-        }
         const copy = [...prev];
-        copy[existingIdx] = { ...copy[existingIdx], qtd: copy[existingIdx].qtd + 1 };
+        copy[existingIdx] = { ...copy[existingIdx], qtd: copy[existingIdx].qtd + 1, maxStock: sku.qtd };
         return copy;
       }
 
@@ -49,13 +54,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           qtd: 1,
           variantId: sku.id,
           productUuid: product.uuid,
-          maxStock: sku.qtd // Salvamos o estoque máximo aqui para usar depois!
-        } as CartItem // Cast necessário até você atualizar o src/types.ts
+          maxStock: sku.qtd
+        }
       ];
     });
 
     return { success: true };
-  }, []);
+  }, [cart]);
 
   const updateQuantity = useCallback((index: number, delta: number) => {
     setCart(prev => {

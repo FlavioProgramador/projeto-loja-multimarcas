@@ -45,6 +45,7 @@ export interface CartItem {
   cor: string;
   preco: number;
   qtd: number;
+  maxStock?: number;
   variantId?: string;
   productUuid?: string;
 }

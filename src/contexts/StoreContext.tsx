@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   Product,
   FinancialTransaction,
@@ -32,6 +32,7 @@ import { useSalesDomain } from '../hooks/domains/useSalesDomain';
 import { isSupabaseConfigured } from '../lib/supabase/client';
 import { useStoreData } from '../hooks/useStoreData';
 import { useStoreSelection } from '../hooks/useStoreSelection';
+import { useStoreAuthReset } from '../hooks/useStoreAuthReset';
 import { InventoryService } from '../services';
 import { useAuth } from './AuthContext';
 
@@ -144,6 +145,34 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [userStores, setUserStores] = useState<UserStoreAccess[]>([]);
 
+  const resetStoreState = useCallback(() => {
+    setProducts([]);
+    setTransactions([]);
+    setMovements([]);
+    setCustomers([]);
+    setReturns([]);
+    setSuppliers([]);
+    setFixedExpenses([]);
+    setNotifications([]);
+    setUserStores([]);
+
+    const keys = [
+      'erp_products',
+      'erp_transactions',
+      'erp_movements',
+      'erp_customers',
+      'erp_returns',
+      'erp_suppliers',
+      'erp_fixed_expenses',
+      'erp_notifications'
+    ];
+
+    keys.forEach(key => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+  }, []);
+
   const storeSelection = useStoreSelection({
     isAuthorized,
     isSupabaseConfigured,
@@ -153,67 +182,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const activeStoreId = storeSelection.activeStoreId;
   const setActiveStoreId = storeSelection.setActiveStoreId;
 
-  useEffect(() => {
-    if (!isAuthorized) {
-      setProducts([]);
-      setTransactions([]);
-      setMovements([]);
-      setCustomers([]);
-      setReturns([]);
-      setSuppliers([]);
-      setFixedExpenses([]);
-      setNotifications([]);
-      setUserStores([]);
-
-      const keys = [
-        'erp_products',
-        'erp_transactions',
-        'erp_movements',
-        'erp_customers',
-        'erp_returns',
-        'erp_suppliers',
-        'erp_fixed_expenses',
-        'erp_notifications'
-      ];
-
-      keys.forEach(key => {
-        localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
-      });
-      previousUserId.current = null;
-      return;
-    }
-
-    if (previousUserId.current && previousUserId.current !== user?.id) {
-      setProducts([]);
-      setTransactions([]);
-      setMovements([]);
-      setCustomers([]);
-      setReturns([]);
-      setSuppliers([]);
-      setFixedExpenses([]);
-      setNotifications([]);
-      setUserStores([]);
-
-      const keys = [
-        'erp_products',
-        'erp_transactions',
-        'erp_movements',
-        'erp_customers',
-        'erp_returns',
-        'erp_suppliers',
-        'erp_fixed_expenses',
-        'erp_notifications'
-      ];
-
-      keys.forEach(key => {
-        localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
-      });
-    }
-
-    previousUserId.current = user?.id ?? null;
-  }, [isAuthorized, user?.id]);
+  useStoreAuthReset({
+    userId: user?.id,
+    isAuthorized,
+    resetStoreState,
+  });
 
   // Carregar dados reais do Supabase somente depois de resolver a loja ativa.
   // Não sobrescreve dados válidos com arrays vazios causados por falta de contexto,

@@ -117,25 +117,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
 
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>(() => {
-    const saved = localStorage.getItem('erp_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
-  });
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
 
-  const [movements, setMovements] = useState<SaleMovement[]>(() => {
-    const saved = localStorage.getItem('erp_movements');
-    return saved ? JSON.parse(saved) : INITIAL_MOVEMENTS;
-  });
+  const [movements, setMovements] = useState<SaleMovement[]>([]);
 
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('erp_customers');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
-  });
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
-  const [returns, setReturns] = useState<ReturnRecord[]>(() => {
-    const saved = localStorage.getItem('erp_returns');
-    return saved ? JSON.parse(saved) : INITIAL_RETURNS;
-  });
+  const [returns, setReturns] = useState<ReturnRecord[]>([]);
 
   const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
     const saved = localStorage.getItem('erp_suppliers');
@@ -261,7 +249,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         FinanceService.getTransactions(resolvedStoreId),
         FinanceService.getFixedExpenses(resolvedStoreId),
         SalesService.getMovements(resolvedStoreId),
-        CustomersService.getAll(),
+        CustomersService.getAll(resolvedStoreId),
         SuppliersService.getAll(),
         ReturnsService.getAll(resolvedStoreId)
       ]);
@@ -304,25 +292,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('erp_products', JSON.stringify(products));
   }, [isAuthorized, products]);
 
-  useEffect(() => {
-    if (!isAuthorized) return;
-    localStorage.setItem('erp_transactions', JSON.stringify(transactions));
-  }, [isAuthorized, transactions]);
 
-  useEffect(() => {
-    if (!isAuthorized) return;
-    localStorage.setItem('erp_movements', JSON.stringify(movements));
-  }, [isAuthorized, movements]);
 
-  useEffect(() => {
-    if (!isAuthorized) return;
-    localStorage.setItem('erp_customers', JSON.stringify(customers));
-  }, [isAuthorized, customers]);
 
-  useEffect(() => {
-    if (!isAuthorized) return;
-    localStorage.setItem('erp_returns', JSON.stringify(returns));
-  }, [isAuthorized, returns]);
 
   useEffect(() => {
     if (!isAuthorized) return;
@@ -782,7 +754,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addCustomer = async (data: Omit<Customer, 'id' | 'historico'>) => {
-    if (isSupabaseConfigured) { await CustomersService.create(data); await refreshData(); return; }
+    if (isSupabaseConfigured) { await CustomersService.create(data, activeStoreId || undefined); await refreshData(); return; }
     const nextId = customers.reduce((max,c)=>Math.max(max,c.id),0)+1;
     setCustomers(prev=>[...prev,{ id: nextId, ...data, saldoCredito: 0, historico: [] }]);
   };

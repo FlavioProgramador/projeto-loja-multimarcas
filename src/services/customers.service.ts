@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import { Customer } from '../types';
 
 export const CustomersService = {
-  async getAll(): Promise<Customer[]> {
+  async getAll(storeId?: string): Promise<Customer[]> {
     if (!isSupabaseConfigured) return [];
 
     const { data, error } = await supabase
@@ -37,6 +37,7 @@ export const CustomersService = {
         )
       `)
       .eq('is_active', true)
+      .eq('store_id', storeId || '')
       .order('name', { ascending: true });
 
     if (error) {
@@ -97,12 +98,13 @@ export const CustomersService = {
     email?: string;
     endereco?: string;
     dataNascimento?: string;
-  }): Promise<any> {
+  }, storeId?: string): Promise<any> {
     if (!isSupabaseConfigured) return null;
 
     const { data, error } = await supabase
       .from('customers')
       .insert({
+        store_id: storeId,
         name: customer.nome.trim(),
         cpf: customer.cpf?.trim() || null,
         rg: customer.rg?.trim() || null,

@@ -18,28 +18,29 @@ const initials = (name: string) =>
 
 export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, onEdit }) => {
   if (!customer) return null;
+
   const total = customer.historico.reduce((sum, item) => sum + item.valor, 0);
-  const sortedHistory = [...customer.historico].sort((a, b) => b.data.localeCompare(a.data));
-  const lastPurchase = sortedHistory[0];
+  const history = [...customer.historico].sort((a, b) => b.data.localeCompare(a.data));
   const movements = customer.movimentacoesCredito || [];
+  const credit = customer.saldoCredito || 0;
 
   return (
-    <Modal isOpen={true} onClose={onClose} maxWidth="760px" title={<><UserRound size={18} /> Perfil do Cliente</>}>
+    <Modal isOpen={true} onClose={onClose} maxWidth="820px" title={<><UserRound size={18} /> Perfil do cliente</>}>
       <div className="customer-details">
         <header className="customer-profile-head">
           <div className="customer-profile-avatar">{initials(customer.nome)}</div>
           <div className="customer-profile-identity">
             <h2>{customer.nome}</h2>
-            <span>{customer.cpf || 'CPF não informado'}</span>
+            <span>{customer.cpf ? `CPF ${customer.cpf}` : 'CPF não informado'}</span>
           </div>
           <button className="btn btn-sm" onClick={() => onEdit(customer)}>Editar cadastro</button>
         </header>
 
         <div className="customer-detail-stats">
           <div><small>Total gasto</small><strong>{formatMoeda(total)}</strong></div>
-          <div><small>Compras</small><strong>{customer.historico.length}</strong></div>
-          <div><small>Crédito disponível</small><strong>{formatMoeda(customer.saldoCredito || 0)}</strong></div>
-          <div><small>Última compra</small><strong>{lastPurchase ? dateLabel(lastPurchase.data) : 'Nunca'}</strong></div>
+          <div><small>Compras</small><strong>{history.length}</strong></div>
+          <div><small>Crédito disponível</small><strong>{formatMoeda(credit)}</strong></div>
+          <div><small>Última compra</small><strong>{history[0] ? dateLabel(history[0].data) : 'Nunca'}</strong></div>
         </div>
 
         <div className="customer-detail-grid">
@@ -63,16 +64,16 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onCl
         </div>
 
         <section className="customer-history-section">
-          <h3><ShoppingBag size={15}/> Histórico de compras <span>{sortedHistory.length}</span></h3>
-          {sortedHistory.length === 0 ? (
+          <h3><ShoppingBag size={15}/> Histórico de compras <span>{history.length}</span></h3>
+          {history.length === 0 ? (
             <p className="customer-history-empty">Nenhuma compra registrada.</p>
           ) : (
             <div className="customer-history-list">
-              {sortedHistory.map((item, index) => (
+              {history.map((item, index) => (
                 <article key={item.uuid || `${item.vendaId}-${item.data}-${index}`}>
                   <div><strong>{item.vendaId || 'Venda'}</strong><span>{dateLabel(item.data)}</span></div>
                   <strong>{formatMoeda(item.valor)}</strong>
-                  <small>{item.itens}</small>
+                  <small>{item.itens || 'Itens não informados'}</small>
                 </article>
               ))}
             </div>

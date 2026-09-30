@@ -31,6 +31,7 @@ import { useReturnsDomain } from '../hooks/domains/useReturnsDomain';
 import { useSalesDomain } from '../hooks/domains/useSalesDomain';
 import { isSupabaseConfigured } from '../lib/supabase/client';
 import { useStoreData } from '../hooks/useStoreData';
+import { useStoreSelection } from '../hooks/useStoreSelection';
 import { InventoryService } from '../services';
 import { useAuth } from './AuthContext';
 
@@ -142,7 +143,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [userStores, setUserStores] = useState<UserStoreAccess[]>([]);
-  const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
+
+  const storeSelection = useStoreSelection({
+    isAuthorized,
+    isSupabaseConfigured,
+    remoteStores: userStores,
+  });
+
+  const activeStoreId = storeSelection.activeStoreId;
+  const setActiveStoreId = storeSelection.setActiveStoreId;
 
   useEffect(() => {
     if (!isAuthorized) {
@@ -155,7 +164,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setFixedExpenses([]);
       setNotifications([]);
       setUserStores([]);
-      setActiveStoreId(null);
 
       const keys = [
         'erp_products',
@@ -186,7 +194,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setFixedExpenses([]);
       setNotifications([]);
       setUserStores([]);
-      setActiveStoreId(null);
 
       const keys = [
         'erp_products',
@@ -216,8 +223,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     accessToken: session?.access_token,
     isAuthorized,
     authLoading,
-    activeStoreId,
-    setActiveStoreId,
+    activeStoreId: storeSelection.activeStoreId,
+    setActiveStoreId: storeSelection.setActiveStoreId,
     setUserStores,
     setProducts,
     setTransactions,

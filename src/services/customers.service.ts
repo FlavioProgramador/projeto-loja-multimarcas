@@ -5,7 +5,7 @@ export const CustomersService = {
   async getAll(storeId?: string): Promise<Customer[]> {
     if (!isSupabaseConfigured) return [];
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('customers')
       .select(`
         id,
@@ -36,8 +36,16 @@ export const CustomersService = {
           reference_id
         )
       `)
+<<<<<<< HEAD
       .eq('is_active', true)
       .eq('store_id', storeId || '')
+=======
+      .eq('is_active', true);
+
+    if (storeId) query = query.eq('store_id', storeId);
+
+    const { data, error } = await query
+>>>>>>> 8f63c92 ( fix: restaurar acesso multi-loja e carregamento de dados)
       .order('name', { ascending: true });
 
     if (error) {

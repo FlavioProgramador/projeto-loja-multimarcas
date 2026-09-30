@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { InventoryService } from '../../services';
 import { hoje } from '../../lib/utils';
 import type { Product, FinancialTransaction } from '../../types';

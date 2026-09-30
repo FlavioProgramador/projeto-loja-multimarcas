@@ -15,7 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "test:db": "supabase test db",
     "test:functions": "deno test --allow-all supabase/functions",
-    "test:all": "npm run typecheck && npm test"
+    "test:all": "npm run typecheck && npm test",
+    "check:functions": "deno check supabase/functions/create-mp-pix/index.ts supabase/functions/mp-webhook/index.ts supabase/functions/mp-pix-reconciliation-worker/index.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -50,5 +51,8 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
     "vitest": "^5.0.2"
+  },
+  "engines": {
+    "node": ">=22.22.2"
   }
 }

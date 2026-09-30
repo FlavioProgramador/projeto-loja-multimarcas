@@ -23,6 +23,7 @@ import {
   INITIAL_NOTIFICATIONS
 } from '../data/initialData';
 import { hoje } from '../lib/utils';
+import { useProductsDomain } from '../hooks/domains/useProductsDomain';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
   ProductsService,
@@ -312,95 +313,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('erp_notifications', JSON.stringify(notifications));
   }, [isAuthorized, notifications]);
 
-  // Product methods
-  const addProduct = async (prodData: Omit<Product, 'id'>) => {
-    const newId = products.reduce((max, p) => Math.max(max, p.id), 0) + 1;
-    const newProd: Product = { id: newId, ...prodData };
-    setProducts(prev => [...prev, newProd]);
-
-    if (isSupabaseConfigured) {
-      if (!activeStoreId) {
-        setProducts(prev => prev.filter(product => product.id !== newId));
-        throw new Error('Nenhuma loja ativa selecionada.');
-      }
-
-      try {
-        const created = await ProductsService.create(prodData);
-        if (!created?.id) throw new Error('O produto não retornou um identificador válido.');
-
-        // Product CRUD and stock movement are deliberately separate.
-        // Register each initial quantity through the stock RPC for the active store.
-        for (const sku of prodData.skus) {
-          const quantity = Math.max(0, Number(sku.qtd) || 0);
-          if (quantity === 0) continue;
-
-          const createdVariant = await ProductsService.getVariantByAttributes(
-            created.id,
-            sku.tamanho.trim() || 'Único',
-            sku.cor.trim() || 'Padrão',
-            sku.sku
-          );
-          if (!createdVariant) {
-            throw new Error('Não foi possível localizar uma variação recém-criada para lançar o estoque inicial.');
-          }
-
-          await InventoryService.registerStockEntry({
-            storeId: activeStoreId,
-            productName: prodData.nome,
-            brand: prodData.marca,
-            category: prodData.categoria,
-            price: prodData.preco,
-            skuIndex: -1,
-            qtd: quantity,
-            custoUnitario: prodData.custo ?? 0,
-            newSize: sku.tamanho,
-            newColor: sku.cor,
-            variantId: createdVariant.id
-          });
-        }
-
-        await refreshData();
-      } catch (err) {
-        setProducts(prev => prev.filter(product => product.id !== newId));
-        console.error('Erro ao salvar produto no Supabase:', err);
-        throw err;
-      }
-    }
-  };
-
-  const updateProduct = async (id: number, updated: Partial<Product>) => {
-    setProducts(prev => prev.map(p => (p.id === id ? { ...p, ...updated } : p)));
-
-    if (isSupabaseConfigured) {
-      const targetProd = products.find(p => p.id === id);
-      if (targetProd?.uuid) {
-        try {
-          await ProductsService.update(targetProd.uuid, updated);
-          await refreshData();
-        } catch (err) {
-          setProducts(prev => prev.map(product => (product.id === id ? targetProd : product)));
-          console.error('Erro ao atualizar produto no Supabase:', err);
-          throw err;
-        }
-      }
-    }
-  };
-
-  const deleteProduct = async (id: number) => {
-    const targetProd = products.find(p => p.id === id);
-    setProducts(prev => prev.filter(p => p.id !== id));
-
-    if (isSupabaseConfigured && targetProd?.uuid) {
-      try {
-        await ProductsService.remove(targetProd.uuid);
-        await refreshData();
-      } catch (err) {
-        setProducts(prev => [...prev, targetProd]);
-        console.error('Erro ao remover produto no Supabase:', err);
-        throw err;
-      }
-    }
-  };
+  const { addProduct, updateProduct, deleteProduct } = useProductsDomain({
+    products,
+    setProducts,
+    activeStoreId,
+    refreshData,
+    isSupabaseConfigured,
+  });
 
   const registerStockEntry = async (params: {
     productName: string;

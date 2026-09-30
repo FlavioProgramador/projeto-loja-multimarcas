@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import type { FixedExpense, Product } from '../../types';
 
 interface UseInventoryAlertsParams {

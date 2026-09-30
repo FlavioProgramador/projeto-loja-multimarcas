@@ -29,17 +29,9 @@ import { useSuppliersDomain } from '../hooks/domains/useSuppliersDomain';
 import { useFinanceDomain } from '../hooks/domains/useFinanceDomain';
 import { useReturnsDomain } from '../hooks/domains/useReturnsDomain';
 import { useSalesDomain } from '../hooks/domains/useSalesDomain';
-import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
-import {
-  ProductsService,
-  InventoryService,
-  CustomersService,
-  SuppliersService,
-  FinanceService,
-  SalesService
-} from '../services';
-import { ReturnsService } from '../services/returns.service';
-import { storeService } from '../services/store.service';
+import { isSupabaseConfigured } from '../lib/supabase/client';
+import { useStoreData } from '../hooks/useStoreData';
+import { InventoryService } from '../services';
 import { useAuth } from './AuthContext';
 
 interface StoreContextType {
@@ -219,73 +211,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Carregar dados reais do Supabase somente depois de resolver a loja ativa.
   // Não sobrescreve dados válidos com arrays vazios causados por falta de contexto,
   // falha transitória ou consulta executada antes da definição do store_id.
-  const refreshData = useCallback(async () => {
-    if (!isSupabaseConfigured || !isAuthorized || authLoading || !session?.access_token) return;
-
-    try {
-      setIsLoading(true);
-
-      // O Supabase Auth mantém a sessão no storage customizado. Exigir uma
-      // sessão válida antes das consultas evita que o RLS devolva [] para o
-      // papel anon durante a transição de autenticação.
-      const { data: { session: verifiedSession }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      if (!verifiedSession?.access_token || verifiedSession.user.id !== user?.id) {
-        throw new Error('Sessão autenticada indisponível para carregar os dados da loja.');
-      }
-
-      const remoteStores = await storeService.getUserStores();
-      if (!remoteStores.length) {
-        throw new Error('Nenhuma loja disponível para o usuário autenticado.');
-      }
-
-      setUserStores(remoteStores);
-
-      const resolvedStoreId =
-        activeStoreId && remoteStores.some(store => store.store_id === activeStoreId)
-          ? activeStoreId
-          : remoteStores[0].store_id;
-
-      if (resolvedStoreId !== activeStoreId) {
-        setActiveStoreId(resolvedStoreId);
-      }
-
-      const results = await Promise.allSettled([
-        ProductsService.getAll(resolvedStoreId),
-        FinanceService.getTransactions(resolvedStoreId),
-        FinanceService.getFixedExpenses(resolvedStoreId),
-        SalesService.getMovements(resolvedStoreId),
-        CustomersService.getAll(resolvedStoreId),
-        SuppliersService.getAll(),
-        ReturnsService.getAll(resolvedStoreId)
-      ]);
-
-      const applyResult = <T,>(
-        result: PromiseSettledResult<T>,
-        setter: (value: T) => void,
-        source: string
-      ) => {
-        if (result.status === 'fulfilled') {
-          setter(result.value);
-        } else {
-          console.warn('Falha ao carregar ' + source + '; mantendo dados atuais.', result.reason);
-        }
-      };
-
-      // Uma falha isolada não pode zerar ou bloquear os demais módulos.
-      applyResult(results[0], setProducts, 'produtos/estoque');
-      applyResult(results[1], setTransactions, 'financeiro');
-      applyResult(results[2], setFixedExpenses, 'despesas fixas');
-      applyResult(results[3], setMovements, 'vendas do PDV');
-      applyResult(results[4], setCustomers, 'clientes');
-      applyResult(results[5], setSuppliers, 'fornecedores');
-      applyResult(results[6], setReturns, 'devoluções');
-    } catch (err) {
-      console.warn('Sincronização com Supabase falhou; mantendo estado atual.', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeStoreId, isAuthorized, authLoading, session?.access_token, user?.id]);
+  const { refreshData } = useStoreData({
+    userId: user?.id,
+    accessToken: session?.access_token,
+    isAuthorized,
+    authLoading,
+    activeStoreId,
+    setActiveStoreId,
+    setUserStores,
+    setProducts,
+    setTransactions,
+    setMovements,
+    setCustomers,
+    setReturns,
+    setSuppliers,
+    setFixedExpenses,
+    setIsLoading,
+  });
 
   useEffect(() => {
     if (!isAuthorized || authLoading || !session?.access_token) return;

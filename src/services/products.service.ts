@@ -84,11 +84,9 @@ export const ProductsService = {
 
   async getById(id: string): Promise<ProductRow | null> {
     if (!isSupabaseConfigured) return null;
-    const { data, error } = await supabase
-      .from('products')
-      .select(`*, brands (*), categories (*), product_variants (*)`)
-      .eq('id', id)
-      .single();
+    const { data, error } = await supabase.rpc('get_product_for_management', {
+      p_product_id: id
+    });
     if (error) {
       console.error('Erro ao buscar produto por ID:', error);
       return null;

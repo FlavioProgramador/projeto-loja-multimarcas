@@ -3,20 +3,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN');
 
-function corsHeaders(origin: string | null) {
-  const allowedOrigin = ALLOWED_ORIGIN || origin || '*';
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
+function corsHeaders() {
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-signature, x-request-id',
+    'Vary': 'Origin',
   };
+
+  if (ALLOWED_ORIGIN) {
+    headers['Access-Control-Allow-Origin'] = ALLOWED_ORIGIN;
+  }
+
+  return headers;
 }
 
 serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const headers = corsHeaders(origin);
+  const headers = corsHeaders();
 
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers });
+    return new Response(null, { headers, status: 204 });
   }
 
   try {
@@ -101,25 +105,25 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Claim the delivery only after signature verification. A repeated x-request-id
-    // is treated as a replay and acknowledged without re-running settlement logic.
-    const { error: replayInsertError } = await supabase
-      .from('mp_webhook_events')
-      .insert({
-        request_id: xRequestId,
-        provider_payment_id: String(dataId),
-        signature_ts: timestamp
-      });
+    const { data: claim, error: claimError } = await supabase.rpc('claim_mp_webhook_event', {
+      p_request_id: xRequestId,
+      p_provider_payment_id: String(dataId),
+      p_signature_ts: timestamp
+    });
 
-    if (replayInsertError) {
-      // 23505 = unique_violation on the request_id primary key.
-      if (replayInsertError.code === '23505') {
-        return new Response(JSON.stringify({ success: true, replayed: true }), {
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          status: 200
-        });
-      }
-      throw replayInsertError;
+    if (claimError) {
+      console.error('Falha ao registrar evento de webhook:', claimError.code);
+      return new Response(JSON.stringify({ error: 'Webhook processing unavailable' }), {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        status: 503
+      });
+    }
+
+    if (claim?.status === 'processed' || claim?.status === 'in_progress') {
+      return new Response(JSON.stringify({ success: true, replayed: true }), {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        status: 200
+      });
     }
 
     const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {
@@ -127,7 +131,12 @@ serve(async (req) => {
     });
 
     if (!mpResponse.ok) {
-      console.error('Falha ao consultar MP:', dataId, await mpResponse.text());
+      const providerError = await mpResponse.text();
+      console.error('Falha ao consultar MP:', mpResponse.status, providerError.slice(0, 500));
+      await supabase.rpc('fail_mp_webhook_event', {
+        p_request_id: xRequestId,
+        p_error: 'Provider payment lookup failed'
+      });
       return new Response(JSON.stringify({ error: 'Failed to fetch payment' }), {
         headers: { ...headers, 'Content-Type': 'application/json' },
         status: 502
@@ -139,6 +148,7 @@ serve(async (req) => {
     const externalReference = paymentInfo.external_reference;
 
     if (!externalReference) {
+      await supabase.rpc('complete_mp_webhook_event', { p_request_id: xRequestId });
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...headers, 'Content-Type': 'application/json' },
         status: 200
@@ -158,12 +168,31 @@ serve(async (req) => {
       if (error) throw error;
     }
 
+    const { error: completeError } = await supabase.rpc('complete_mp_webhook_event', {
+      p_request_id: xRequestId
+    });
+    if (completeError) throw completeError;
+
     return new Response(JSON.stringify({ success: true, status }), {
       headers: { ...headers, 'Content-Type': 'application/json' },
       status: 200
     });
-  } catch (error) {
-    console.error('MP Webhook erro crítico:', error);
+  } catch (error: unknown) {
+    console.error('MP Webhook erro crítico:', error instanceof Error ? error.name : 'unknown');
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        await supabase.rpc('fail_mp_webhook_event', {
+          p_request_id: xRequestId,
+          p_error: 'Webhook processing failed'
+        });
+      }
+    } catch (markError) {
+      console.error('Falha ao marcar webhook para retry:', markError instanceof Error ? markError.name : 'unknown');
+    }
+
     return new Response(JSON.stringify({ error: 'Webhook processing failed' }), {
       headers: { ...headers, 'Content-Type': 'application/json' },
       status: 500

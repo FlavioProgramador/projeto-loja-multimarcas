@@ -2125,7 +2125,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px 12px;
   padding: 10px 11px;
-  border: 1px solid #252525;
+  border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: var(--surface);
 }

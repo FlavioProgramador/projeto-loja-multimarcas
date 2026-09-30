@@ -11,6 +11,7 @@ export interface CreateAutomationInput {
   priority: number;
   cooldown_minutes: number;
   schedule?: string | null;
+  timezone?: string;
 }
 
 export type AutomationMutationResult = { success: boolean; message?: string; id?: string };
@@ -74,6 +75,7 @@ export const AutomationsService = {
       p_priority: input.priority,
       p_cooldown_minutes: input.cooldown_minutes,
       p_schedule: input.schedule ?? null,
+      p_timezone: input.timezone ?? 'America/Sao_Paulo',
     });
   },
 
@@ -90,6 +92,7 @@ export const AutomationsService = {
       p_priority: input.priority,
       p_cooldown_minutes: input.cooldown_minutes,
       p_schedule: input.schedule,
+      p_timezone: input.timezone,
     });
   },
 

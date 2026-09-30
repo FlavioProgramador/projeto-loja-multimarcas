@@ -9,7 +9,7 @@ type Props = {
   onSave: (input: {
     name: string; description: string; category: AutomationCategory; trigger: AutomationTrigger;
     conditions: Record<string, unknown>[]; actions: Record<string, unknown>[];
-    priority: number; cooldown_minutes: number; schedule: string | null;
+    priority: number; cooldown_minutes: number; schedule: string | null; timezone: string;
   }) => Promise<void>;
   onPreset?: (preset: typeof AUTOMATION_PRESETS[number]) => void;
 };
@@ -37,6 +37,8 @@ export const AutomationBuilder: React.FC<Props> = ({ initial, onClose, onSave, o
   const [trigger, setTrigger] = useState<AutomationTrigger>(initial?.trigger ?? 'LOW_STOCK');
   const [threshold, setThreshold] = useState('');
   const [cooldown, setCooldown] = useState(String(initial?.cooldown_minutes ?? 1440));
+  const [schedule, setSchedule] = useState(initial?.schedule ?? '');
+  const [timezone, setTimezone] = useState(initial?.timezone ?? 'America/Sao_Paulo');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preset, setPreset] = useState('');
@@ -51,7 +53,7 @@ export const AutomationBuilder: React.FC<Props> = ({ initial, onClose, onSave, o
       await onSave({
         name: name.trim(), description: description.trim(), category, trigger,
         conditions: condition ? [condition] : [], actions: [action], priority: 100,
-        cooldown_minutes: Math.max(0, Number(cooldown) || 0), schedule: null,
+        cooldown_minutes: Math.max(0, Number(cooldown) || 0), schedule: schedule || null, timezone,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar a automação.');
@@ -64,6 +66,8 @@ export const AutomationBuilder: React.FC<Props> = ({ initial, onClose, onSave, o
     setPreset(String(index)); setName(selected.name); setDescription(selected.description);
     setCategory(selected.category); setTrigger(selected.trigger);
     setCooldown(String(selected.cooldown_minutes));
+    setSchedule('');
+    setTimezone('America/Sao_Paulo');
     setThreshold(typeof selected.conditions[0]?.value === 'number' ? String(selected.conditions[0].value) : '');
     onPreset?.(selected);
   };
@@ -84,6 +88,8 @@ export const AutomationBuilder: React.FC<Props> = ({ initial, onClose, onSave, o
             <div className="field"><label>Quando</label><select value={trigger} onChange={e=>{const t=triggers.find(x=>x.value===e.target.value); setTrigger(e.target.value as AutomationTrigger); if(t) setCategory(t.category);}}>{triggers.map(t=><option value={t.value} key={t.value}>{t.label}</option>)}</select></div>
             <div className="field"><label>Limite (opcional)</label><input inputMode="numeric" value={threshold} onChange={e=>setThreshold(e.target.value.replace(/[^0-9]/g,''))} placeholder="Ex.: 2" /></div>
             <div className="field"><label>Intervalo entre alertas (min.)</label><input inputMode="numeric" value={cooldown} onChange={e=>setCooldown(e.target.value.replace(/[^0-9]/g,''))} /></div>
+            <div className="field"><label>Horário de execução (HH:MM)</label><input type="time" value={schedule} onChange={e=>setSchedule(e.target.value)} /></div>
+            <div className="field"><label>Fuso horário</label><select value={timezone} onChange={e=>setTimezone(e.target.value)}><option value="America/Sao_Paulo">Brasília (UTC−03:00)</option><option value="America/Manaus">Manaus (UTC−04:00)</option><option value="America/Belem">Belém (UTC−03:00)</option><option value="America/Fortaleza">Fortaleza (UTC−03:00)</option></select></div>
             <div className="automation-builder-flow full"><span>QUANDO</span><strong>{triggers.find(t=>t.value===trigger)?.label}</strong><span>ENTÃO</span><strong>{trigger.startsWith('REPORT_') ? 'Preparar relatório' : 'Gerar notificação interna'}</strong></div>
           </div>
           {error && <div className="form-error">{error}</div>}

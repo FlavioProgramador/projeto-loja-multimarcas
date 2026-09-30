@@ -122,19 +122,92 @@ set search_path = public
 as $$
   declare
     r public.automation_rules%rowtype;
-    v_count integer := 0;
+    v_due integer := 0;
+    v_run_id uuid;
+    v_run_started timestamptz;
+    v_idempotency_key text;
+    v_local_hm text;
+    v_message text;
   begin
     for r in
-      select * from public.automation_rules
-       where status='ACTIVE'
-         and (p_store_id is null or store_id=p_store_id)
+      select *
+        from public.automation_rules
+       where status = 'ACTIVE'
+         and (p_store_id is null or store_id = p_store_id)
+         and schedule is not null
+         and to_char(now() at time zone coalesce(nullif(timezone, ''), 'America/Sao_Paulo'), 'HH24:MI') = schedule
+         and (last_run_at is null or last_run_at < date_trunc('minute', now()))
        order by priority desc, created_at
     loop
-      v_count := v_count + 1;
-      -- A execução de ações será adicionada somente após validação do catálogo de ações.
-      -- Este ciclo mantém o scheduler seguro e não toca em dados operacionais.
+      v_due := v_due + 1;
+      v_local_hm := to_char(now() at time zone coalesce(nullif(r.timezone, ''), 'America/Sao_Paulo'), 'HH24:MI');
+      v_idempotency_key := format('schedule:%s:%s:%s', r.id, to_char(now() at time zone coalesce(nullif(r.timezone, ''), 'America/Sao_Paulo'), 'YYYY-MM-DD'), v_local_hm);
+      v_run_started := clock_timestamp();
+
+      begin
+        insert into public.automation_runs (
+          automation_id, store_id, event_type, idempotency_key, status, result, started_at
+        )
+        values (
+          r.id, r.store_id, r.trigger_type, v_idempotency_key, 'RUNNING',
+          jsonb_build_object('mode', p_mode, 'scheduled_at', v_local_hm, 'timezone', r.timezone),
+          v_run_started
+        )
+        on conflict (automation_id, store_id, idempotency_key) do nothing
+        returning id into v_run_id;
+
+        if v_run_id is null then
+          continue;
+        end if;
+
+        -- As ações são registradas de forma observável nesta etapa.
+        -- A execução operacional de cada ação deve ser adicionada por tipo,
+        -- sem permitir que falhas de uma regra interrompam as demais.
+        v_message := format('Ciclo agendado processado para %s.', r.name);
+
+        update public.automation_runs
+           set status = 'COMPLETED',
+               result = jsonb_build_object(
+                 'success', true,
+                 'message', v_message,
+                 'scheduled_at', v_local_hm,
+                 'timezone', r.timezone
+               ),
+               finished_at = clock_timestamp(),
+               duration_ms = round(extract(epoch from (clock_timestamp() - v_run_started)) * 1000)::bigint
+         where id = v_run_id;
+
+        update public.automation_rules
+           set last_run_at = now(),
+               next_run_at = (date_trunc('day', (now() at time zone coalesce(nullif(r.timezone, ''), 'America/Sao_Paulo')) + interval '1 day')
+                               + (r.schedule || ':00')::time) at time zone coalesce(nullif(r.timezone, ''), 'America/Sao_Paulo'),
+               execution_count = execution_count + 1,
+               updated_at = now()
+         where id = r.id;
+      exception
+        when others then
+          if v_run_id is not null then
+            update public.automation_runs
+               set status = 'FAILED',
+                   error_message = sqlerrm,
+                   finished_at = clock_timestamp(),
+                   duration_ms = round(extract(epoch from (clock_timestamp() - v_run_started)) * 1000)::bigint
+             where id = v_run_id;
+          end if;
+
+          update public.automation_rules
+             set failure_count = failure_count + 1,
+                 last_run_at = now(),
+                 updated_at = now()
+           where id = r.id;
+      end;
     end loop;
-    return jsonb_build_object('success',true,'mode',p_mode,'active_rules',v_count);
+
+    return jsonb_build_object(
+      'success', true,
+      'mode', p_mode,
+      'due_rules', v_due
+    );
   end;
 $$;
 

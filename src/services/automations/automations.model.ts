@@ -55,6 +55,7 @@ export interface AutomationRule {
   priority: number;
   cooldown_minutes: number;
   schedule: string | null;
+  timezone: string;
   created_by: string;
   updated_by: string;
   created_at: string;

@@ -31,7 +31,6 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
   ProductsService,
   InventoryService,
-  SalesService,
   CustomersService,
   SuppliersService,
   FinanceService
@@ -408,221 +407,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ]);
   };
 
-  const processSale = async ({
-    cartItems,
-    buyerName,
-    cpf,
-    paymentMethod,
-    installments,
-    discountValue,
-    discountPercent,
-    creditUsed = 0
-  }: {
-    cartItems: CartItem[];
-    buyerName: string;
-    cpf: string;
-    paymentMethod: string;
-    installments: number;
-    discountValue: number;
-    discountPercent: number;
-    creditUsed?: number;
-  }) => {
-    if (cartItems.length === 0) {
-      return { success: false, message: 'Carrinho vazio', totalFinal: 0 };
-    }
-
-    // Se o Supabase estiver configurado e os itens tiverem UUIDs, processar atomicamente via RPC complete_sale
-    if (isSupabaseConfigured) {
-      if (!activeStoreId) {
-        return { success: false, message: 'Nenhuma loja ativa selecionada', totalFinal: 0 };
-      }
-      const hasVariantIds = cartItems.every(item => item.variantId);
-      if (hasVariantIds) {
-        const idempotencyKey = crypto.randomUUID();
-        const rpcResult = await SalesService.completeSale({
-          storeId: activeStoreId,
-          cartItems,
-          buyerName,
-          cpf,
-          paymentMethod,
-          installments,
-          discountValue: discountValue + creditUsed,
-          discountPercent,
-          idempotencyKey
-        });
-
-        if (rpcResult.success) {
-          // Se houve crédito usado, abater do cliente localmente também
-          if (creditUsed > 0) {
-            setCustomers(prev =>
-              prev.map(c =>
-                c.cpf === cpf || c.nome.toLowerCase() === buyerName.toLowerCase()
-                  ? {
-                    ...c,
-                    saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed)
-                  }
-                  : c
-              )
-            );
-          }
-          await refreshData();
-          return {
-            success: true,
-            message: 'Venda processada atomicamente no Supabase com sucesso!',
-            totalFinal: rpcResult.totalFinal
-          };
-        } else {
-          return {
-            success: false,
-            message: rpcResult.message || 'Falha ao processar venda no banco de dados.',
-            totalFinal: 0
-          };
-        }
-      }
-    }
-
-    // Operações críticas não podem cair silenciosamente para o navegador quando o backend está configurado.
-    // O fallback local continua disponível apenas para o modo explicitamente offline/local.
-    if (isSupabaseConfigured) {
-      return {
-        success: false,
-        message: 'Não foi possível concluir a venda no servidor. A operação não foi registrada localmente.',
-        totalFinal: 0
-      };
-    }
-
-    // Processamento Local / Fallback
-    const subtotal = cartItems.reduce((acc, item) => acc + item.preco * item.qtd, 0);
-    const discountTotal = discountValue + subtotal * (discountPercent / 100);
-    const totalFinal = Math.max(0, subtotal - discountTotal - creditUsed);
-
-    const nextVendaNum = movements.length + 1004;
-    const vendaIdFormatted = `PDV #${nextVendaNum}`;
-    const currentDate = hoje();
-    const resolvedName = buyerName.trim() || 'Cliente não identificado';
-    const resolvedCpf = cpf.trim() || 'Não informado';
-
-    let paymentFormatted = paymentMethod;
-    if (paymentMethod === 'Cartão' && installments > 1) {
-      paymentFormatted += ` ${installments}x`;
-    }
-    if (creditUsed > 0) {
-      paymentFormatted += ` (Abatido R$ ${creditUsed.toFixed(2)} de Crédito)`;
-    }
-
-    // Deduct stock from products
-    setProducts(prev =>
-      prev.map(prod => {
-        const matchingItems = cartItems.filter(item => item.produtoId === prod.id);
-        if (matchingItems.length === 0) return prod;
-
-        const updatedSkus = prod.skus.map((sku, sIdx) => {
-          const cartItemMatch = matchingItems.find(item => item.skuIndex === sIdx);
-          if (!cartItemMatch) return sku;
-          return {
-            ...sku,
-            qtd: Math.max(0, sku.qtd - cartItemMatch.qtd)
-          };
-        });
-
-        return { ...prod, skus: updatedSkus };
-      })
-    );
-
-    // Add movement
-    const nextMovId = movements.reduce((max, m) => Math.max(max, m.id), 0) + 1;
-    const newMovement: SaleMovement = {
-      id: nextMovId,
-      tipo: 'EXPENSE',
-      valor: totalFinal,
-      formaPagamento: paymentFormatted,
-      comprador: resolvedName,
-      cpf: resolvedCpf,
-      produtos: cartItems.map(i => `${i.nome} (${i.tamanho}/${i.cor}) x${i.qtd}`).join(', '),
-      data: currentDate,
-      vendaId: vendaIdFormatted,
-      creditoUtilizado: creditUsed
-    };
-    setMovements(prev => [newMovement, ...prev]);
-
-    // Update customer history and deduct store credit if used
-    setCustomers(prev => {
-      const existingCustomer =
-        prev.find(c => c.cpf === resolvedCpf && resolvedCpf !== 'Não informado') ||
-        prev.find(c => c.nome.toLowerCase() === resolvedName.toLowerCase());
-
-      const purchaseRecord = {
-        vendaId: vendaIdFormatted,
-        valor: totalFinal,
-        data: currentDate,
-        itens: cartItems.map(i => `${i.nome} x${i.qtd}`).join(', ')
-      };
-
-      const creditDebitMovement = creditUsed > 0
-        ? [{
-          id: Date.now(),
-          tipo: 'saida' as const,
-          valor: creditUsed,
-          descricao: `Uso de crédito na Venda ${vendaIdFormatted}`,
-          data: currentDate,
-          referenciaId: vendaIdFormatted
-        }]
-        : [];
-
-      if (existingCustomer) {
-        return prev.map(c =>
-          c.id === existingCustomer.id
-            ? {
-              ...c,
-              saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed),
-              historico: [purchaseRecord, ...c.historico],
-              movimentacoesCredito: [
-                ...creditDebitMovement,
-                ...(c.movimentacoesCredito || [])
-              ]
-            }
-            : c
-        );
-      } else if (resolvedName !== 'Cliente não identificado') {
-        const nextCustId = prev.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-        return [
-          ...prev,
-          {
-            id: nextCustId,
-            nome: resolvedName,
-            cpf: resolvedCpf,
-            telefone: '',
-            email: '',
-            endereco: '',
-            saldoCredito: 0,
-            historico: [purchaseRecord],
-            movimentacoesCredito: creditDebitMovement
-          }
-        ];
-      }
-      return prev;
-    });
-
-    // Add financial entry transaction
-    if (totalFinal > 0) {
-      const nextTransId = transactions.reduce((max, t) => Math.max(max, t.id), 0) + 1;
-      setTransactions(prev => [
-        {
-          id: nextTransId,
-          tipo: 'INCOME',
-          descricao: `Venda ${vendaIdFormatted}`,
-          valor: totalFinal,
-          data: currentDate
-        },
-        ...prev
-      ]);
-    }
-
-    // Check low stock notifications
-    checkAlerts();
-
-    return { success: true, message: 'Venda realizada com sucesso!', totalFinal };
-  };
+  const processSale = useSalesDomain({
+    activeStoreId,
+    isSupabaseConfigured,
+    movements,
+    transactions,
+    setProducts,
+    setMovements,
+    setCustomers,
+    setTransactions,
+    checkAlerts,
+    refreshData,
+  }).processSale;
 
   const processReturn = async ({
     clienteNome, clienteCpf, vendaOriginalId, itens, tipoResolucao, observacoes

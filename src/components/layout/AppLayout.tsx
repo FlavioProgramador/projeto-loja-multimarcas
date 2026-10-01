@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, DollarSign, ArrowLeftRight, Users, Truck, FileText, Zap, Settings, Sun, Moon, Minus, Plus, HelpCircle, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, ShoppingCart, Package, DollarSign, ArrowLeftRight, RotateCcw, Users, Truck, FileText, Zap, Settings, Sun, Moon, Minus, Plus, HelpCircle, LogOut, Building2 } from 'lucide-react';
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useStore } from '../../contexts/StoreContext';
+import { canAccessModule, getRoleLabel } from '../../lib/permissions';
 import { HeaderAgenda } from './HeaderAgenda';
 
 interface AppLayoutProps {
@@ -20,6 +22,7 @@ const menuGroups = [
     title: 'Operações',
     items: [
       { id: 'pdv' as ActiveModule, label: 'PDV / Caixa', icon: ShoppingCart },
+      { id: 'trocas' as ActiveModule, label: 'Trocas & Devoluções', icon: RotateCcw },
     ],
   },
   {
@@ -49,19 +52,6 @@ const menuGroups = [
   },
 ];
 
-const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
-  dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  estoque: ['ADMIN', 'MANAGER'],
-  trocas: ['ADMIN', 'MANAGER'],
-  financeiro: ['ADMIN', 'MANAGER'],
-  movimentacoes: ['ADMIN', 'MANAGER', 'EMPLOYEE'],
-  clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  fornecedores: ['ADMIN', 'MANAGER'],
-  relatorios: ['ADMIN', 'MANAGER'],
-  automacoes: ['ADMIN'],
-};
-
 const moduleLabels: Record<ActiveModule, string> = {
   dashboard: 'Dashboard',
   pdv: 'PDV / Caixa',
@@ -76,7 +66,8 @@ const moduleLabels: Record<ActiveModule, string> = {
 };
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate, children }) => {
-  const { user, profile, role, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  const { userStores, activeStoreId, activeStoreRole, setActiveStoreId, isLoading } = useStore();
   const { theme, toggleTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -102,13 +93,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
   }, [isSettingsOpen]);
 
   const displayName = profile?.full_name || (user?.email ? user.email.split('@')[0] : 'Administrador');
-  const roleLabel = role === 'ADMIN'
-    ? 'Administrador'
-    : role === 'MANAGER'
-      ? 'Gerente'
-      : role === 'CASHIER'
-        ? 'Caixa'
-        : 'Colaborador';
+  const roleLabel = getRoleLabel(activeStoreRole);
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'CS';
 
   const handleSignOut = async () => {
@@ -129,7 +114,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
 
         <nav className="sidebar-navigation" aria-label="Navegação principal">
           {menuGroups.map(group => {
-            const visibleItems = group.items.filter(item => !user || (role && MODULE_PERMISSIONS[item.id].includes(role)));
+            const visibleItems = group.items.filter(item => !user || canAccessModule(activeStoreRole, item.id));
             if (visibleItems.length === 0) return null;
 
             return (
@@ -196,6 +181,23 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
           </div>
 
           <div className="header-right">
+            {userStores.length > 1 && (
+              <label className="store-switcher" title="Loja ativa">
+                <Building2 className="store-switcher__icon" size={16} aria-hidden="true" />
+                <select
+                  className="store-switcher__select"
+                  aria-label="Loja ativa"
+                  value={activeStoreId ?? ''}
+                  onChange={event => setActiveStoreId(event.target.value)}
+                  disabled={isLoading}
+                >
+                  {userStores.map(store => (
+                    <option key={store.store_id} value={store.store_id}>{store.store_name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             <HeaderAgenda />
 
             <div style={{ position: 'relative' }} ref={settingsRef}>

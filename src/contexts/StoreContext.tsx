@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Product, FinancialTransaction, Customer, Supplier, FixedExpense, SaleMovement, CartItem, ReturnRecord, ReturnItem, UserStoreAccess } from '../types';
+import type { UserRole } from '../types/database';
 import { INITIAL_PRODUCTS, INITIAL_SUPPLIERS, INITIAL_FIXED_EXPENSES, INITIAL_NOTIFICATIONS } from '../data/initialData';
 import { useCustomersDomain } from '../hooks/domains/useCustomersDomain';
 import { useProductsDomain } from '../hooks/domains/useProductsDomain';
@@ -27,6 +28,7 @@ interface StoreContextType {
   isLoading: boolean;
   userStores: UserStoreAccess[];
   activeStoreId: string | null;
+  activeStoreRole: UserRole | null;
   setActiveStoreId: (id: string) => void;
   addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   updateProduct: (id: number, updated: Partial<Product>) => Promise<void>;
@@ -48,29 +50,48 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, session, isAuthorized, loading: authLoading } = useAuth();
-  const [products, setProducts] = useState<Product[]>(() => { const saved = localStorage.getItem('erp_products'); return saved ? JSON.parse(saved) : INITIAL_PRODUCTS; });
+  const { user, session, stores: authorizedStores, isAuthorized, loading: authLoading } = useAuth();
+  const [products, setProducts] = useState<Product[]>(() => { if (isSupabaseConfigured) return []; const saved = localStorage.getItem('erp_products'); return saved ? JSON.parse(saved) : INITIAL_PRODUCTS; });
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [movements, setMovements] = useState<SaleMovement[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(() => { const saved = localStorage.getItem('erp_suppliers'); return saved ? JSON.parse(saved) : INITIAL_SUPPLIERS; });
-  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(() => { const saved = localStorage.getItem('erp_fixed_expenses'); return saved ? JSON.parse(saved) : INITIAL_FIXED_EXPENSES; });
-  const [notifications, setNotifications] = useState<string[]>(() => { const saved = localStorage.getItem('erp_notifications'); return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS; });
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => { if (isSupabaseConfigured) return []; const saved = localStorage.getItem('erp_suppliers'); return saved ? JSON.parse(saved) : INITIAL_SUPPLIERS; });
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(() => { if (isSupabaseConfigured) return []; const saved = localStorage.getItem('erp_fixed_expenses'); return saved ? JSON.parse(saved) : INITIAL_FIXED_EXPENSES; });
+  const [notifications, setNotifications] = useState<string[]>(() => { if (isSupabaseConfigured) return []; const saved = localStorage.getItem('erp_notifications'); return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS; });
   const [isLoading, setIsLoading] = useState(false);
-  const [userStores, setUserStores] = useState<UserStoreAccess[]>([]);
+  const userStores: UserStoreAccess[] = authorizedStores;
   const resetStoreState = useCallback(() => {
-    setProducts([]); setTransactions([]); setMovements([]); setCustomers([]); setReturns([]); setSuppliers([]); setFixedExpenses([]); setNotifications([]); setUserStores([]);
+    setProducts([]); setTransactions([]); setMovements([]); setCustomers([]); setReturns([]); setSuppliers([]); setFixedExpenses([]); setNotifications([]); setIsLoading(false);
     ['erp_products','erp_transactions','erp_movements','erp_customers','erp_returns','erp_suppliers','erp_fixed_expenses','erp_notifications'].forEach(key => { localStorage.removeItem(key); sessionStorage.removeItem(key); });
   }, []);
 
   const { activeStoreId, setActiveStoreId } = useStoreSelection({ isAuthorized, isSupabaseConfigured, remoteStores: userStores });
+  const activeStoreRole = useMemo<UserRole | null>(
+    () => (userStores.find(store => store.store_id === activeStoreId)?.role as UserRole | undefined) ?? null,
+    [activeStoreId, userStores]
+  );
   useStoreAuthReset({ userId: user?.id, isAuthorized, resetStoreState });
   const { refreshData } = useStoreData({
     userId: user?.id, accessToken: session?.access_token, isAuthorized, authLoading,
-    activeStoreId, setUserStores, setProducts, setTransactions,
+    activeStoreId, setProducts, setTransactions,
     setMovements, setCustomers, setReturns, setSuppliers, setFixedExpenses, setIsLoading,
   });
+
+  const previousStoreIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!activeStoreId || previousStoreIdRef.current === activeStoreId) return;
+
+    setProducts([]);
+    setTransactions([]);
+    setMovements([]);
+    setCustomers([]);
+    setReturns([]);
+    setFixedExpenses([]);
+    setNotifications([]);
+    previousStoreIdRef.current = activeStoreId;
+  }, [activeStoreId]);
 
   const refreshDataRef = useRef(refreshData);
 
@@ -100,7 +121,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <StoreContext.Provider value={{
       products, transactions, movements, customers, returns, suppliers, fixedExpenses, notifications,
-      isLoading, userStores, activeStoreId, setActiveStoreId,
+      isLoading, userStores, activeStoreId, activeStoreRole, setActiveStoreId,
       addProduct: productsDomain.addProduct,
       updateProduct: productsDomain.updateProduct,
       deleteProduct: productsDomain.deleteProduct,

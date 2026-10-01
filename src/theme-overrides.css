@@ -553,3 +553,14 @@ body.dark-mode button:disabled {
 :root:not([data-theme='dark']) .breadcrumb-divider {
   color: #64748b !important;
 }
+
+/* Store switcher: the outer wrapper owns the visual border. */
+.store-switcher .store-switcher__select {
+  border: 0 !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  background: transparent !important;
+}
+

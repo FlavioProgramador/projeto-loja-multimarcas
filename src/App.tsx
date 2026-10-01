@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { StoreProvider } from './contexts/StoreContext';
+import { StoreProvider, useStore } from './contexts/StoreContext';
 import { CartProvider } from './contexts/CartContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { DashboardView } from './components/dashboard/DashboardView';
@@ -20,6 +20,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { getAuthScreen, goToApp, goToLogin, goToResetPassword, AuthScreen } from './lib/auth-routing';
+import { canAccessModule } from './lib/permissions';
 
 const VALID_MODULES: ActiveModule[] = [
   'dashboard',
@@ -44,19 +45,6 @@ function getInitialModule(): ActiveModule {
   return 'dashboard';
 }
 
-const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
-  dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  estoque: ['ADMIN', 'MANAGER'],
-  trocas: ['ADMIN', 'MANAGER'],
-  financeiro: ['ADMIN', 'MANAGER'],
-  movimentacoes: ['ADMIN', 'MANAGER', 'EMPLOYEE'],
-  clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  fornecedores: ['ADMIN', 'MANAGER'],
-  relatorios: ['ADMIN', 'MANAGER'],
-  automacoes: ['ADMIN']
-};
-
 function useAuthScreen(): AuthScreen {
   const [screen, setScreen] = useState<AuthScreen>(getAuthScreen);
 
@@ -74,7 +62,8 @@ function useAuthScreen(): AuthScreen {
 }
 
 export function AppContent() {
-  const { loading, isAuthorized, isPasswordRecovery, role } = useAuth();
+  const { loading, isAuthorized, isPasswordRecovery } = useAuth();
+  const { activeStoreId, activeStoreRole } = useStore();
   const screen = useAuthScreen();
   const [currentModule, setCurrentModule] = useState<ActiveModule>(getInitialModule);
 
@@ -109,9 +98,20 @@ export function AppContent() {
   }, [loading, isAuthorized, isPasswordRecovery, screen]);
 
   const handleNavigate = (module: ActiveModule) => {
-    setCurrentModule(module);
-    window.location.hash = `#/${module}`;
+    const target = activeStoreRole && canAccessModule(activeStoreRole, module) ? module : 'dashboard';
+    setCurrentModule(target);
+    window.location.hash = `#/${target}`;
   };
+
+  useEffect(() => {
+    if (!isAuthorized || !activeStoreRole) return;
+    if (canAccessModule(activeStoreRole, currentModule)) return;
+
+    setCurrentModule('dashboard');
+    if (window.location.hash !== '#/dashboard') {
+      window.location.hash = '#/dashboard';
+    }
+  }, [activeStoreRole, currentModule, isAuthorized]);
 
   if (loading) {
     return <AuthBootScreen />;
@@ -133,11 +133,11 @@ export function AppContent() {
     return <LoginPage />;
   }
 
-  const hasPermission = role ? MODULE_PERMISSIONS[currentModule]?.includes(role) : false;
-  const safeModule = hasPermission ? currentModule : 'dashboard';
-  if (!hasPermission && window.location.hash !== '#/dashboard') {
-    window.location.hash = '#/dashboard';
+  if (!activeStoreId || !activeStoreRole) {
+    return <AuthBootScreen />;
   }
+
+  const safeModule = canAccessModule(activeStoreRole, currentModule) ? currentModule : 'dashboard';
 
   const renderCurrentModule = () => {
     switch (safeModule) {

@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { ActiveModule } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useStore } from '../../contexts/StoreContext';
+import { canAccessModule, getRoleLabel } from '../../lib/permissions';
 
 interface SidebarProps {
   currentModule: ActiveModule;
@@ -41,33 +43,14 @@ const NAV_ITEMS: NavItemConfig[] = [
   { id: 'automacoes', label: 'Automações', icon: <Bot size={18} /> }
 ];
 
-const MODULE_PERMISSIONS: Record<ActiveModule, string[]> = {
-  dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  estoque: ['ADMIN', 'MANAGER'],
-  trocas: ['ADMIN', 'MANAGER'],
-  financeiro: ['ADMIN', 'MANAGER'],
-  movimentacoes: ['ADMIN', 'MANAGER', 'EMPLOYEE'],
-  clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
-  fornecedores: ['ADMIN', 'MANAGER'],
-  relatorios: ['ADMIN', 'MANAGER'],
-  automacoes: ['ADMIN']
-};
-
-const roleLabels: Record<string, string> = {
-  ADMIN: 'Administrador',
-  MANAGER: 'Gerente',
-  CASHIER: 'Caixa',
-  EMPLOYEE: 'Colaborador'
-};
-
 export const Sidebar: React.FC<SidebarProps> = ({
   currentModule,
   onNavigate,
   isOpen,
   onClose
 }) => {
-  const { user, profile, role } = useAuth();
+  const { user, profile } = useAuth();
+  const { activeStoreRole } = useStore();
 
   const handleItemClick = (module: ActiveModule) => {
     onNavigate(module);
@@ -83,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .toUpperCase() || 'CS';
 
   const filteredNavItems = NAV_ITEMS.filter(item =>
-    !user || (role ? MODULE_PERMISSIONS[item.id]?.includes(role) : false)
+    !user || canAccessModule(activeStoreRole, item.id)
   );
 
   return (
@@ -122,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="avatar avatar-sm">{initials}</div>
             <div className="account-copy">
               <strong>{displayName}</strong>
-              <span>{roleLabels[role] || 'Usuário'}</span>
+              <span>{getRoleLabel(activeStoreRole)}</span>
             </div>
           </div>
         </div>

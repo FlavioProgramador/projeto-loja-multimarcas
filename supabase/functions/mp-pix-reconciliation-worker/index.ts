@@ -11,6 +11,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function isPastExpiration(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && timestamp <= Date.now();
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   if (!supabaseUrl || !serviceRoleKey || !mpAccessToken) {
@@ -18,7 +24,18 @@ Deno.serve(async (req) => {
     return json({ error: "worker_unavailable" }, 500);
   }
 
+  const workerToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  if (!workerToken) return json({ error: "unauthorized" }, 401);
+
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const { data: authorized, error: authError } = await supabase.rpc("verify_pix_worker_token", {
+    p_token: workerToken,
+  });
+  if (authError || authorized !== true) {
+    console.warn("PIX worker authorization rejected");
+    return json({ error: "unauthorized" }, 401);
+  }
+
   const { data: candidates, error: candidateError } = await supabase.rpc(
     "list_stale_pix_reconciliation_candidates",
     { p_older_than_minutes: 60 },
@@ -54,6 +71,7 @@ Deno.serve(async (req) => {
 
       const payment = await providerResponse.json();
       const status = payment?.status;
+      const expiredByDeadline = status === "pending" && isPastExpiration(payment?.date_of_expiration);
 
       if (status === "approved") {
         const { error } = await supabase.rpc("approve_mp_pix_sale", {
@@ -62,10 +80,14 @@ Deno.serve(async (req) => {
         });
         if (error) throw error;
         results.push({ sale_id: saleId, action: "approved" });
-      } else if (["cancelled", "rejected", "expired"].includes(status)) {
+      } else if (["cancelled", "rejected", "expired"].includes(status) || expiredByDeadline) {
         const { error } = await supabase.rpc("cancel_mp_pix_sale", { p_sale_id: saleId });
         if (error) throw error;
-        results.push({ sale_id: saleId, action: "cancelled", provider_status: status });
+        results.push({
+          sale_id: saleId,
+          action: "cancelled",
+          provider_status: expiredByDeadline ? "expired_deadline" : status,
+        });
       } else {
         results.push({ sale_id: saleId, action: "unchanged", provider_status: status ?? "unknown" });
       }
@@ -74,6 +96,16 @@ Deno.serve(async (req) => {
       results.push({ sale_id: saleId, action: "retry", reason: "processing_failed" });
     }
   }
+
+  const summary = results.reduce(
+    (acc, item) => {
+      const action = String(item.action ?? "unknown");
+      acc[action] = (acc[action] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  console.log("PIX reconciliation summary", JSON.stringify({ processed: results.length, ...summary }));
 
   return json({ processed: results.length, results });
 });

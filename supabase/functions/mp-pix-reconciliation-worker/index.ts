@@ -97,14 +97,11 @@ Deno.serve(async (req) => {
     }
   }
 
-  const summary = results.reduce(
-    (acc, item) => {
-      const action = String(item.action ?? "unknown");
-      acc[action] = (acc[action] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
+  const summary: Record<string, number> = {};
+  for (const item of results) {
+    const action = String(item.action ?? "unknown");
+    summary[action] = (summary[action] ?? 0) + 1;
+  }
   console.log("PIX reconciliation summary", JSON.stringify({ processed: results.length, ...summary }));
 
   return json({ processed: results.length, results });

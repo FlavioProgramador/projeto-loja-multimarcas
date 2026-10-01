@@ -62,7 +62,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState(false);
   const userStores: UserStoreAccess[] = authorizedStores;
   const resetStoreState = useCallback(() => {
-    setProducts([]); setTransactions([]); setMovements([]); setCustomers([]); setReturns([]); setSuppliers([]); setFixedExpenses([]); setNotifications([]);
+    setProducts([]); setTransactions([]); setMovements([]); setCustomers([]); setReturns([]); setSuppliers([]); setFixedExpenses([]); setNotifications([]); setIsLoading(false);
     ['erp_products','erp_transactions','erp_movements','erp_customers','erp_returns','erp_suppliers','erp_fixed_expenses','erp_notifications'].forEach(key => { localStorage.removeItem(key); sessionStorage.removeItem(key); });
   }, []);
 

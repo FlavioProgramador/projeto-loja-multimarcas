@@ -37,10 +37,6 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    if (chartInstance.current) {
-      chartInstance.current.destroy();
-    }
-
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
@@ -96,11 +92,21 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
     });
 
     return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
+      chartInstance.current?.destroy();
+      chartInstance.current = null;
     };
-  }, [theme, labels, data, colors]);
+  }, [theme, colors]);
+
+  useEffect(() => {
+    const chart = chartInstance.current;
+    if (!chart) return;
+
+    const nextData = data.length ? data : [1];
+    chart.data.labels = labels.length ? labels : ['Sem dados'];
+    chart.data.datasets[0].data = nextData;
+    chart.data.datasets[0].backgroundColor = nextData.map((_, i) => colors[i % colors.length]);
+    chart.update('none');
+  }, [labels, data, colors]);
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '280px', overflow: 'hidden' }}>

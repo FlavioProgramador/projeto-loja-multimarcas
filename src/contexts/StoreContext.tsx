@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Product, FinancialTransaction, Customer, Supplier, FixedExpense, SaleMovement, CartItem, ReturnRecord, ReturnItem, UserStoreAccess } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_SUPPLIERS, INITIAL_FIXED_EXPENSES, INITIAL_NOTIFICATIONS } from '../data/initialData';
 import { useCustomersDomain } from '../hooks/domains/useCustomersDomain';
@@ -68,14 +68,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useStoreAuthReset({ userId: user?.id, isAuthorized, resetStoreState });
   const { refreshData } = useStoreData({
     userId: user?.id, accessToken: session?.access_token, isAuthorized, authLoading,
-    activeStoreId, setActiveStoreId, setUserStores, setProducts, setTransactions,
+    activeStoreId, setUserStores, setProducts, setTransactions,
     setMovements, setCustomers, setReturns, setSuppliers, setFixedExpenses, setIsLoading,
   });
 
+  const refreshDataRef = useRef(refreshData);
+
+  useEffect(() => {
+    refreshDataRef.current = refreshData;
+  }, [refreshData]);
+
   useEffect(() => {
     if (!isAuthorized || authLoading || !session?.access_token) return;
-    refreshData();
-  }, [refreshData, isAuthorized, authLoading, session?.access_token]);
+    void refreshDataRef.current();
+  }, [activeStoreId, authLoading, isAuthorized, session?.access_token, user?.id]);
 
   useEffect(() => { if (isAuthorized) localStorage.setItem('erp_products', JSON.stringify(products)); }, [isAuthorized, products]);
   useEffect(() => { if (isAuthorized) localStorage.setItem('erp_suppliers', JSON.stringify(suppliers)); }, [isAuthorized, suppliers]);

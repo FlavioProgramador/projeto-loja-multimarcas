@@ -23,13 +23,26 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
 
+function areStoreAccessListsEqual(current: UserStoreAccess[], next: UserStoreAccess[]): boolean {
+  if (current.length !== next.length) return false;
+
+  return current.every((store, index) => {
+    const candidate = next[index];
+    return Boolean(
+      candidate &&
+      store.store_id === candidate.store_id &&
+      store.role === candidate.role &&
+      store.store_name === candidate.store_name
+    );
+  });
+}
+
 interface UseStoreDataParams {
   userId?: string;
   accessToken?: string;
   isAuthorized: boolean;
   authLoading: boolean;
   activeStoreId: string | null;
-  setActiveStoreId: (id: string) => void;
   setUserStores: Setter<UserStoreAccess[]>;
   setProducts: Setter<Product[]>;
   setTransactions: Setter<FinancialTransaction[]>;
@@ -47,7 +60,6 @@ export const useStoreData = ({
   isAuthorized,
   authLoading,
   activeStoreId,
-  setActiveStoreId,
   setUserStores,
   setProducts,
   setTransactions,
@@ -79,16 +91,13 @@ export const useStoreData = ({
         throw new Error('Nenhuma loja disponível para o usuário autenticado.');
       }
 
-      setUserStores(remoteStores);
+      setUserStores(current => areStoreAccessListsEqual(current, remoteStores) ? current : remoteStores);
 
       const resolvedStoreId =
         activeStoreId && remoteStores.some(store => store.store_id === activeStoreId)
           ? activeStoreId
           : remoteStores[0].store_id;
 
-      if (resolvedStoreId !== activeStoreId) {
-        setActiveStoreId(resolvedStoreId);
-      }
 
       const results = await Promise.allSettled([
         ProductsService.getAll(resolvedStoreId),
@@ -136,7 +145,6 @@ export const useStoreData = ({
     activeStoreId,
     authLoading,
     isAuthorized,
-    setActiveStoreId,
     setCustomers,
     setFixedExpenses,
     setIsLoading,

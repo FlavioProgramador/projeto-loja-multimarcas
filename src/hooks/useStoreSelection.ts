@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UserStoreAccess } from '../types';
 
 interface UseStoreSelectionParams {
@@ -13,34 +13,36 @@ export const useStoreSelection = ({
   remoteStores,
 }: UseStoreSelectionParams) => {
   const [activeStoreId, setActiveStoreIdState] = useState<string | null>(null);
+  const validStoreIdsRef = useRef<Set<string>>(new Set());
 
-  const validStoreIds = useMemo(
-    () => new Set(remoteStores.map(store => store.store_id)),
-    [remoteStores]
-  );
+  useEffect(() => {
+    validStoreIdsRef.current = new Set(remoteStores.map(store => store.store_id));
+  }, [remoteStores]);
 
   const setActiveStoreId = useCallback((id: string) => {
-    if (!validStoreIds.has(id)) return;
-    setActiveStoreIdState(id);
-  }, [validStoreIds]);
+    if (!validStoreIdsRef.current.has(id)) return;
+    setActiveStoreIdState(current => current === id ? current : id);
+  }, []);
 
   useEffect(() => {
     if (!isAuthorized) {
-      setActiveStoreIdState(null);
+      setActiveStoreIdState(current => current === null ? current : null);
       return;
     }
 
     if (!remoteStores.length) {
       if (isSupabaseConfigured) {
-        setActiveStoreIdState(null);
+        setActiveStoreIdState(current => current === null ? current : null);
       }
       return;
     }
 
     setActiveStoreIdState(current =>
-      current && validStoreIds.has(current) ? current : remoteStores[0].store_id
+      current && remoteStores.some(store => store.store_id === current)
+        ? current
+        : remoteStores[0].store_id
     );
-  }, [isAuthorized, isSupabaseConfigured, remoteStores, validStoreIds]);
+  }, [isAuthorized, isSupabaseConfigured, remoteStores]);
 
   return {
     activeStoreId,

@@ -29,10 +29,6 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    if (chartInstance.current) {
-      chartInstance.current.destroy();
-    }
-
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
@@ -104,11 +100,21 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
     });
 
     return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
+      chartInstance.current?.destroy();
+      chartInstance.current = null;
     };
-  }, [theme, labels, data, color]);
+  }, [theme, color]);
+
+  useEffect(() => {
+    const chart = chartInstance.current;
+    if (!chart) return;
+
+    chart.data.labels = labels.length ? labels : ['Sem dados'];
+    chart.data.datasets[0].data = data.length ? data : [0];
+    chart.data.datasets[0].backgroundColor = color;
+    chart.data.datasets[0].hoverBackgroundColor = color;
+    chart.update('none');
+  }, [labels, data, color]);
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '280px', overflow: 'hidden' }}>

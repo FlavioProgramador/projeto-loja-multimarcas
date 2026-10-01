@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type {
   Customer,
   FinancialTransaction,
@@ -53,6 +53,10 @@ export const useStoreData = ({
   setIsLoading,
 }: UseStoreDataParams) => {
   const refreshSequenceRef = useRef(0);
+
+  useEffect(() => {
+    refreshSequenceRef.current += 1;
+  }, [accessToken, activeStoreId, isAuthorized, userId]);
 
   const refreshData = useCallback(async () => {
     if (!isSupabaseConfigured || !isAuthorized || authLoading || !accessToken || !activeStoreId) return;

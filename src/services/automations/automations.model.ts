@@ -64,15 +64,20 @@ export interface AutomationRule {
   next_run_at: string | null;
   execution_count: number;
   failure_count: number;
+  archived_at: string | null;
+  archived_by: string | null;
 }
 
 export interface AutomationEvent {
   id: string;
   store_id: string;
+  automation_id: string | null;
   event_type: string;
   reference_id: string | null;
   idempotency_key: string | null;
   payload: Record<string, unknown>;
+  processed_at: string | null;
+  processing_error: string | null;
   created_at: string;
 }
 
@@ -91,6 +96,23 @@ export interface AutomationRun {
   duration_ms: number | null;
 }
 
+export interface AutomationTestResult {
+  success: boolean;
+  dry_run: boolean;
+  rule_id: string;
+  eligible: boolean;
+  matched_count: number;
+  in_cooldown: boolean;
+  next_run_at: string | null;
+  message: string;
+  evaluation: {
+    eligible?: boolean;
+    matched_count?: number;
+    trigger?: AutomationTrigger;
+    summary?: Record<string, unknown>;
+  };
+}
+
 export const AUTOMATION_PRESETS: Array<{
   name: string;
   description: string;
@@ -99,42 +121,78 @@ export const AUTOMATION_PRESETS: Array<{
   conditions: AutomationCondition[];
   actions: AutomationAction[];
   cooldown_minutes: number;
+  schedule?: string | null;
+  timezone?: string;
 }> = [
   {
     name: 'Alerta de estoque baixo',
-    description: 'Gera um alerta quando a quantidade de um SKU atinge o estoque mínimo.',
+    description: 'Gera alerta assim que um SKU atinge o estoque mínimo.',
     category: 'ESTOQUE',
     trigger: 'LOW_STOCK',
     conditions: [{ field: 'quantity', operator: 'LTE', value: 'minimum_stock' }],
     actions: [{ type: 'CREATE_ALERT' }, { type: 'CREATE_NOTIFICATION' }],
     cooldown_minutes: 1440,
+    schedule: null,
   },
   {
     name: 'Produto esgotado',
-    description: 'Sinaliza produtos sem saldo disponível para reposição.',
+    description: 'Sinaliza imediatamente produtos sem saldo disponível.',
     category: 'ESTOQUE',
     trigger: 'OUT_OF_STOCK',
     conditions: [{ field: 'quantity', operator: 'EQ', value: 0 }],
     actions: [{ type: 'CREATE_ALERT' }, { type: 'REQUEST_INTERVENTION' }],
     cooldown_minutes: 1440,
+    schedule: null,
   },
   {
     name: 'Conta vencendo',
-    description: 'Avisa sobre despesas que vencem nos próximos dias.',
+    description: 'Avisa diariamente sobre despesas que vencem nos próximos 3 dias.',
     category: 'FINANCEIRO',
     trigger: 'EXPENSE_DUE',
     conditions: [{ field: 'days_to_due', operator: 'LTE', value: 3 }],
     actions: [{ type: 'CREATE_NOTIFICATION' }, { type: 'AUDIT' }],
     cooldown_minutes: 1440,
+    schedule: '09:00',
   },
   {
     name: 'Conta vencida',
-    description: 'Avisa quando uma despesa passa da data de vencimento.',
+    description: 'Avisa diariamente quando uma despesa está vencida.',
     category: 'FINANCEIRO',
     trigger: 'EXPENSE_OVERDUE',
     conditions: [{ field: 'days_overdue', operator: 'GTE', value: 1 }],
     actions: [{ type: 'CREATE_ALERT' }, { type: 'REQUEST_INTERVENTION' }],
     cooldown_minutes: 1440,
+    schedule: '09:05',
+  },
+  {
+    name: 'Venda concluída',
+    description: 'Registra uma notificação interna quando uma venda é concluída.',
+    category: 'VENDAS',
+    trigger: 'SALE_COMPLETED',
+    conditions: [],
+    actions: [{ type: 'CREATE_NOTIFICATION' }, { type: 'AUDIT' }],
+    cooldown_minutes: 0,
+    schedule: null,
+  },
+  {
+    name: 'Cliente inativo',
+    description: 'Identifica clientes sem compra há 90 dias.',
+    category: 'CLIENTES',
+    trigger: 'CUSTOMER_INACTIVE',
+    conditions: [{ field: 'days_inactive', operator: 'DAYS_GTE', value: 90 }],
+    actions: [{ type: 'CREATE_NOTIFICATION' }],
+    cooldown_minutes: 1440,
+    schedule: '10:00',
+  },
+  {
+    name: 'Produto sem giro',
+    description: 'Identifica produtos sem venda há 60 dias.',
+    category: 'PRODUTOS',
+    trigger: 'PRODUCT_INACTIVE',
+    conditions: [{ field: 'days_inactive', operator: 'DAYS_GTE', value: 60 }],
+    actions: [{ type: 'CREATE_NOTIFICATION' }],
+    cooldown_minutes: 1440,
+    schedule: '10:05',
   },
   {
     name: 'Resumo diário de vendas',
@@ -144,5 +202,6 @@ export const AUTOMATION_PRESETS: Array<{
     conditions: [],
     actions: [{ type: 'GENERATE_REPORT' }, { type: 'AUDIT' }],
     cooldown_minutes: 1440,
+    schedule: '18:00',
   },
 ];

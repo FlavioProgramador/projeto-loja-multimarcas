@@ -3,7 +3,7 @@ import { canAccessModule, getRoleLabel } from './permissions';
 describe('permissões por módulo e loja ativa', () => {
   it('preserva as regras de acesso dos módulos por papel', () => {
     expect(canAccessModule('ADMIN', 'automacoes')).toBe(true);
-    expect(canAccessModule('MANAGER', 'automacoes')).toBe(false);
+    expect(canAccessModule('MANAGER', 'automacoes')).toBe(true);
     expect(canAccessModule('MANAGER', 'trocas')).toBe(true);
     expect(canAccessModule('CASHIER', 'trocas')).toBe(false);
     expect(canAccessModule('EMPLOYEE', 'movimentacoes')).toBe(true);

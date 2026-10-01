@@ -70,7 +70,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onCl
           ) : (
             <div className="customer-history-list">
               {history.map((item, index) => (
-                <article key={item.uuid || `${item.vendaId}-${item.data}-${index}`}>
+                <article key={`${item.vendaId}-${item.data}-${index}`}>
                   <div><strong>{item.vendaId || 'Venda'}</strong><span>{dateLabel(item.data)}</span></div>
                   <strong>{formatMoeda(item.valor)}</strong>
                   <small>{item.itens || 'Itens não informados'}</small>

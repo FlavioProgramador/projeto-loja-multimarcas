@@ -8,7 +8,7 @@ type Props = {
   onClose: () => void;
   onSave: (input: {
     name: string; description: string; category: AutomationCategory; trigger: AutomationTrigger;
-    conditions: Record<string, unknown>[]; actions: Record<string, unknown>[];
+    conditions: AutomationCondition[]; actions: AutomationAction[];
     priority: number; cooldown_minutes: number; schedule: string | null; timezone: string;
   }) => Promise<void>;
   onPreset?: (preset: typeof AUTOMATION_PRESETS[number]) => void;

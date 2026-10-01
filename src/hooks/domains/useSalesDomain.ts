@@ -148,8 +148,8 @@ export function useSalesDomain({
       if (resolvedName !== 'Cliente não identificado') {
         const nextCustId = prev.reduce((max, c) => Math.max(max, c.id), 0) + 1;
         return [...prev, {
-          id: nextCustId, nome: resolvedName, cpf: resolvedCpf, telefone: '', email: '',
-          endereco: '', saldoCredito: 0, historico: [purchaseRecord],
+          id: nextCustId, nome: resolvedName, cpf: resolvedCpf, rg: '', telefone: '', email: '',
+          endereco: '', dataNascimento: '', saldoCredito: 0, historico: [purchaseRecord],
           movimentacoesCredito: creditDebitMovement,
         }];
       }

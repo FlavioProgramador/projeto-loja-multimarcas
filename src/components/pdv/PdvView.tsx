@@ -720,7 +720,7 @@ export const PdvView: React.FC = () => {
         )}
       </div>
 
-      {lastSaleData && (<ReceiptPrinter cartItems={lastSaleData.cartItems} totalFinal={lastSaleData.totalFinal} paymentMethod={lastSaleData.paymentMethod} amountPaid={lastSaleData.amountPaid} change={lastSaleData.change} buyerName={lastSaleData.buyerName} cpf={lastSaleData.cpf} />)}
+      {lastSaleData && <ReceiptPrinter saleData={lastSaleData} />}
 
       {/* Modal de Novo Cliente com feedback visual integrado */}
       <NewCustomerModal

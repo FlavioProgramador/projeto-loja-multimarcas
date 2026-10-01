@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShoppingCart, Check, ShieldCheck, CreditCard, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingCart, Check, ShieldCheck, CreditCard, User, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { CartItem } from '../../types';
 import { formatMoeda, maskCpf } from '../../lib/utils';
@@ -40,8 +40,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   qrCodeBase64,
   isGeneratingPix
 }) => {
+  const [cashError, setCashError] = useState<string | null>(null);
+
   const amountNum = parseFloat(amountPaid) || 0;
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
+
+  // Auto-fill amountPaid with totalFinal when modal opens for cash payments if empty
+  useEffect(() => {
+    if (isOpen && paymentMethod === 'Dinheiro' && !amountPaid) {
+      setAmountPaid(totalFinal > 0 ? totalFinal.toFixed(2) : '');
+    }
+  }, [isOpen, paymentMethod, totalFinal, amountPaid, setAmountPaid]);
+
+  // Clear cash error when modal closes or payment method changes
+  useEffect(() => {
+    if (!isOpen || paymentMethod !== 'Dinheiro') {
+      setCashError(null);
+    }
+  }, [isOpen, paymentMethod]);
+
+  const handleConfirmAction = () => {
+    if (paymentMethod === 'Dinheiro') {
+      if (amountNum < totalFinal) {
+        setCashError(`Valor recebido insuficiente (${formatMoeda(amountNum)}). Falta ${formatMoeda(totalFinal - amountNum)}.`);
+        return;
+      }
+      setCashError(null);
+    }
+    onConfirm();
+  };
+
+  const handleApplyPreset = (value: number) => {
+    setAmountPaid(value.toFixed(2));
+    setCashError(null);
+  };
 
   return (
     <Modal
@@ -130,29 +162,74 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </span>
         </div>
 
-        {/* Calculadora de troco (somente dinheiro) */}
+        {/* Calculadora de troco & Atalhos de Dinheiro */}
         {paymentMethod === 'Dinheiro' && (
-          <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Valor Recebido (R$):</span>
-              <input 
-                type="number" 
-                step="0.01" 
-                value={amountPaid} 
-                onChange={(e) => setAmountPaid(e.target.value)}
-                style={{ width: '100px', textAlign: 'right' }}
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>Valor Recebido (R$):</span>
+              <input
+                type="number"
+                step="0.01"
+                value={amountPaid}
+                onChange={(e) => {
+                  setAmountPaid(e.target.value);
+                  setCashError(null);
+                }}
+                style={{
+                  width: '120px',
+                  textAlign: 'right',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-md)',
+                  border: cashError ? '1px solid var(--badge-red)' : '1px solid var(--border-color)',
+                  background: 'var(--bg-canvas)'
+                }}
+                placeholder="0.00"
               />
             </div>
+
+            {/* Quick Cash Presets */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginRight: '2px' }}>Atalhos:</span>
+              <button
+                type="button"
+                onClick={() => handleApplyPreset(totalFinal)}
+                style={{
+                  fontSize: '11px', padding: '4px 8px', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)', background: 'var(--bg-canvas)',
+                  color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                }}
+              >
+                Exato ({formatMoeda(totalFinal)})
+              </button>
+              {[20, 50, 100, 200].map(note => (
+                <button
+                  key={note}
+                  type="button"
+                  onClick={() => handleApplyPreset(note)}
+                  style={{
+                    fontSize: '11px', padding: '4px 8px', borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)', background: 'var(--bg-canvas)',
+                    color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 500
+                  }}
+                >
+                  R$ {note}
+                </button>
+              ))}
+            </div>
+
             {amountNum >= totalFinal && amountNum > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)', background: 'var(--badge-green-bg)', padding: '8px 10px', borderRadius: 'var(--radius-md)' }}>
                 <span style={{ fontSize: '13px' }}>Troco a devolver:</span>
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(change)}</span>
               </div>
             )}
-            {amountNum > 0 && amountNum < totalFinal && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)' }}>
-                <span style={{ fontSize: '13px' }}>Falta:</span>
-                <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
+
+            {cashError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--badge-red)', background: 'var(--badge-red-bg)', padding: '8px 10px', borderRadius: 'var(--radius-md)', fontWeight: 600 }}>
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>{cashError}</span>
               </div>
             )}
           </div>
@@ -186,7 +263,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+            <button className="btn" onClick={handleConfirmAction} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
               <Check size={16} />
               <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
               <kbd className="kbd-key-primary">F4</kbd>

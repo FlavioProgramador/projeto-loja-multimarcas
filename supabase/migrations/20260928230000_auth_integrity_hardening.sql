@@ -5,53 +5,62 @@
 BEGIN;
 
 -- 1) Explicit API grants/revokes. Keep service-only PIX settlement RPCs service_role-only.
-REVOKE ALL ON FUNCTION public.complete_sale(uuid,text,text,jsonb,text,integer,numeric,numeric,text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric) FROM PUBLIC, anon, authenticated;
-
-REVOKE ALL ON FUNCTION public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text) TO authenticated;
-
-REVOKE ALL ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) TO authenticated;
-
-REVOKE ALL ON FUNCTION public.admin_set_user_role(uuid,text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.admin_set_user_role(uuid,text) TO authenticated;
-REVOKE ALL ON FUNCTION public.approve_physical_inventory(uuid,uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.approve_physical_inventory(uuid,uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.cancel_sale(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.cancel_sale(uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) TO authenticated;
-REVOKE ALL ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) TO authenticated;
-REVOKE ALL ON FUNCTION public.manage_product(uuid,text,text,text,numeric,numeric,jsonb) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.manage_product(uuid,text,text,text,numeric,numeric,jsonb) TO authenticated;
-
-REVOKE ALL ON FUNCTION public.current_user_role() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.current_user_role() TO authenticated;
-REVOKE ALL ON FUNCTION public.get_user_store_role(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_user_store_role(uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.has_store_access(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.has_store_access(uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.get_variant_stock_by_store(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_variant_stock_by_store(uuid) TO authenticated;
-
--- Modern store-scoped reports.
-REVOKE ALL ON FUNCTION public.report_stock_status(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.report_stock_status(uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.report_top_selling_products(integer,uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.report_top_selling_products(integer,uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz,uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz,uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.get_profitability_by_product(uuid,date,date) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_profitability_by_product(uuid,date,date) TO authenticated;
-REVOKE ALL ON FUNCTION public.get_profitability_by_category(uuid,date,date) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.get_profitability_by_category(uuid,date,date) TO authenticated;
-
-REVOKE ALL ON FUNCTION public.approve_mp_pix_sale(uuid,text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.cancel_mp_pix_sale(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.approve_mp_pix_sale(uuid,text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale(uuid) TO service_role;
+DO $$
+DECLARE
+  stmt text;
+  stmts text[] := ARRAY[
+    'REVOKE ALL ON FUNCTION public.complete_sale(uuid,text,text,jsonb,text,integer,numeric,numeric,text) FROM PUBLIC, anon, authenticated',
+    'REVOKE ALL ON FUNCTION public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.create_mp_pix_sale(uuid,uuid,text,text,jsonb,numeric,numeric,text) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.create_mp_pix_sale(uuid,uuid,text,text,jsonb,numeric,numeric,text) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.admin_set_user_role(uuid,text) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.admin_set_user_role(uuid,text) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.approve_physical_inventory(uuid,uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.approve_physical_inventory(uuid,uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.cancel_sale(uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.cancel_sale(uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.manage_product(uuid,text,text,text,numeric,numeric,jsonb) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.manage_product(uuid,text,text,text,numeric,numeric,jsonb) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.current_user_role() FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.current_user_role() TO authenticated',
+    'REVOKE ALL ON FUNCTION public.get_user_store_role(uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.get_user_store_role(uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.has_store_access(uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.has_store_access(uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.get_variant_stock_by_store(uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.get_variant_stock_by_store(uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.report_stock_status(uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.report_stock_status(uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.report_top_selling_products(integer,uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.report_top_selling_products(integer,uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz,uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz,uuid) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.get_profitability_by_product(uuid,date,date) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.get_profitability_by_product(uuid,date,date) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.get_profitability_by_category(uuid,date,date) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.get_profitability_by_category(uuid,date,date) TO authenticated',
+    'REVOKE ALL ON FUNCTION public.approve_mp_pix_sale(uuid,text) FROM PUBLIC, anon, authenticated',
+    'REVOKE ALL ON FUNCTION public.cancel_mp_pix_sale(uuid) FROM PUBLIC, anon, authenticated',
+    'GRANT EXECUTE ON FUNCTION public.approve_mp_pix_sale(uuid,text) TO service_role',
+    'GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale(uuid) TO service_role'
+  ];
+BEGIN
+  FOREACH stmt IN ARRAY stmts
+  LOOP
+    BEGIN
+      EXECUTE stmt;
+    EXCEPTION
+      WHEN undefined_function OR undefined_object THEN NULL;
+    END;
+  END LOOP;
+END $$;
 
 -- 2) Prevent direct access to internal idempotency storage.
 REVOKE ALL ON TABLE public.sale_idempotency FROM PUBLIC, anon, authenticated;
@@ -1266,8 +1275,23 @@ END;
 $$;
 
 -- Ensure all modified SECDEF functions have a fixed search_path.
-ALTER FUNCTION public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text) SET search_path=public;
-ALTER FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) SET search_path=public;
+DO $$
+BEGIN
+  ALTER FUNCTION public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text) SET search_path=public;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER FUNCTION public.create_mp_pix_sale(uuid,uuid,text,text,jsonb,numeric,numeric,text) SET search_path=public;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) SET search_path=public;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
 ALTER FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) SET search_path=public;
 ALTER FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) SET search_path=public;
 ALTER FUNCTION public.cancel_sale(uuid) SET search_path=public;

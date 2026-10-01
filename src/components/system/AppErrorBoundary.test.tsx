@@ -18,8 +18,8 @@ describe('AppErrorBoundary', () => {
       </AppErrorBoundary>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Não foi possível exibir esta tela.' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Recarregar aplicação' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Não foi possível exibir esta tela.' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Recarregar aplicação' })).toBeTruthy();
     expect(listener).toHaveBeenCalledTimes(1);
 
     window.removeEventListener('coresys:frontend-error', listener);

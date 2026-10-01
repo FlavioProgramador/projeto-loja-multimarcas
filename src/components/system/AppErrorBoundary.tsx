@@ -1,10 +1,14 @@
 import React from 'react';
 
+interface AppErrorBoundaryProps {
+  children?: React.ReactNode;
+}
+
 interface AppErrorBoundaryState {
   hasError: boolean;
 }
 
-export class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppErrorBoundaryState> {
+export class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   state: AppErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): AppErrorBoundaryState {

@@ -1028,7 +1028,7 @@ BEGIN
 
   RETURN true;
 END;
-$;
+$$;
 
 -- 10) Harden returns with concurrency by locking the original sale
 -- (already present) and validating availability under that lock.

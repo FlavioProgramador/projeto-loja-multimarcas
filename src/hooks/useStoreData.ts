@@ -7,7 +7,6 @@ import type {
   ReturnRecord,
   SaleMovement,
   Supplier,
-  UserStoreAccess,
 } from '../types';
 
 import {
@@ -18,24 +17,9 @@ import {
   SalesService,
 } from '../services';
 import { ReturnsService } from '../services/returns.service';
-import { storeService } from '../services/store.service';
 import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
-
-function areStoreAccessListsEqual(current: UserStoreAccess[], next: UserStoreAccess[]): boolean {
-  if (current.length !== next.length) return false;
-
-  return current.every((store, index) => {
-    const candidate = next[index];
-    return Boolean(
-      candidate &&
-      store.store_id === candidate.store_id &&
-      store.role === candidate.role &&
-      store.store_name === candidate.store_name
-    );
-  });
-}
 
 interface UseStoreDataParams {
   userId?: string;
@@ -43,7 +27,6 @@ interface UseStoreDataParams {
   isAuthorized: boolean;
   authLoading: boolean;
   activeStoreId: string | null;
-  setUserStores: Setter<UserStoreAccess[]>;
   setProducts: Setter<Product[]>;
   setTransactions: Setter<FinancialTransaction[]>;
   setMovements: Setter<SaleMovement[]>;
@@ -60,7 +43,6 @@ export const useStoreData = ({
   isAuthorized,
   authLoading,
   activeStoreId,
-  setUserStores,
   setProducts,
   setTransactions,
   setMovements,
@@ -71,7 +53,7 @@ export const useStoreData = ({
   setIsLoading,
 }: UseStoreDataParams) => {
   const refreshData = useCallback(async () => {
-    if (!isSupabaseConfigured || !isAuthorized || authLoading || !accessToken) return;
+    if (!isSupabaseConfigured || !isAuthorized || authLoading || !accessToken || !activeStoreId) return;
 
     try {
       setIsLoading(true);
@@ -86,27 +68,14 @@ export const useStoreData = ({
         throw new Error('Sessão autenticada indisponível para carregar os dados da loja.');
       }
 
-      const remoteStores = await storeService.getUserStores();
-      if (!remoteStores.length) {
-        throw new Error('Nenhuma loja disponível para o usuário autenticado.');
-      }
-
-      setUserStores(current => areStoreAccessListsEqual(current, remoteStores) ? current : remoteStores);
-
-      const resolvedStoreId =
-        activeStoreId && remoteStores.some(store => store.store_id === activeStoreId)
-          ? activeStoreId
-          : remoteStores[0].store_id;
-
-
       const results = await Promise.allSettled([
-        ProductsService.getAll(resolvedStoreId),
-        FinanceService.getTransactions(resolvedStoreId),
-        FinanceService.getFixedExpenses(resolvedStoreId),
-        SalesService.getMovements(resolvedStoreId),
-        CustomersService.getAll(resolvedStoreId),
+        ProductsService.getAll(activeStoreId),
+        FinanceService.getTransactions(activeStoreId),
+        FinanceService.getFixedExpenses(activeStoreId),
+        SalesService.getMovements(activeStoreId),
+        CustomersService.getAll(activeStoreId),
         SuppliersService.getAll(),
-        ReturnsService.getAll(resolvedStoreId),
+        ReturnsService.getAll(activeStoreId),
       ]);
 
       const applyResult = <T,>(
@@ -153,7 +122,6 @@ export const useStoreData = ({
     setReturns,
     setSuppliers,
     setTransactions,
-    setUserStores,
     userId,
   ]);
 

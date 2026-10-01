@@ -1,21 +1,18 @@
 /**
- * VESTRA ERP — Sistema Centralizado de Permissões (RBAC)
+ * CoreSys ERP — Sistema centralizado de permissões (RBAC)
  *
- * IMPORTANTE: Este arquivo define permissões de UI (ocultar/desabilitar elementos).
- * A segurança real está no backend (RLS + RPCs SECURITY DEFINER).
- * Nunca confie apenas neste arquivo para proteger dados.
+ * Este arquivo controla somente a experiência da interface.
+ * A segurança real continua no backend (RLS + RPCs SECURITY DEFINER).
  */
 
-import { UserRole } from '../types/database';
+import type { ActiveModule } from '../types';
+import type { UserRole } from '../types/database';
 
-// Todas as ações possíveis no sistema
 export type Permission =
-  // Vendas
   | 'sales.create'
   | 'sales.view'
   | 'sales.cancel'
   | 'sales.refund'
-  // Estoque
   | 'products.view'
   | 'products.create'
   | 'products.update'
@@ -23,35 +20,26 @@ export type Permission =
   | 'inventory.view'
   | 'inventory.adjust'
   | 'inventory.entry'
-  // Financeiro
   | 'finance.view'
   | 'finance.create'
   | 'finance.manage'
-  // Clientes
   | 'customers.view'
   | 'customers.create'
   | 'customers.update'
   | 'customers.delete'
-  // Fornecedores
   | 'suppliers.view'
   | 'suppliers.manage'
-  // Relatórios
   | 'reports.view'
   | 'reports.export'
-  // Usuários e Admin
   | 'users.view'
   | 'users.manage'
   | 'users.promote'
-  // Auditoria
   | 'audit.view'
-  // Automações
   | 'automations.view'
   | 'automations.manage';
 
-// Mapa de permissões por papel
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ADMIN: [
-    // Acesso total
     'sales.create', 'sales.view', 'sales.cancel', 'sales.refund',
     'products.view', 'products.create', 'products.update', 'products.delete',
     'inventory.view', 'inventory.adjust', 'inventory.entry',
@@ -91,27 +79,45 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
 };
 
-/**
- * Verifica se um papel tem permissão para uma ação.
- * Uso: can(role, 'sales.create')
- */
+const MODULE_ROLE_ACCESS: Record<ActiveModule, readonly UserRole[]> = {
+  dashboard: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  pdv: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  estoque: ['ADMIN', 'MANAGER'],
+  trocas: ['ADMIN', 'MANAGER'],
+  financeiro: ['ADMIN', 'MANAGER'],
+  movimentacoes: ['ADMIN', 'MANAGER', 'EMPLOYEE'],
+  clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
+  fornecedores: ['ADMIN', 'MANAGER'],
+  relatorios: ['ADMIN', 'MANAGER'],
+  automacoes: ['ADMIN'],
+};
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  ADMIN: 'Administrador',
+  MANAGER: 'Gerente',
+  CASHIER: 'Caixa',
+  EMPLOYEE: 'Colaborador',
+};
+
 export function can(role: UserRole | null | undefined, permission: Permission): boolean {
   if (!role) return false;
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
-/**
- * Retorna todas as permissões de um papel.
- */
 export function getPermissions(role: UserRole | null | undefined): Permission[] {
   if (!role) return [];
   return ROLE_PERMISSIONS[role] ?? [];
 }
 
-/**
- * Hook helper — usa junto com useAuth().
- * Exemplo: const { can } = usePermissions(); can('finance.view')
- */
 export function createPermissionChecker(role: UserRole | null | undefined) {
   return (permission: Permission) => can(role, permission);
+}
+
+export function canAccessModule(role: UserRole | null | undefined, module: ActiveModule): boolean {
+  if (!role) return false;
+  return MODULE_ROLE_ACCESS[module].includes(role);
+}
+
+export function getRoleLabel(role: UserRole | null | undefined): string {
+  return role ? ROLE_LABELS[role] : 'Usuário';
 }

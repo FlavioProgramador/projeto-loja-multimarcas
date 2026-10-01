@@ -4,7 +4,6 @@ import { useStore } from '../../contexts/StoreContext';
 import { AutomationsService, AutomationRule, AutomationRun, AUTOMATION_PRESETS } from '../../services/automations';
 import { AutomationBuilder } from './AutomationBuilder';
 import { can } from '../../lib/permissions';
-import { useAuth } from '../../contexts/AuthContext';
 
 const categoryLabels: Record<string, string> = {
   ESTOQUE: 'Estoque', VENDAS: 'Vendas', FINANCEIRO: 'Financeiro', CLIENTES: 'Clientes',
@@ -20,10 +19,9 @@ const triggerLabels: Record<string, string> = {
 };
 
 export const AutomationsView: React.FC = () => {
-  const { activeStoreId } = useStore();
-  const { profile } = useAuth();
-  const canManage = can(profile?.role, 'automations.manage');
-  const canView = can(profile?.role, 'automations.view');
+  const { activeStoreId, activeStoreRole } = useStore();
+  const canManage = can(activeStoreRole, 'automations.manage');
+  const canView = can(activeStoreRole, 'automations.view');
   const [rules, setRules] = useState<AutomationRule[]>([]);
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [events, setEvents] = useState<Awaited<ReturnType<typeof AutomationsService.listEvents>>>([]);

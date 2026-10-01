@@ -76,4 +76,74 @@ BEGIN
   ASSERT v_policy.with_check ILIKE '%storage.foldername(name)%', 'logo upload must be path-scoped';
 END $$;
 
+
+DO $
+DECLARE
+  v_rls boolean;
+BEGIN
+  SELECT relrowsecurity INTO v_rls
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relname = 'data_export_audit';
+  ASSERT v_rls, 'data_export_audit must keep RLS enabled';
+
+  SELECT relrowsecurity INTO v_rls
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relname = 'privacy_requests';
+  ASSERT v_rls, 'privacy_requests must keep RLS enabled';
+
+  ASSERT has_table_privilege('authenticated', 'public.data_export_audit', 'SELECT') = false,
+    'authenticated must not read export audit directly';
+  ASSERT has_table_privilege('authenticated', 'public.privacy_requests', 'SELECT') = false,
+    'authenticated must not read privacy requests directly';
+END $;
+
+DO $
+BEGIN
+  ASSERT has_function_privilege('anon', 'public.log_data_export(uuid,text,text,integer,boolean,jsonb)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('anon', 'public.export_customer_personal_data(uuid,uuid)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('anon', 'public.create_privacy_request(uuid,uuid,text,text)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('anon', 'public.check_customer_anonymization_eligibility(uuid,uuid)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('anon', 'public.resolve_privacy_request(uuid,uuid,text,text)'::regprocedure, 'EXECUTE') = false;
+
+  ASSERT has_function_privilege('authenticated', 'public.log_data_export(uuid,text,text,integer,boolean,jsonb)'::regprocedure, 'EXECUTE');
+  ASSERT has_function_privilege('authenticated', 'public.export_customer_personal_data(uuid,uuid)'::regprocedure, 'EXECUTE');
+  ASSERT has_function_privilege('authenticated', 'public.create_privacy_request(uuid,uuid,text,text)'::regprocedure, 'EXECUTE');
+  ASSERT has_function_privilege('authenticated', 'public.check_customer_anonymization_eligibility(uuid,uuid)'::regprocedure, 'EXECUTE');
+  ASSERT has_function_privilege('authenticated', 'public.resolve_privacy_request(uuid,uuid,text,text)'::regprocedure, 'EXECUTE');
+END $;
+
+DO $
+BEGIN
+  ASSERT has_function_privilege('anon', 'public.get_pix_operational_health(integer)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('authenticated', 'public.get_pix_operational_health(integer)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('service_role', 'public.get_pix_operational_health(integer)'::regprocedure, 'EXECUTE');
+
+  ASSERT has_function_privilege('anon', 'public.get_database_operational_health()'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('authenticated', 'public.get_database_operational_health()'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('service_role', 'public.get_database_operational_health()'::regprocedure, 'EXECUTE');
+
+  ASSERT has_function_privilege('anon', 'public.get_slow_query_metrics(integer)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('authenticated', 'public.get_slow_query_metrics(integer)'::regprocedure, 'EXECUTE') = false;
+  ASSERT has_function_privilege('service_role', 'public.get_slow_query_metrics(integer)'::regprocedure, 'EXECUTE');
+END $;
+
+DO $
+DECLARE
+  v_def text;
+BEGIN
+  ASSERT EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'customers'
+      AND indexname = 'idx_customers_store_id'
+  ), 'customers.store_id index must exist';
+
+  v_def := pg_get_functiondef('public.list_stale_pix_reconciliation_candidates(integer)'::regprocedure);
+  ASSERT position('MERCADO_PAGO' IN v_def) > 0, 'PIX reconciliation candidates must be provider-scoped';
+  ASSERT position('provider_transaction_id' IN v_def) > 0, 'PIX reconciliation candidates must require provider transaction id';
+END $;
+
 ROLLBACK;

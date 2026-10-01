@@ -47,10 +47,10 @@ CREATE TABLE IF NOT EXISTS public.sale_idempotency (
 );
 
 -- Adicionar colunas store_id nas tabelas operacionais
-ALTER TABLE public.sales ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
-ALTER TABLE public.inventory_movements ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
-ALTER TABLE public.financial_transactions ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
-ALTER TABLE public.fixed_expenses ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.inventory_movements ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.financial_transactions ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.fixed_expenses ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
 
 -- ============================================================================
 -- 2. MIGRAÇÃO DE DADOS (Preservação de Histórico)

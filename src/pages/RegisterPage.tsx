@@ -4,7 +4,7 @@ import { AuthShell } from '../components/auth/AuthShell';
 import { AuthSuccessNotice } from './LoginPage';
 import { useAuth } from '../contexts/AuthContext';
 import { mapAuthError } from '../lib/auth-errors';
-import { goToLogin } from '../lib/auth-routing';
+import { goToLogin, goToPrivacy } from '../lib/auth-routing';
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -16,7 +16,7 @@ function getPasswordStrength(value: string) {
   if (/[a-z]/.test(value)) score++;
   if (/[A-Z]/.test(value)) score++;
   if (/\d/.test(value)) score++;
-  if (/[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./\`~]/.test(value)) score++;
+  if (/[!@#$%^&*()_+\-=[\]{};':"\\|<>?,./`~]/.test(value)) score++;
   const label = score <= 1 ? 'Muito fraca' : score === 2 ? 'Fraca' : score === 3 ? 'Média' : 'Forte';
   return { label, score };
 }
@@ -136,6 +136,9 @@ export const RegisterPage: React.FC = () => {
             <span>Já possui uma conta?</span>
             <button type="button" className="auth-link" onClick={() => goToLogin()}>
               Voltar ao login
+            </button>
+            <button type="button" className="auth-link" onClick={goToPrivacy}>
+              Privacidade
             </button>
           </div>
         )}

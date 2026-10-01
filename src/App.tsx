@@ -19,6 +19,7 @@ import { AuthBootScreen, LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 import { getAuthScreen, goToApp, goToLogin, goToResetPassword, AuthScreen } from './lib/auth-routing';
 import { canAccessModule } from './lib/permissions';
 
@@ -127,6 +128,10 @@ export function AppContent() {
 
   if (screen === 'reset-password' || isPasswordRecovery) {
     return <ResetPasswordPage />;
+  }
+
+  if (screen === 'privacy') {
+    return <PrivacyPage />;
   }
 
   if (!isAuthorized) {

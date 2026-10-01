@@ -1,6 +1,6 @@
 import React from 'react';
 import { CartItem } from '../../types';
-import { formatMoeda } from '../../lib/utils';
+import { formatMoeda, maskCpf } from '../../lib/utils';
 
 export interface ReceiptData {
   saleNumber?: string;
@@ -96,7 +96,7 @@ export const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
           {buyerName && buyerName !== 'Consumidor Final' && (
             <div style={{ marginBottom: '8px' }}>
               <strong>Cliente:</strong> {buyerName}
-              {cpf && <><br /><strong>CPF:</strong> {cpf}</>}
+              {cpf && <><br /><strong>CPF:</strong> {maskCpf(cpf)}</>}
             </div>
           )}
           <p style={{ margin: '4px 0' }}>Obrigado pela preferência!</p>

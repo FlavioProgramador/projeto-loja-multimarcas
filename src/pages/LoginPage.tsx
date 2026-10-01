@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { useAuth } from '../contexts/AuthContext';
 import { mapAuthError, AUTH_ACCESS_DENIED, AUTH_SESSION_EXPIRED } from '../lib/auth-errors';
-import { goToForgotPassword, goToRegister } from '../lib/auth-routing';
+import { goToForgotPassword, goToPrivacy, goToRegister } from '../lib/auth-routing';
 import { getRememberAccess } from '../lib/auth-storage';
 
 function isValidEmail(value: string) {
@@ -185,6 +185,9 @@ export const LoginPage: React.FC = () => {
           <span>Ainda não possui uma conta?</span>
           <button type="button" className="auth-link" onClick={goToRegister}>
             Criar conta
+          </button>
+          <button type="button" className="auth-link" onClick={goToPrivacy}>
+            Privacidade
           </button>
         </div>
       </div>

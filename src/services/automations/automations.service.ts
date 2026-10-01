@@ -1,5 +1,15 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import type { AutomationAction, AutomationCategory, AutomationCondition, AutomationEvent, AutomationRule, AutomationRun, AutomationStatus, AutomationTrigger } from './automations.model';
+import type {
+  AutomationAction,
+  AutomationCategory,
+  AutomationCondition,
+  AutomationEvent,
+  AutomationRule,
+  AutomationRun,
+  AutomationStatus,
+  AutomationTestResult,
+  AutomationTrigger,
+} from './automations.model';
 
 export interface CreateAutomationInput {
   name: string;
@@ -14,7 +24,13 @@ export interface CreateAutomationInput {
   timezone?: string;
 }
 
-export type AutomationMutationResult = { success: boolean; message?: string; id?: string };
+export type AutomationMutationResult = {
+  success: boolean;
+  message?: string;
+  id?: string;
+  next_run_at?: string | null;
+  archived?: boolean;
+};
 
 async function rpc<T>(name: string, params: Record<string, unknown>): Promise<T> {
   if (!isSupabaseConfigured) throw new Error('Serviço de automações indisponível.');
@@ -26,13 +42,17 @@ async function rpc<T>(name: string, params: Record<string, unknown>): Promise<T>
 export const AutomationsService = {
   async list(storeId: string): Promise<AutomationRule[]> {
     if (!isSupabaseConfigured || !storeId) return [];
+
     const { data, error } = await supabase
       .from('automation_rules')
       .select('*')
       .eq('store_id', storeId)
+      .is('archived_at', null)
       .order('priority', { ascending: false })
       .order('created_at', { ascending: false });
+
     if (error) throw error;
+
     return ((data ?? []) as Array<AutomationRule & { trigger_type?: string }>).map(row => ({
       ...row,
       trigger: row.trigger_type ?? row.trigger,
@@ -41,26 +61,31 @@ export const AutomationsService = {
 
   async listRuns(storeId: string, limit = 50): Promise<AutomationRun[]> {
     if (!isSupabaseConfigured || !storeId) return [];
+
     const { data, error } = await supabase
       .from('automation_runs')
       .select('*')
       .eq('store_id', storeId)
       .order('started_at', { ascending: false })
       .limit(limit);
+
     if (error) throw error;
     return (data ?? []) as AutomationRun[];
   },
 
   async listEvents(storeId: string, limit = 100): Promise<AutomationEvent[]> {
     if (!isSupabaseConfigured || !storeId) return [];
+
     const { data, error } = await supabase
       .from('automation_events')
       .select('*')
       .eq('store_id', storeId)
+      .not('automation_id', 'is', null)
       .order('created_at', { ascending: false })
       .limit(limit);
+
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []) as AutomationEvent[];
   },
 
   async create(storeId: string, input: CreateAutomationInput): Promise<AutomationMutationResult> {
@@ -91,8 +116,8 @@ export const AutomationsService = {
       p_actions: input.actions,
       p_priority: input.priority,
       p_cooldown_minutes: input.cooldown_minutes,
-      p_schedule: input.schedule,
-      p_timezone: input.timezone,
+      p_schedule: input.schedule ?? null,
+      p_timezone: input.timezone ?? 'America/Sao_Paulo',
     });
   },
 
@@ -111,8 +136,8 @@ export const AutomationsService = {
     });
   },
 
-  async test(storeId: string, id: string): Promise<AutomationMutationResult> {
-    return rpc<AutomationMutationResult>('test_automation_rule', {
+  async test(storeId: string, id: string): Promise<AutomationTestResult> {
+    return rpc<AutomationTestResult>('test_automation_rule', {
       p_store_id: storeId,
       p_automation_id: id,
     });

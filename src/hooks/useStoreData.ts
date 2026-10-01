@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import type {
   Customer,
   FinancialTransaction,
@@ -52,8 +52,12 @@ export const useStoreData = ({
   setFixedExpenses,
   setIsLoading,
 }: UseStoreDataParams) => {
+  const refreshSequenceRef = useRef(0);
+
   const refreshData = useCallback(async () => {
     if (!isSupabaseConfigured || !isAuthorized || authLoading || !accessToken || !activeStoreId) return;
+
+    const requestSequence = ++refreshSequenceRef.current;
 
     try {
       setIsLoading(true);
@@ -77,6 +81,8 @@ export const useStoreData = ({
         SuppliersService.getAll(),
         ReturnsService.getAll(activeStoreId),
       ]);
+
+      if (requestSequence !== refreshSequenceRef.current) return;
 
       const applyResult = <T,>(
         result: PromiseSettledResult<T>,
@@ -107,7 +113,9 @@ export const useStoreData = ({
         err
       );
     } finally {
-      setIsLoading(false);
+      if (requestSequence === refreshSequenceRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [
     accessToken,

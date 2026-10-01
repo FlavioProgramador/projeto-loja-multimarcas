@@ -8,7 +8,6 @@ GRANT EXECUTE ON FUNCTION public.approve_mp_pix_sale(uuid,text) TO service_role;
 REVOKE ALL ON FUNCTION public.cancel_mp_pix_sale(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.cancel_mp_pix_sale(uuid) TO service_role;
 
-REVOKE ALL ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) TO authenticated;
 

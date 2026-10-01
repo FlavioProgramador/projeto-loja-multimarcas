@@ -57,15 +57,16 @@ export const AuthService = {
     return user;
   },
 
-  async getCurrentProfile(): Promise<ProfileRow | null> {
+  async getCurrentProfile(userId?: string): Promise<ProfileRow | null> {
     if (!isSupabaseConfigured) return null;
-    const user = await this.getCurrentUser();
-    if (!user) return null;
+
+    const resolvedUserId = userId ?? (await this.getCurrentUser())?.id;
+    if (!resolvedUserId) return null;
 
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, email, role, is_active, created_at, updated_at')
-      .eq('id', user.id)
+      .eq('id', resolvedUserId)
       .maybeSingle();
 
     if (error) {
@@ -119,7 +120,7 @@ export const AuthService = {
       return { context: null, reason: 'unauthenticated' };
     }
 
-    const profile = await this.getCurrentProfile();
+    const profile = await this.getCurrentProfile(user.id);
     const stores = profile ? await this.getActiveStoreAccess(user.id) : [];
     const reason = this.evaluateAccess(profile, stores);
 

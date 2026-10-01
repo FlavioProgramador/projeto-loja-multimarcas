@@ -53,74 +53,96 @@ export const useStoreData = ({
   setIsLoading,
 }: UseStoreDataParams) => {
   const refreshSequenceRef = useRef(0);
+  const inFlightRefreshRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
   useEffect(() => {
     refreshSequenceRef.current += 1;
   }, [accessToken, activeStoreId, isAuthorized, userId]);
 
-  const refreshData = useCallback(async () => {
-    if (!isSupabaseConfigured || !isAuthorized || authLoading || !accessToken || !activeStoreId) return;
+  const refreshData = useCallback((): Promise<void> => {
+    if (!isSupabaseConfigured || !isAuthorized || authLoading || !accessToken || !activeStoreId) {
+      return Promise.resolve();
+    }
+
+    const refreshKey = `${userId ?? 'anonymous'}:${activeStoreId}:${accessToken}`;
+    const currentRefresh = inFlightRefreshRef.current;
+
+    if (currentRefresh?.key === refreshKey) {
+      return currentRefresh.promise;
+    }
 
     const requestSequence = ++refreshSequenceRef.current;
 
-    try {
-      setIsLoading(true);
+    const operation = (async () => {
+      try {
+        setIsLoading(true);
 
-      const {
-        data: { session: verifiedSession },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+        const {
+          data: { session: verifiedSession },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-      if (sessionError) throw sessionError;
-      if (!verifiedSession?.access_token || verifiedSession.user.id !== userId) {
-        throw new Error('Sessão autenticada indisponível para carregar os dados da loja.');
-      }
-
-      const results = await Promise.allSettled([
-        ProductsService.getAll(activeStoreId),
-        FinanceService.getTransactions(activeStoreId),
-        FinanceService.getFixedExpenses(activeStoreId),
-        SalesService.getMovements(activeStoreId),
-        CustomersService.getAll(activeStoreId),
-        SuppliersService.getAll(),
-        ReturnsService.getAll(activeStoreId),
-      ]);
-
-      if (requestSequence !== refreshSequenceRef.current) return;
-
-      const applyResult = <T,>(
-        result: PromiseSettledResult<T>,
-        setter: Setter<T>,
-        source: string
-      ) => {
-        if (result.status === 'fulfilled') {
-          setter(result.value);
-          return;
+        if (sessionError) throw sessionError;
+        if (!verifiedSession?.access_token || verifiedSession.user.id !== userId) {
+          throw new Error('Sessão autenticada indisponível para carregar os dados da loja.');
         }
 
-        console.warn(
-          'Falha ao carregar ' + source + '; mantendo dados atuais.',
-          result.reason
-        );
-      };
+        const results = await Promise.allSettled([
+          ProductsService.getAll(activeStoreId),
+          FinanceService.getTransactions(activeStoreId),
+          FinanceService.getFixedExpenses(activeStoreId),
+          SalesService.getMovements(activeStoreId),
+          CustomersService.getAll(activeStoreId),
+          SuppliersService.getAll(),
+          ReturnsService.getAll(activeStoreId),
+        ]);
 
-      applyResult(results[0], setProducts, 'produtos/estoque');
-      applyResult(results[1], setTransactions, 'financeiro');
-      applyResult(results[2], setFixedExpenses, 'despesas fixas');
-      applyResult(results[3], setMovements, 'vendas do PDV');
-      applyResult(results[4], setCustomers, 'clientes');
-      applyResult(results[5], setSuppliers, 'fornecedores');
-      applyResult(results[6], setReturns, 'devoluções');
-    } catch (err) {
-      console.warn(
-        'Sincronização com Supabase falhou; mantendo estado atual.',
-        err
-      );
-    } finally {
-      if (requestSequence === refreshSequenceRef.current) {
-        setIsLoading(false);
+        if (requestSequence !== refreshSequenceRef.current) return;
+
+        const applyResult = <T,>(
+          result: PromiseSettledResult<T>,
+          setter: Setter<T>,
+          source: string
+        ) => {
+          if (result.status === 'fulfilled') {
+            setter(result.value);
+            return;
+          }
+
+          console.warn(
+            'Falha ao carregar ' + source + '; mantendo dados atuais.',
+            result.reason
+          );
+        };
+
+        applyResult(results[0], setProducts, 'produtos/estoque');
+        applyResult(results[1], setTransactions, 'financeiro');
+        applyResult(results[2], setFixedExpenses, 'despesas fixas');
+        applyResult(results[3], setMovements, 'vendas do PDV');
+        applyResult(results[4], setCustomers, 'clientes');
+        applyResult(results[5], setSuppliers, 'fornecedores');
+        applyResult(results[6], setReturns, 'devoluções');
+      } catch (err) {
+        console.warn(
+          'Sincronização com Supabase falhou; mantendo estado atual.',
+          err
+        );
+      } finally {
+        if (requestSequence === refreshSequenceRef.current) {
+          setIsLoading(false);
+        }
       }
-    }
+    })();
+
+    inFlightRefreshRef.current = { key: refreshKey, promise: operation };
+
+    void operation.finally(() => {
+      if (inFlightRefreshRef.current?.promise === operation) {
+        inFlightRefreshRef.current = null;
+      }
+    });
+
+    return operation;
   }, [
     accessToken,
     activeStoreId,

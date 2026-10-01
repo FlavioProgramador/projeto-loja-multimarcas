@@ -1,26 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { StoreProvider, useStore } from './contexts/StoreContext';
 import { CartProvider } from './contexts/CartContext';
 import { AppLayout } from './components/layout/AppLayout';
-import { DashboardView } from './components/dashboard/DashboardView';
-import { PdvView } from './components/pdv/PdvView';
-import { InventoryView } from './components/inventory/InventoryView';
-import { FinanceView } from './components/finance/FinanceView';
-import { MovementsView } from './components/movements/MovementsView';
-import { CustomersView } from './components/customers/CustomersView';
-import { SuppliersView } from './components/suppliers/SuppliersView';
-import { ReportsView } from './components/reports/ReportsView';
-import { AutomationsView } from './components/automations/AutomationsView';
-import { ReturnsView } from './components/returns/ReturnsView';
 import { ActiveModule } from './types';
 import { AuthBootScreen, LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 import { getAuthScreen, goToApp, goToLogin, goToResetPassword, AuthScreen } from './lib/auth-routing';
 import { canAccessModule } from './lib/permissions';
+
+
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
+const PdvView = lazy(() => import('./components/pdv/PdvView').then(m => ({ default: m.PdvView })));
+const InventoryView = lazy(() => import('./components/inventory/InventoryView').then(m => ({ default: m.InventoryView })));
+const FinanceView = lazy(() => import('./components/finance/FinanceView').then(m => ({ default: m.FinanceView })));
+const MovementsView = lazy(() => import('./components/movements/MovementsView').then(m => ({ default: m.MovementsView })));
+const CustomersView = lazy(() => import('./components/customers/CustomersView').then(m => ({ default: m.CustomersView })));
+const SuppliersView = lazy(() => import('./components/suppliers/SuppliersView').then(m => ({ default: m.SuppliersView })));
+const ReportsView = lazy(() => import('./components/reports/ReportsView').then(m => ({ default: m.ReportsView })));
+const AutomationsView = lazy(() => import('./components/automations/AutomationsView').then(m => ({ default: m.AutomationsView })));
+const ReturnsView = lazy(() => import('./components/returns/ReturnsView').then(m => ({ default: m.ReturnsView })));
 
 const VALID_MODULES: ActiveModule[] = [
   'dashboard',
@@ -129,6 +132,10 @@ export function AppContent() {
     return <ResetPasswordPage />;
   }
 
+  if (screen === 'privacy') {
+    return <PrivacyPage />;
+  }
+
   if (!isAuthorized) {
     return <LoginPage />;
   }
@@ -168,7 +175,9 @@ export function AppContent() {
 
   return (
     <AppLayout currentModule={safeModule} onNavigate={handleNavigate}>
-      {renderCurrentModule()}
+      <Suspense fallback={<AuthBootScreen label="Carregando módulo" />}>
+        {renderCurrentModule()}
+      </Suspense>
     </AppLayout>
   );
 }

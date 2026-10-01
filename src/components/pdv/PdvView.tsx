@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
-import { formatMoeda } from '../../lib/utils';
+import { formatMoeda, maskCpf } from '../../lib/utils';
 import { CheckoutModal } from './CheckoutModal';
 import { ReceiptPrinter } from './ReceiptPrinter';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -570,7 +570,7 @@ export const PdvView: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '12.5px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{buyerName}</div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{cpf || 'CPF não informado'}</div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{cpf ? maskCpf(cpf) : 'CPF não informado'}</div>
                   </div>
                   <button onClick={handleClearCustomer} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={15} /></button>
                 </div>
@@ -601,7 +601,7 @@ export const PdvView: React.FC = () => {
                       {customerSuggestions.map(c => (
                         <button key={c.id} type="button" onClick={() => handleSelectCustomer(c)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
                           <span style={{ fontWeight: 500 }}>{c.nome}</span>
-                          <span style={{ color: 'var(--text-muted)' }}>{c.cpf || 'Sem CPF'}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>{c.cpf ? maskCpf(c.cpf) : 'Sem CPF'}</span>
                         </button>
                       ))}
                     </div>
@@ -720,7 +720,7 @@ export const PdvView: React.FC = () => {
         )}
       </div>
 
-      {lastSaleData && (<ReceiptPrinter cartItems={lastSaleData.cartItems} totalFinal={lastSaleData.totalFinal} paymentMethod={lastSaleData.paymentMethod} amountPaid={lastSaleData.amountPaid} change={lastSaleData.change} buyerName={lastSaleData.buyerName} cpf={lastSaleData.cpf} />)}
+      {lastSaleData && <ReceiptPrinter saleData={lastSaleData} />}
 
       {/* Modal de Novo Cliente com feedback visual integrado */}
       <NewCustomerModal

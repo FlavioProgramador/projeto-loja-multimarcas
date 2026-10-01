@@ -374,7 +374,6 @@ BEGIN
         FROM public.sales s
         WHERE s.id = v_sale_id
       );
-    END;
   END;
 
   FOR v_item IN

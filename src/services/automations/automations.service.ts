@@ -1,13 +1,13 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
-import type { AutomationCategory, AutomationEvent, AutomationRule, AutomationRun, AutomationStatus, AutomationTrigger } from './automations.model';
+import type { AutomationAction, AutomationCategory, AutomationCondition, AutomationEvent, AutomationRule, AutomationRun, AutomationStatus, AutomationTrigger } from './automations.model';
 
 export interface CreateAutomationInput {
   name: string;
   description: string;
   category: AutomationCategory;
   trigger: AutomationTrigger;
-  conditions: Record<string, unknown>[];
-  actions: Record<string, unknown>[];
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
   priority: number;
   cooldown_minutes: number;
   schedule?: string | null;

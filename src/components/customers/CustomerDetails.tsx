@@ -1,7 +1,7 @@
 import React from 'react';
 import { CalendarDays, CreditCard, Mail, MapPin, Phone, ShoppingBag, UserRound } from 'lucide-react';
 import type { Customer } from '../../types';
-import { formatMoeda } from '../../lib/utils';
+import { formatMoeda, maskCpf } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 
 interface CustomerDetailsProps {
@@ -31,7 +31,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onCl
           <div className="customer-profile-avatar">{initials(customer.nome)}</div>
           <div className="customer-profile-identity">
             <h2>{customer.nome}</h2>
-            <span>{customer.cpf ? `CPF ${customer.cpf}` : 'CPF não informado'}</span>
+            <span>{customer.cpf ? `CPF ${maskCpf(customer.cpf)}` : 'CPF não informado'}</span>
           </div>
           <button className="btn btn-sm" onClick={() => onEdit(customer)}>Editar cadastro</button>
         </header>
@@ -47,7 +47,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onCl
           <section className="customer-detail-panel">
             <h3><UserRound size={15} /> Dados pessoais</h3>
             <div className="customer-info-list">
-              <div><span>CPF</span><strong>{customer.cpf || 'Não informado'}</strong></div>
+              <div><span>CPF</span><strong>{customer.cpf ? maskCpf(customer.cpf) : 'Não informado'}</strong></div>
               <div><span>RG</span><strong>{customer.rg || 'Não informado'}</strong></div>
               <div><span>Data de nascimento</span><strong><CalendarDays size={14}/> {dateLabel(customer.dataNascimento)}</strong></div>
             </div>
@@ -70,7 +70,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onCl
           ) : (
             <div className="customer-history-list">
               {history.map((item, index) => (
-                <article key={item.uuid || `${item.vendaId}-${item.data}-${index}`}>
+                <article key={`${item.vendaId}-${item.data}-${index}`}>
                   <div><strong>{item.vendaId || 'Venda'}</strong><span>{dateLabel(item.data)}</span></div>
                   <strong>{formatMoeda(item.valor)}</strong>
                   <small>{item.itens || 'Itens não informados'}</small>

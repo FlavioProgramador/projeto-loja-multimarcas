@@ -1,7 +1,7 @@
 import React from 'react';
 import { Eye, Pencil, Trash2, UserRound } from 'lucide-react';
 import type { Customer } from '../../types';
-import { formatMoeda } from '../../lib/utils';
+import { formatMoeda, maskCpf } from '../../lib/utils';
 
 interface CustomerListProps {
   customers: Customer[];
@@ -41,7 +41,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                   <span className="customer-avatar">{getInitials(customer.nome)}</span>
                   <span>
                     <strong>{customer.nome}</strong>
-                    <small>{customer.cpf || 'CPF não informado'}</small>
+                    <small>{customer.cpf ? maskCpf(customer.cpf) : 'CPF não informado'}</small>
                   </span>
                 </div>
               </td>

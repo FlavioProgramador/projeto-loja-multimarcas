@@ -12,7 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { formatMoeda, hoje, downloadCSV } from '../../lib/utils';
+import { formatMoeda, hoje, downloadCSV, maskCpf } from '../../lib/utils';
 import { StatCard } from '../ui/StatCard';
 import { StatusBadge } from '../ui/StatusBadge';
 import { NewReturnModal } from './NewReturnModal';
@@ -60,7 +60,7 @@ export const ReturnsView: React.FC = () => {
     let csv = 'Codigo,Data,Cliente,CPF,VendaOrigem,ValorTotal,Destino,Status,Itens\n';
     returns.forEach(r => {
       const itensStr = r.itens.map(i => `${i.nome} (${i.tamanho}/${i.cor}) x${i.qtd} - ${i.motivo}`).join('; ');
-      csv += `"${r.codigo}","${r.data}","${r.clienteNome}","${r.clienteCpf}","${r.vendaOriginalId || 'Avulsa'}","${r.valorTotal.toFixed(2).replace('.', ',')}","${r.tipoResolucao}","${r.status}","${itensStr.replace(/"/g, '""')}"\n`;
+      csv += `"${r.codigo}","${r.data}","${r.clienteNome}","${maskCpf(r.clienteCpf)}","${r.vendaOriginalId || 'Avulsa'}","${r.valorTotal.toFixed(2).replace('.', ',')}","${r.tipoResolucao}","${r.status}","${itensStr.replace(/"/g, '""')}"\n`;
     });
     downloadCSV(`relatorio_trocas_devolucoes_${hoje()}.csv`, csv);
   };
@@ -194,7 +194,7 @@ export const ReturnsView: React.FC = () => {
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{r.clienteNome}</div>
                       {r.clienteCpf && r.clienteCpf !== 'Não informado' && (
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                          {r.clienteCpf}
+                          {maskCpf(r.clienteCpf)}
                         </div>
                       )}
                     </td>

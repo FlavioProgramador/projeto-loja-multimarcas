@@ -2,7 +2,7 @@ import React from 'react';
 import { ShoppingCart, Check, ShieldCheck, CreditCard, User } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { CartItem } from '../../types';
-import { formatMoeda } from '../../lib/utils';
+import { formatMoeda, maskCpf } from '../../lib/utils';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -62,7 +62,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <User size={15} style={{ color: 'var(--text-muted)' }} />
             <span style={{ color: 'var(--text-secondary)' }}>Cliente:</span>
             <strong style={{ color: 'var(--text-primary)' }}>{buyerName || 'Consumidor Final'}</strong>
-            {cpf && <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({cpf})</span>}
+            {cpf && <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({maskCpf(cpf)})</span>}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>

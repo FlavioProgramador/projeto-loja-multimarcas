@@ -41,6 +41,13 @@ export function mesAnterior(): string {
   return d.toISOString().slice(0, 7);
 }
 
+export function maskCpf(value?: string | null): string {
+  if (!value || value === 'Não informado') return 'Não informado';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 2) return '***';
+  return `***.***.***-${digits.slice(-2)}`;
+}
+
 export function calcVariacao(atual: number, anterior: number) {
   if (anterior === 0) {
     return {

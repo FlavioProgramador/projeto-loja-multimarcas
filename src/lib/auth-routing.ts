@@ -1,4 +1,4 @@
-export type AuthScreen = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'app';
+export type AuthScreen = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'privacy' | 'app';
 
 export function getAuthScreen(): AuthScreen {
   if (typeof window === 'undefined') return 'app';
@@ -7,6 +7,7 @@ export function getAuthScreen(): AuthScreen {
   if (path === '/register') return 'register';
   if (path === '/forgot-password') return 'forgot-password';
   if (path === '/reset-password') return 'reset-password';
+  if (path === '/privacidade') return 'privacy';
   return 'app';
 }
 
@@ -38,4 +39,8 @@ export function goToForgotPassword(): void {
 
 export function goToResetPassword(replace = true): void {
   navigateTo('/reset-password', replace);
+}
+
+export function goToPrivacy(): void {
+  navigateTo('/privacidade');
 }

@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { AppErrorBoundary } from './components/system/AppErrorBoundary';
 import './index.css';
 import './components/inventory/inventory.css';
 import './reference-theme.css';
@@ -10,6 +11,8 @@ import './theme-overrides.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );

@@ -38,8 +38,24 @@ REVOKE ALL ON FUNCTION public.get_user_store_role(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_user_store_role(uuid) TO authenticated;
 REVOKE ALL ON FUNCTION public.has_store_access(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.has_store_access(uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'handle_new_user'
+  ) THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'rls_auto_enable'
+  ) THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated';
+  END IF;
+END $$;
 
 ALTER FUNCTION public.admin_set_user_role(uuid,text) SET search_path=public;
 ALTER FUNCTION public.cancel_sale(uuid) SET search_path=public;
@@ -70,10 +86,40 @@ BEGIN
     EXECUTE 'ALTER FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text) SET search_path=public';
   END IF;
 END $$;
-ALTER FUNCTION public.handle_new_user() SET search_path=public;
-ALTER FUNCTION public.rls_auto_enable() SET search_path=pg_catalog;
-ALTER FUNCTION public.prevent_inventory_movement_delete() SET search_path=pg_catalog;
-ALTER FUNCTION public.prevent_inventory_movement_update() SET search_path=pg_catalog;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'handle_new_user'
+  ) THEN
+    EXECUTE 'ALTER FUNCTION public.handle_new_user() SET search_path=public';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'rls_auto_enable'
+  ) THEN
+    EXECUTE 'ALTER FUNCTION public.rls_auto_enable() SET search_path=pg_catalog';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'prevent_inventory_movement_delete'
+  ) THEN
+    EXECUTE 'ALTER FUNCTION public.prevent_inventory_movement_delete() SET search_path=pg_catalog';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'prevent_inventory_movement_update'
+  ) THEN
+    EXECUTE 'ALTER FUNCTION public.prevent_inventory_movement_update() SET search_path=pg_catalog';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_user_id ON public.inventory_movements(user_id);
 CREATE INDEX IF NOT EXISTS idx_physical_inventories_approved_by ON public.physical_inventories(approved_by);

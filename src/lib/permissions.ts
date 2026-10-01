@@ -60,7 +60,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'suppliers.view', 'suppliers.manage',
     'reports.view', 'reports.export',
     'users.view',
-    'automations.view',
+    'automations.view', 'automations.manage',
   ],
   CASHIER: [
     'sales.create', 'sales.view',
@@ -89,7 +89,7 @@ const MODULE_ROLE_ACCESS: Record<ActiveModule, readonly UserRole[]> = {
   clientes: ['ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE'],
   fornecedores: ['ADMIN', 'MANAGER'],
   relatorios: ['ADMIN', 'MANAGER'],
-  automacoes: ['ADMIN'],
+  automacoes: ['ADMIN', 'MANAGER'],
 };
 
 const ROLE_LABELS: Record<UserRole, string> = {

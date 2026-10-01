@@ -89,21 +89,64 @@ BEGIN
 END
 $hardening$;
 
-CREATE INDEX IF NOT EXISTS idx_inventory_movements_user_id ON public.inventory_movements(user_id);
-CREATE INDEX IF NOT EXISTS idx_physical_inventories_approved_by ON public.physical_inventories(approved_by);
-CREATE INDEX IF NOT EXISTS idx_physical_inventories_created_by ON public.physical_inventories(created_by);
-CREATE INDEX IF NOT EXISTS idx_physical_inventories_store_id ON public.physical_inventories(store_id);
-CREATE INDEX IF NOT EXISTS idx_physical_inventory_items_inventory_id ON public.physical_inventory_items(inventory_id);
-CREATE INDEX IF NOT EXISTS idx_physical_inventory_items_product_variant_id ON public.physical_inventory_items(product_variant_id);
-CREATE INDEX IF NOT EXISTS idx_return_items_product_id ON public.return_items(product_id);
-CREATE INDEX IF NOT EXISTS idx_returns_created_by ON public.returns(created_by);
-CREATE INDEX IF NOT EXISTS idx_returns_customer_id ON public.returns(customer_id);
-CREATE INDEX IF NOT EXISTS idx_sale_idempotency_sale_id ON public.sale_idempotency(sale_id);
-CREATE INDEX IF NOT EXISTS idx_sale_items_product_id ON public.sale_items(product_id);
-CREATE INDEX IF NOT EXISTS idx_sales_user_id ON public.sales(user_id);
-CREATE INDEX IF NOT EXISTS idx_store_inventory_product_variant_id ON public.store_inventory(product_variant_id);
-CREATE INDEX IF NOT EXISTS idx_customer_credit_movements_customer_id ON public.customer_credit_movements(customer_id);
-CREATE INDEX IF NOT EXISTS idx_user_store_access_store_id ON public.user_store_access(store_id);
+-- Índices consolidados podem apontar para objetos criados por migrations posteriores.
+-- Em rebuild limpo, aplique cada índice somente quando tabela e coluna já existirem.
+DO $indexes$
+DECLARE
+  v_index text;
+  v_table text;
+  v_column text;
+BEGIN
+  FOR v_index, v_table, v_column IN
+    SELECT *
+    FROM (VALUES
+      ('idx_inventory_movements_user_id', 'inventory_movements', 'user_id'),
+      ('idx_physical_inventories_approved_by', 'physical_inventories', 'approved_by'),
+      ('idx_physical_inventories_created_by', 'physical_inventories', 'created_by'),
+      ('idx_physical_inventories_store_id', 'physical_inventories', 'store_id'),
+      ('idx_physical_inventory_items_inventory_id', 'physical_inventory_items', 'inventory_id'),
+      ('idx_physical_inventory_items_product_variant_id', 'physical_inventory_items', 'product_variant_id'),
+      ('idx_return_items_product_id', 'return_items', 'product_id'),
+      ('idx_returns_created_by', 'returns', 'created_by'),
+      ('idx_returns_customer_id', 'returns', 'customer_id'),
+      ('idx_sale_idempotency_sale_id', 'sale_idempotency', 'sale_id'),
+      ('idx_sale_items_product_id', 'sale_items', 'product_id'),
+      ('idx_sales_user_id', 'sales', 'user_id'),
+      ('idx_store_inventory_product_variant_id', 'store_inventory', 'product_variant_id'),
+      ('idx_customer_credit_movements_customer_id', 'customer_credit_movements', 'customer_id'),
+      ('idx_user_store_access_store_id', 'user_store_access', 'store_id')
+    ) AS indexes(index_name, table_name, column_name)
+  LOOP
+    IF to_regclass('public.' || v_table) IS NOT NULL
+       AND EXISTS (
+         SELECT 1
+         FROM information_schema.columns
+         WHERE table_schema='public'
+           AND table_name=v_table
+           AND column_name=v_column
+       ) THEN
+      EXECUTE format(
+        'CREATE INDEX IF NOT EXISTS %I ON public.%I(%I)',
+        v_index, v_table, v_column
+      );
+    END IF;
+  END LOOP;
+END
+$indexes$;
 
-ALTER EXTENSION unaccent SET SCHEMA extensions;
+DO $extension$
+DECLARE
+  v_schema text;
+BEGIN
+  SELECT n.nspname
+    INTO v_schema
+  FROM pg_extension e
+  JOIN pg_namespace n ON n.oid=e.extnamespace
+  WHERE e.extname='unaccent';
+
+  IF v_schema IS NOT NULL AND v_schema <> 'extensions' THEN
+    ALTER EXTENSION unaccent SET SCHEMA extensions;
+  END IF;
+END
+$extension$;
 COMMIT;

@@ -182,38 +182,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentModule, onNavigate,
 
           <div className="header-right">
             {userStores.length > 1 && (
-              <label
-                title="Loja ativa"
-                style={{
-                  minHeight: '38px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '7px',
-                  padding: '0 9px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--bg-surface)',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <Building2 size={15} />
+              <label className="store-switcher" title="Loja ativa">
+                <Building2 className="store-switcher__icon" size={16} aria-hidden="true" />
                 <select
+                  className="store-switcher__select"
                   aria-label="Loja ativa"
                   value={activeStoreId ?? ''}
                   onChange={event => setActiveStoreId(event.target.value)}
                   disabled={isLoading}
-                  style={{
-                    minHeight: '34px',
-                    maxWidth: '190px',
-                    padding: '0 24px 0 0',
-                    border: 0,
-                    boxShadow: 'none',
-                    background: 'transparent',
-                    color: 'var(--text-primary)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: isLoading ? 'wait' : 'pointer'
-                  }}
                 >
                   {userStores.map(store => (
                     <option key={store.store_id} value={store.store_id}>{store.store_name}</option>

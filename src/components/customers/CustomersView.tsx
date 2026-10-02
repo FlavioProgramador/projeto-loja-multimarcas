@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { RefreshCw, UserPlus, UsersRound } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, RefreshCw, UserPlus, UsersRound } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
+import { CustomersService, type CustomerDirectoryStats } from '../../services/customers.service';
 import type { Customer } from '../../types';
 import { CustomerDetails } from './CustomerDetails';
 import { CustomerDeleteModal } from './CustomerDeleteModal';
@@ -9,12 +10,29 @@ import { CustomerForm, type CustomerFormData } from './CustomerForm';
 import { CustomerList } from './CustomerList';
 import { CustomerStats } from './CustomerStats';
 
+const PAGE_SIZE = 20;
+const EMPTY_STATS:CustomerDirectoryStats={
+  totalCustomers:0,
+  activeCustomers:0,
+  customersWithCredit:0,
+  totalPurchases:0,
+  totalRevenue:0,
+  creditBalance:0,
+};
+
 export const CustomersView: React.FC = () => {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, refreshData, isLoading } = useStore();
+  const { activeStoreId, addCustomer, updateCustomer, deleteCustomer } = useStore();
+  const [customers,setCustomers]=useState<Customer[]>([]);
+  const [stats,setStats]=useState<CustomerDirectoryStats>(EMPTY_STATS);
+  const [total,setTotal]=useState(0);
+  const [page,setPage]=useState(1);
+  const [loading,setLoading]=useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'with-credit' | 'without-credit'>('all');
   const [sort, setSort] = useState<'name' | 'spending' | 'purchases' | 'recent'>('name');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [detailLoading,setDetailLoading]=useState(false);
+  const [detailError,setDetailError]=useState<string|null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
@@ -23,37 +41,44 @@ export const CustomersView: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const metrics = useMemo(() => ({
-    totalRevenue: customers.reduce((sum, c) => sum + c.historico.reduce((inner, s) => inner + s.valor, 0), 0),
-    totalPurchases: customers.reduce((sum, c) => sum + c.historico.length, 0),
-    creditBalance: customers.reduce((sum, c) => sum + (c.saldoCredito || 0), 0),
-    customersWithCredit: customers.filter(c => (c.saldoCredito || 0) > 0).length,
-    activeCustomers: customers.length,
-  }), [customers]);
+  const loadPage=useCallback(async()=>{
+    if(!activeStoreId){
+      setCustomers([]);
+      setStats(EMPTY_STATS);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try{
+      const result=await CustomersService.getDirectoryPage({
+        storeId:activeStoreId,
+        page,
+        pageSize:PAGE_SIZE,
+        search,
+        creditFilter:status,
+        sort,
+      });
+      setCustomers(result.rows);
+      setStats(result.stats);
+      setTotal(result.total);
+      const lastPage=Math.max(1,Math.ceil(result.total/PAGE_SIZE));
+      if(page>lastPage) setPage(lastPage);
+    }catch(error){
+      setFormError(error instanceof Error?error.message:'Não foi possível carregar os clientes.');
+    }finally{
+      setLoading(false);
+    }
+  },[activeStoreId,page,search,status,sort]);
 
-  const filteredCustomers = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('pt-BR');
-    const result = customers.filter(customer => {
-      const textMatch = !term
-        || customer.nome.toLocaleLowerCase('pt-BR').includes(term)
-        || customer.cpf.toLocaleLowerCase('pt-BR').includes(term)
-        || customer.telefone.toLocaleLowerCase('pt-BR').includes(term)
-        || customer.email.toLocaleLowerCase('pt-BR').includes(term);
-      const credit = customer.saldoCredito || 0;
-      const statusMatch = status === 'all' || (status === 'with-credit' && credit > 0) || (status === 'without-credit' && credit <= 0);
-      return textMatch && statusMatch;
-    });
-    return [...result].sort((a, b) => {
-      if (sort === 'spending') return b.historico.reduce((s, x) => s + x.valor, 0) - a.historico.reduce((s, x) => s + x.valor, 0);
-      if (sort === 'purchases') return b.historico.length - a.historico.length;
-      if (sort === 'recent') {
-        const ad = a.historico.reduce((latest, sale) => sale.data > latest ? sale.data : latest, '');
-        const bd = b.historico.reduce((latest, sale) => sale.data > latest ? sale.data : latest, '');
-        return bd.localeCompare(ad);
-      }
-      return a.nome.localeCompare(b.nome, 'pt-BR');
-    });
-  }, [customers, search, sort, status]);
+  useEffect(()=>{setPage(1);},[activeStoreId,search,status,sort]);
+
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>{void loadPage();},search.trim()?250:0);
+    return ()=>window.clearTimeout(timer);
+  },[loadPage,search]);
+
+  const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
 
   const openCreate = () => {
     setIsCreateOpen(true);
@@ -69,6 +94,24 @@ export const CustomersView: React.FC = () => {
     setFormError(null);
   };
 
+  const openDetails=async(customer:Customer)=>{
+    setSelectedCustomer(customer);
+    setDetailLoading(true);
+    setDetailError(null);
+    if(!activeStoreId||!customer.uuid){
+      setDetailLoading(false);
+      return;
+    }
+    try{
+      const detail=await CustomersService.getDetail(activeStoreId,customer.uuid);
+      setSelectedCustomer(detail);
+    }catch(error){
+      setDetailError(error instanceof Error?error.message:'Não foi possível carregar o histórico do cliente.');
+    }finally{
+      setDetailLoading(false);
+    }
+  };
+
   const showNotice = (message: string) => {
     setNotice(message);
     window.setTimeout(() => setNotice(null), 3500);
@@ -78,8 +121,12 @@ export const CustomersView: React.FC = () => {
     setSaving(true);
     setFormError(null);
     try {
-      if (editingCustomer) await updateCustomer(editingCustomer.id, data);
-      else await addCustomer(data);
+      if (editingCustomer) {
+        await updateCustomer(editingCustomer.uuid || editingCustomer.id, data);
+      } else {
+        await addCustomer(data);
+      }
+      await loadPage();
       showNotice(editingCustomer ? 'Cliente atualizado com sucesso.' : 'Cliente cadastrado com sucesso.');
       setIsCreateOpen(false);
       setEditingCustomer(null);
@@ -95,7 +142,8 @@ export const CustomersView: React.FC = () => {
     setDeleting(true);
     setFormError(null);
     try {
-      await deleteCustomer(deletingCustomer.id);
+      await deleteCustomer(deletingCustomer.uuid || deletingCustomer.id);
+      await loadPage();
       showNotice('Cliente arquivado com sucesso. Histórico preservado.');
       setDeletingCustomer(null);
       setSelectedCustomer(null);
@@ -116,26 +164,35 @@ export const CustomersView: React.FC = () => {
           <p className="page-subtitle">Relacionamento, compras, crédito e histórico centralizados na loja ativa.</p>
         </div>
         <div className="customers-head-actions">
-          <button className="btn btn-outline btn-sm" onClick={() => refreshData()} disabled={isLoading}>
-            <RefreshCw size={14} className={isLoading ? 'spin' : ''}/> Sincronizar
+          <button className="btn btn-outline btn-sm" onClick={() => void loadPage()} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'spin' : ''}/> Sincronizar
           </button>
           <button className="btn" onClick={openCreate}><UserPlus size={15}/> Novo cliente</button>
         </div>
       </div>
-      <CustomerStats totalCustomers={customers.length} activeCustomers={metrics.activeCustomers}
-        customersWithCredit={metrics.customersWithCredit} totalPurchases={metrics.totalPurchases}
-        totalRevenue={metrics.totalRevenue} creditBalance={metrics.creditBalance} />
+      <CustomerStats totalCustomers={stats.totalCustomers} activeCustomers={stats.activeCustomers}
+        customersWithCredit={stats.customersWithCredit} totalPurchases={stats.totalPurchases}
+        totalRevenue={stats.totalRevenue} creditBalance={stats.creditBalance} />
       <section className="card customers-list-card">
         <div className="customers-list-heading">
-          <div><strong><UsersRound size={16}/> Base de clientes</strong><span>Dados lidos do Supabase da loja ativa</span></div>
+          <div><strong><UsersRound size={16}/> Base de clientes</strong><span>Consulta paginada no Supabase da loja ativa</span></div>
         </div>
         <CustomerFilters search={search} onSearchChange={setSearch} status={status}
           onStatusChange={setStatus} sort={sort} onSortChange={setSort}
-          resultCount={filteredCustomers.length} totalCount={customers.length} />
-        <CustomerList customers={filteredCustomers} onView={setSelectedCustomer}
+          resultCount={total} totalCount={stats.totalCustomers} />
+        <CustomerList customers={customers} onView={customer=>void openDetails(customer)}
           onEdit={openEdit} onDelete={setDeletingCustomer}/>
+        {total>0&&<div className="finance-pagination">
+          <span>Exibindo {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE,total)} de {total}</span>
+          <div>
+            <button disabled={page===1||loading} onClick={()=>setPage(value=>Math.max(1,value-1))}><ChevronLeft size={16}/></button>
+            <strong>{page}/{pages}</strong>
+            <button disabled={page===pages||loading} onClick={()=>setPage(value=>Math.min(pages,value+1))}><ChevronRight size={16}/></button>
+          </div>
+        </div>}
       </section>
-      <CustomerDetails customer={selectedCustomer} onClose={() => setSelectedCustomer(null)} onEdit={openEdit}/>
+      <CustomerDetails customer={selectedCustomer} loading={detailLoading} error={detailError}
+        onClose={() => {setSelectedCustomer(null);setDetailError(null);}} onEdit={openEdit}/>
       <CustomerForm isOpen={isCreateOpen || !!editingCustomer} customer={editingCustomer} saving={saving}
         error={formError} onClose={() => { setIsCreateOpen(false); setEditingCustomer(null); setFormError(null); }}
         onSubmit={handleSubmit}/>

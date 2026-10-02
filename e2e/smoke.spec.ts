@@ -5,7 +5,7 @@ test('exibe o login com campos acessíveis', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'Bem-vindo de volta' })).toBeVisible();
   await expect(page.getByLabel('E-mail')).toBeVisible();
-  await expect(page.getByLabel('Senha')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Senha', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Privacidade' })).toBeVisible();
 });

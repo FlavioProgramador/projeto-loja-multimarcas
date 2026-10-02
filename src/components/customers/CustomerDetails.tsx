@@ -82,7 +82,13 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({
               <div className="customer-history-list">
                 {history.map((item, index) => (
                   <article key={`${item.vendaId}-${item.data}-${index}`}>
-                    <div><strong>{item.vendaId || 'Venda'}</strong><span>{dateLabel(item.data)}</span></div>
+                    <div>
+                      <strong>{item.vendaId || 'Venda'}</strong>
+                      <span>{dateLabel(item.data)}</span>
+                      <span className={`customer-purchase-status ${item.status === 'DEVOLUCAO' ? 'returned' : 'completed'}`}>
+                        {item.status === 'DEVOLUCAO' ? 'Devolução' : 'Concluída'}
+                      </span>
+                    </div>
                     <strong>{formatMoeda(item.valor)}</strong>
                     <small>{item.itens || 'Itens não informados'}</small>
                   </article>

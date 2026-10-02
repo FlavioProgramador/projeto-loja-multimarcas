@@ -259,15 +259,57 @@ export const CustomersService = {
   },
 
   async search(storeId: string, search: string, limit = 8): Promise<Customer[]> {
-    const result = await this.getDirectoryPage({
-      storeId,
-      search,
-      page: 1,
-      pageSize: Math.min(20, Math.max(1, limit)),
-      sort: 'name',
-      creditFilter: 'all',
+    if (!isSupabaseConfigured || !storeId || !search.trim()) return [];
+
+    const normalized = search.trim().replace(/[(),]/g, ' ');
+    const pattern = `%${normalized}%`;
+    const { data, error } = await supabase
+      .from('customers')
+      .select(`
+        id,
+        name,
+        cpf,
+        rg,
+        phone,
+        email,
+        address,
+        birth_date,
+        customer_credit_movements (
+          type,
+          amount
+        )
+      `)
+      .eq('store_id', storeId)
+      .eq('is_active', true)
+      .or(`name.ilike.${pattern},cpf.ilike.${pattern},phone.ilike.${pattern}`)
+      .order('name', { ascending: true })
+      .limit(Math.min(20, Math.max(1, limit)));
+
+    if (error) throw error;
+
+    return (data || []).map((row: any, index: number) => {
+      const creditBalance = (row.customer_credit_movements || []).reduce(
+        (total: number, movement: any) =>
+          total + (movement.type === 'CREDIT' ? toNumber(movement.amount) : -toNumber(movement.amount)),
+        0,
+      );
+
+      return {
+        id: index + 1,
+        uuid: row.id,
+        nome: row.name,
+        cpf: row.cpf || 'Não informado',
+        rg: row.rg || '',
+        telefone: row.phone || '',
+        email: row.email || '',
+        endereco: row.address || '',
+        dataNascimento: row.birth_date || '',
+        saldoCredito: Math.max(0, creditBalance),
+        detalhesCarregados: false,
+        historico: [],
+        movimentacoesCredito: [],
+      };
     });
-    return result.rows;
   },
 
   async getDetail(storeId: string, customerId: string): Promise<Customer> {

@@ -75,24 +75,38 @@ BEGIN
   
   IF v_default_store_id IS NULL THEN
     -- Inserir loja padrão somente quando não existe nenhuma loja ativa.
-    INSERT INTO public.stores (name) VALUES ('Loja Principal') RETURNING id INTO v_default_store_id;
-
-    -- Inserir acesso para todos os usuários existentes
-    INSERT INTO public.user_store_access (user_id, store_id, role)
-    SELECT id, v_default_store_id, role FROM public.profiles
-    ON CONFLICT DO NOTHING;
-
-    -- Migrar o estoque para a nova tabela de inventário
-    INSERT INTO public.store_inventory (store_id, product_variant_id, quantity)
-    SELECT v_default_store_id, id, COALESCE(stock_quantity, 0) FROM public.product_variants
-    ON CONFLICT DO NOTHING;
-
-    -- Atualizar registros existentes com a loja padrão
-    UPDATE public.sales SET store_id = v_default_store_id WHERE store_id IS NULL;
-    UPDATE public.inventory_movements SET store_id = v_default_store_id WHERE store_id IS NULL;
-    UPDATE public.financial_transactions SET store_id = v_default_store_id WHERE store_id IS NULL;
-    UPDATE public.fixed_expenses SET store_id = v_default_store_id WHERE store_id IS NULL;
+    INSERT INTO public.stores (name)
+    VALUES ('Loja Principal')
+    RETURNING id INTO v_default_store_id;
   END IF;
+
+  -- O backfill precisa ocorrer tanto para uma loja recém-criada quanto para uma
+  -- loja já existente de migrations anteriores.
+  INSERT INTO public.user_store_access (user_id, store_id, role)
+  SELECT id, v_default_store_id, role
+  FROM public.profiles
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.store_inventory (store_id, product_variant_id, quantity)
+  SELECT v_default_store_id, id, COALESCE(stock_quantity, 0)
+  FROM public.product_variants
+  ON CONFLICT DO NOTHING;
+
+  UPDATE public.sales
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
+
+  UPDATE public.inventory_movements
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
+
+  UPDATE public.financial_transactions
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
+
+  UPDATE public.fixed_expenses
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
 END $$;
 
 -- Tornar store_id NOT NULL para garantir consistência daqui pra frente

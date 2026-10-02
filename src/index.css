@@ -1501,6 +1501,16 @@ select option {
     width: 100%;
   }
 
+  .print-receipt {
+    left: 50% !important;
+    right: auto !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    transform: translateX(-50%);
+  }
+
   body:has(.print-only) .module-fade,
   body:has(#receipt-print-area) .module-fade {
     display: none !important;

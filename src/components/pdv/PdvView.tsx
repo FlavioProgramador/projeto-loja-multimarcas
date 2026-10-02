@@ -101,6 +101,18 @@ export const PdvView: React.FC = () => {
   const creditUsed = useCustomerCredit ? maxCreditApplicable : 0;
   const calculatedTotal = Math.max(0, subtotal - discountTotal - creditUsed);
 
+  const discountSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (numDescVal > 0) {
+      parts.push(formatMoeda(numDescVal));
+    }
+    if (numDescPerc > 0) {
+      const percAmount = subtotal * (numDescPerc / 100);
+      parts.push(`${numDescPerc}% (${formatMoeda(percAmount)})`);
+    }
+    return parts.join(' + ');
+  }, [numDescVal, numDescPerc, subtotal]);
+
   // ==========================================
   // AÇÕES DO UTILIZADOR
   // ==========================================
@@ -144,6 +156,9 @@ export const PdvView: React.FC = () => {
     if (cart.length === 0) {
       showBanner('⚠️ O carrinho está vazio. Adicione produtos para prosseguir.');
       return;
+    }
+    if (paymentMethod === 'Dinheiro' && (!amountPaid || parseFloat(amountPaid) === 0)) {
+      setAmountPaid(calculatedTotal > 0 ? calculatedTotal.toFixed(2) : '');
     }
     setIsCheckoutModalOpen(true);
   };
@@ -193,6 +208,11 @@ export const PdvView: React.FC = () => {
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
   const handleConfirmSale = async () => {
+    if (paymentMethod === 'Dinheiro' && calculatedTotal > 0 && (parseFloat(amountPaid) || 0) < calculatedTotal) {
+      showBanner('⚠️ O valor recebido em dinheiro deve ser igual ou superior ao total final.');
+      return;
+    }
+
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -614,7 +634,17 @@ export const PdvView: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '6px', marginBottom: '12px' }}>
               <input type="number" placeholder="Desc R$" step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
               <input type="number" placeholder="Desc %" step="1" value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
-              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }}>
+              <select
+                value={paymentMethod}
+                onChange={e => {
+                  const newMethod = e.target.value;
+                  setPaymentMethod(newMethod);
+                  if (newMethod === 'Dinheiro' && (!amountPaid || parseFloat(amountPaid) === 0)) {
+                    setAmountPaid(calculatedTotal > 0 ? calculatedTotal.toFixed(2) : '');
+                  }
+                }}
+                style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }}
+              >
                 <option value="PIX">PIX</option>
                 <option value="Cartão">Cartão</option>
                 <option value="Dinheiro">Dinheiro</option>
@@ -661,7 +691,7 @@ export const PdvView: React.FC = () => {
         </div>
 
         {/* Modais */}
-        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={""} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
+        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={discountSummary} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
         <NewReturnModal isOpen={isReturnModalOpen} onClose={() => setIsReturnModalOpen(false)} />
 
         {/* Modal Customizado de Confirmação para Limpar o Carrinho */}

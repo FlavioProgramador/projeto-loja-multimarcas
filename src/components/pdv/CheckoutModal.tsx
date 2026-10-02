@@ -42,6 +42,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const amountNum = parseFloat(amountPaid) || 0;
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
+  const isCashInsufficient = paymentMethod === 'Dinheiro' && totalFinal > 0 && amountNum < totalFinal;
 
   return (
     <Modal
@@ -155,6 +156,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
               </div>
             )}
+            {isCashInsufficient && (
+              <div style={{ fontSize: '11.5px', color: 'var(--badge-red)', fontWeight: 600, textAlign: 'right' }}>
+                ⚠️ O valor recebido deve ser igual ou superior ao total.
+              </div>
+            )}
           </div>
         )}
 
@@ -186,7 +192,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+            <button
+              className="btn"
+              onClick={onConfirm}
+              style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              disabled={isGeneratingPix || isCashInsufficient}
+              title={isCashInsufficient ? 'Valor recebido em dinheiro é insuficiente' : undefined}
+            >
               <Check size={16} />
               <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
               <kbd className="kbd-key-primary">F4</kbd>

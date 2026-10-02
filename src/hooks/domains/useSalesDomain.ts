@@ -71,7 +71,7 @@ export function useSalesDomain({
                 : c
             ));
           }
-          await refreshDomains('products', 'sales', 'customers', 'transactions');
+          await refreshDomains('products', 'sales', 'transactions');
           return { success: true, message: 'Venda processada atomicamente no Supabase com sucesso!', totalFinal: rpcResult.totalFinal };
         }
 

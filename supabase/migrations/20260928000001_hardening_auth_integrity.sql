@@ -895,7 +895,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
   v_actor uuid := (select auth.uid());
   v_profile_active boolean;

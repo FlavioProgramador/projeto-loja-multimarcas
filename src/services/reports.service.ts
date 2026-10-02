@@ -119,10 +119,11 @@ function normalizeCommercialSummary(value: unknown): ReportCommercialSummary {
 }
 
 function isMissingCommercialSummaryRpc(error: { code?: string; message?: string }): boolean {
+  const message = error.message || '';
   return error.code === 'PGRST202'
     || (
-      error.message?.includes('Could not find the function') === true
-      && error.message.includes('report_commercial_summary')
+      message.includes('Could not find the function')
+      && message.includes('report_commercial_summary')
     );
 }
 

@@ -6,6 +6,8 @@ import { Modal } from '../ui/Modal';
 
 interface CustomerDetailsProps {
   customer: Customer | null;
+  loading?: boolean;
+  error?: string | null;
   onClose: () => void;
   onEdit: (customer: Customer) => void;
 }
@@ -16,11 +18,16 @@ const dateLabel = (value?: string) =>
 const initials = (name: string) =>
   name.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'CL';
 
-export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, onEdit }) => {
+export const CustomerDetails: React.FC<CustomerDetailsProps> = ({
+  customer, loading = false, error, onClose, onEdit,
+}) => {
   if (!customer) return null;
 
-  const total = customer.historico.reduce((sum, item) => sum + item.valor, 0);
+  const total = customer.totalGasto
+    ?? customer.historico.reduce((sum, item) => sum + item.valor, 0);
   const history = [...customer.historico].sort((a, b) => b.data.localeCompare(a.data));
+  const purchaseCount = customer.totalCompras ?? history.length;
+  const lastPurchase = customer.ultimaCompra || history[0]?.data;
   const movements = customer.movimentacoesCredito || [];
   const credit = customer.saldoCredito || 0;
 
@@ -38,9 +45,9 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onCl
 
         <div className="customer-detail-stats">
           <div><small>Total gasto</small><strong>{formatMoeda(total)}</strong></div>
-          <div><small>Compras</small><strong>{history.length}</strong></div>
+          <div><small>Compras</small><strong>{purchaseCount}</strong></div>
           <div><small>Crédito disponível</small><strong>{formatMoeda(credit)}</strong></div>
-          <div><small>Última compra</small><strong>{history[0] ? dateLabel(history[0].data) : 'Nunca'}</strong></div>
+          <div><small>Última compra</small><strong>{lastPurchase ? dateLabel(lastPurchase) : 'Nunca'}</strong></div>
         </div>
 
         <div className="customer-detail-grid">
@@ -63,43 +70,48 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onCl
           </section>
         </div>
 
-        <section className="customer-history-section">
-          <h3><ShoppingBag size={15}/> Histórico de compras <span>{history.length}</span></h3>
-          {history.length === 0 ? (
-            <p className="customer-history-empty">Nenhuma compra registrada.</p>
-          ) : (
-            <div className="customer-history-list">
-              {history.map((item, index) => (
-                <article key={`${item.vendaId}-${item.data}-${index}`}>
-                  <div><strong>{item.vendaId || 'Venda'}</strong><span>{dateLabel(item.data)}</span></div>
-                  <strong>{formatMoeda(item.valor)}</strong>
-                  <small>{item.itens || 'Itens não informados'}</small>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        {loading && <p className="customer-history-empty">Carregando histórico completo...</p>}
+        {error && <p className="customer-history-empty">{error}</p>}
 
-        <section className="customer-history-section">
-          <h3><CreditCard size={15}/> Créditos e vales <span>{movements.length}</span></h3>
-          {movements.length === 0 ? (
-            <p className="customer-history-empty">Nenhuma movimentação de crédito registrada.</p>
-          ) : (
-            <div className="customer-history-list customer-credit-history">
-              {movements.map((movement, index) => (
-                <article key={movement.id || index}>
-                  <div>
-                    <strong>{movement.descricao || 'Movimentação de crédito'}</strong>
-                    <span>{dateLabel(movement.data)}</span>
-                  </div>
-                  <strong className={movement.tipo === 'entrada' ? 'credit-in' : 'credit-out'}>
-                    {movement.tipo === 'entrada' ? '+' : '-'} {formatMoeda(movement.valor)}
-                  </strong>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        {!loading && !error && <>
+          <section className="customer-history-section">
+            <h3><ShoppingBag size={15}/> Histórico de compras <span>{history.length}</span></h3>
+            {history.length === 0 ? (
+              <p className="customer-history-empty">Nenhuma compra registrada.</p>
+            ) : (
+              <div className="customer-history-list">
+                {history.map((item, index) => (
+                  <article key={`${item.vendaId}-${item.data}-${index}`}>
+                    <div><strong>{item.vendaId || 'Venda'}</strong><span>{dateLabel(item.data)}</span></div>
+                    <strong>{formatMoeda(item.valor)}</strong>
+                    <small>{item.itens || 'Itens não informados'}</small>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="customer-history-section">
+            <h3><CreditCard size={15}/> Créditos e vales <span>{movements.length}</span></h3>
+            {movements.length === 0 ? (
+              <p className="customer-history-empty">Nenhuma movimentação de crédito registrada.</p>
+            ) : (
+              <div className="customer-history-list customer-credit-history">
+                {movements.map((movement, index) => (
+                  <article key={movement.id || index}>
+                    <div>
+                      <strong>{movement.descricao || 'Movimentação de crédito'}</strong>
+                      <span>{dateLabel(movement.data)}</span>
+                    </div>
+                    <strong className={movement.tipo === 'entrada' ? 'credit-in' : 'credit-out'}>
+                      {movement.tipo === 'entrada' ? '+' : '-'} {formatMoeda(movement.valor)}
+                    </strong>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </>}
       </div>
     </Modal>
   );

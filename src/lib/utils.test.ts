@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { maskCpf } from './utils';
+import { formatCpf, maskCpf } from './utils';
 
 describe('maskCpf', () => {
   it('mascara CPF formatado preservando apenas os dois últimos dígitos', () => {
@@ -17,5 +17,19 @@ describe('maskCpf', () => {
 
   it('preserva o marcador de dado ausente', () => {
     expect(maskCpf('Não informado')).toBe('Não informado');
+  });
+});
+
+
+describe('formatCpf', () => {
+  it('exibe o CPF completo formatado nos fluxos operacionais', () => {
+    expect(formatCpf('12345678909')).toBe('123.456.789-09');
+    expect(formatCpf('123.456.789-09')).toBe('123.456.789-09');
+  });
+
+  it('mantém valores ausentes como não informados', () => {
+    expect(formatCpf('')).toBe('Não informado');
+    expect(formatCpf(null)).toBe('Não informado');
+    expect(formatCpf('Não informado')).toBe('Não informado');
   });
 });

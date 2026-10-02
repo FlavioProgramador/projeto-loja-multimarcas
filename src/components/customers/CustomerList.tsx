@@ -1,7 +1,7 @@
 import React from 'react';
 import { Eye, Pencil, Trash2, UserRound } from 'lucide-react';
 import type { Customer } from '../../types';
-import { formatMoeda, maskCpf } from '../../lib/utils';
+import { formatMoeda, formatCpf } from '../../lib/utils';
 
 interface CustomerListProps {
   customers: Customer[];
@@ -31,8 +31,11 @@ export const CustomerList: React.FC<CustomerListProps> = ({
       </thead>
       <tbody>
         {customers.map(customer => {
-          const total = customer.historico.reduce((sum, item) => sum + item.valor, 0);
-          const lastPurchase = [...customer.historico].sort((a, b) => b.data.localeCompare(a.data))[0];
+          const total = customer.totalGasto
+            ?? customer.historico.reduce((sum, item) => sum + item.valor, 0);
+          const purchaseCount = customer.totalCompras ?? customer.historico.length;
+          const lastPurchaseDate = customer.ultimaCompra
+            || [...customer.historico].sort((a, b) => b.data.localeCompare(a.data))[0]?.data;
           const credit = customer.saldoCredito || 0;
           return (
             <tr key={customer.uuid || customer.id} className="clickable-row" onClick={() => onView(customer)}>
@@ -41,7 +44,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                   <span className="customer-avatar">{getInitials(customer.nome)}</span>
                   <span>
                     <strong>{customer.nome}</strong>
-                    <small>{customer.cpf ? maskCpf(customer.cpf) : 'CPF não informado'}</small>
+                    <small>{customer.cpf ? formatCpf(customer.cpf) : 'CPF não informado'}</small>
                   </span>
                 </div>
               </td>
@@ -51,8 +54,8 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                   <small>{customer.email || 'E-mail não informado'}</small>
                 </div>
               </td>
-              <td><span className="customer-metric-badge">{customer.historico.length}</span></td>
-              <td>{lastPurchase ? new Date(`${lastPurchase.data}T00:00:00`).toLocaleDateString('pt-BR') : 'Nunca'}</td>
+              <td><span className="customer-metric-badge">{purchaseCount}</span></td>
+              <td>{lastPurchaseDate ? new Date(`${lastPurchaseDate}T00:00:00`).toLocaleDateString('pt-BR') : 'Nunca'}</td>
               <td>
                 <span className={`customer-credit-pill ${credit > 0 ? 'has-credit' : ''}`}>{formatMoeda(credit)}</span>
               </td>

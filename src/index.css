@@ -1501,6 +1501,16 @@ select option {
     width: 100%;
   }
 
+  .print-receipt {
+    left: 50% !important;
+    right: auto !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    transform: translateX(-50%);
+  }
+
   body:has(.print-only) .module-fade,
   body:has(#receipt-print-area) .module-fade {
     display: none !important;
@@ -1684,7 +1694,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
   padding: 15px;
   border: 1px solid var(--card-border);
   border-radius: 10px;
-  background: var(--surface);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1769,7 +1779,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-subtle);
+  background: var(--bg-surface-subtle);
 }
 
 .customer-search-field {
@@ -1932,7 +1942,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
   justify-content: center;
   border: 1px solid var(--border-color);
   border-radius: 7px;
-  background: var(--surface-subtle);
+  background: var(--bg-surface-subtle);
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1946,7 +1956,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
   padding: 4px 8px;
   border: 1px solid var(--border-color);
   border-radius: 7px;
-  background: var(--surface-subtle);
+  background: var(--bg-surface-subtle);
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1969,7 +1979,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
   width: 31px;
   height: 31px;
   border-radius: 7px;
-  background: var(--surface);
+  background: var(--bg-surface);
   border-color: var(--border-color);
   color: var(--text-secondary);
 }
@@ -2007,6 +2017,104 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
 
 .customers-empty span {
   font-size: 11px;
+}
+
+.customers-pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.customers-pagination {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-secondary);
+}
+
+.customers-pagination button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.customers-pagination button:hover:not(:disabled) {
+  border-color: var(--brand-accent);
+  color: var(--brand-accent);
+}
+
+.customers-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+.customers-pagination strong {
+  min-width: 42px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.customer-purchase-payment {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.customer-purchase-payment svg {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.customer-purchase-payment span {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.customer-purchase-payment em {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-style: normal;
+}
+
+.customer-purchase-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px !important;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.customer-purchase-status.completed {
+  background: var(--badge-green-bg);
+  color: var(--badge-green);
+}
+
+.customer-purchase-status.returned {
+  background: var(--badge-yellow-bg);
+  color: var(--badge-yellow);
 }
 
 .customer-details {

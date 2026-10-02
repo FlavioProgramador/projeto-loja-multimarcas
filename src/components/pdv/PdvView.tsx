@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
-import { formatMoeda, maskCpf } from '../../lib/utils';
+import { formatMoeda, formatCpf } from '../../lib/utils';
 import { CheckoutModal } from './CheckoutModal';
 import { ReceiptPrinter } from './ReceiptPrinter';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -10,6 +10,8 @@ import { NewReturnModal } from '../returns/NewReturnModal';
 import { NewCustomerModal } from '../customers/NewCustomerModal';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { generateIdempotencyKey } from '../../lib/idempotency';
+import { CustomersService } from '../../services/customers.service';
+import type { Customer } from '../../types';
 
 export const PdvView: React.FC = () => {
   const { products, customers, processSale, activeStoreId } = useStore();
@@ -35,6 +37,8 @@ export const PdvView: React.FC = () => {
   const [useCustomerCredit, setUseCustomerCredit] = useState(true);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
+  const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
   const [amountPaid, setAmountPaid] = useState<string>('');
 
   // PIX Integration States
@@ -75,20 +79,52 @@ export const PdvView: React.FC = () => {
     });
   }, [products, searchTerm, selectedCategory, selectedColecao, selectedEstacao, selectedGenero]);
 
-  const matchedCustomer = useMemo(() => {
-    return customers.find(c =>
-      (cpf.trim() && c.cpf === cpf.trim()) ||
-      (buyerName.trim() && c.nome.toLowerCase() === buyerName.trim().toLowerCase())
-    );
-  }, [customers, cpf, buyerName]);
+  useEffect(() => {
+    const term = customerSearchTerm.trim();
+    if (!term) {
+      setCustomerSuggestions([]);
+      return;
+    }
 
-  const customerSuggestions = useMemo(() => {
-    if (customerSearchTerm.trim().length < 1) return [];
-    const termLower = customerSearchTerm.toLowerCase();
-    return customers.filter(c =>
-      c.nome.toLowerCase().includes(termLower) || c.cpf.includes(customerSearchTerm) || c.telefone.includes(customerSearchTerm)
-    ).slice(0, 6);
-  }, [customers, customerSearchTerm]);
+    if (!isSupabaseConfigured || !activeStoreId) {
+      const termLower = term.toLowerCase();
+      setCustomerSuggestions(customers.filter(customer =>
+        customer.nome.toLowerCase().includes(termLower)
+        || customer.cpf.includes(term)
+        || customer.telefone.includes(term)
+      ).slice(0, 6));
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        setCustomerSuggestions(await CustomersService.search(activeStoreId, term, 6));
+      } catch (error) {
+        console.error('Erro ao buscar clientes no PDV:', error);
+        setCustomerSuggestions([]);
+      }
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [activeStoreId, customerSearchTerm, customers]);
+
+  useEffect(() => {
+    if (matchedCustomer) {
+      const stillMatches =
+        (cpf.trim() && matchedCustomer.cpf === cpf.trim())
+        || (buyerName.trim() && matchedCustomer.nome.toLowerCase() === buyerName.trim().toLowerCase());
+      if (stillMatches) return;
+      setMatchedCustomer(null);
+    }
+
+    if (!isSupabaseConfigured) {
+      const localMatch = customers.find(customer =>
+        (cpf.trim() && customer.cpf === cpf.trim())
+        || (buyerName.trim() && customer.nome.toLowerCase() === buyerName.trim().toLowerCase())
+      );
+      if (localMatch) setMatchedCustomer(localMatch);
+    }
+  }, [buyerName, cpf, customers, matchedCustomer]);
 
   // ==========================================
   // CÁLCULOS FINANCEIROS
@@ -104,10 +140,12 @@ export const PdvView: React.FC = () => {
   // ==========================================
   // AÇÕES DO UTILIZADOR
   // ==========================================
-  const handleSelectCustomer = (customer: typeof customers[0]) => {
+  const handleSelectCustomer = (customer: Customer) => {
+    setMatchedCustomer(customer);
     setBuyerName(customer.nome);
     setCpf(customer.cpf);
     setCustomerSearchTerm('');
+    setCustomerSuggestions([]);
     setShowCustomerSuggestions(false);
   };
 
@@ -115,6 +153,8 @@ export const PdvView: React.FC = () => {
     setBuyerName('');
     setCpf('');
     setCustomerSearchTerm('');
+    setCustomerSuggestions([]);
+    setMatchedCustomer(null);
     setShowCustomerSuggestions(false);
   };
 
@@ -266,6 +306,7 @@ export const PdvView: React.FC = () => {
       cartItems: cart,
       buyerName: buyerName.trim() || 'Cliente não identificado',
       cpf: cpf.trim() || 'Não informado',
+      customerId: matchedCustomer?.uuid,
       paymentMethod,
       installments,
       discountValue: numDescVal,
@@ -570,7 +611,7 @@ export const PdvView: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '12.5px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{buyerName}</div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{cpf ? maskCpf(cpf) : 'CPF não informado'}</div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{cpf ? formatCpf(cpf) : 'CPF não informado'}</div>
                   </div>
                   <button onClick={handleClearCustomer} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={15} /></button>
                 </div>
@@ -601,7 +642,7 @@ export const PdvView: React.FC = () => {
                       {customerSuggestions.map(c => (
                         <button key={c.id} type="button" onClick={() => handleSelectCustomer(c)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
                           <span style={{ fontWeight: 500 }}>{c.nome}</span>
-                          <span style={{ color: 'var(--text-muted)' }}>{c.cpf ? maskCpf(c.cpf) : 'Sem CPF'}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>{c.cpf ? formatCpf(c.cpf) : 'Sem CPF'}</span>
                         </button>
                       ))}
                     </div>

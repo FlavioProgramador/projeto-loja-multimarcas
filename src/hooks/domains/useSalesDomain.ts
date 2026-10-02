@@ -9,6 +9,7 @@ type SaleParams = {
   cartItems: CartItem[];
   buyerName: string;
   cpf: string;
+  customerId?: string;
   paymentMethod: string;
   installments: number;
   discountValue: number;
@@ -44,7 +45,7 @@ export function useSalesDomain({
   refreshDomains,
 }: SalesDomainArgs) {
   const processSale = useCallback(async ({
-    cartItems, buyerName, cpf, paymentMethod, installments,
+    cartItems, buyerName, cpf, customerId, paymentMethod, installments,
     discountValue, discountPercent, creditUsed = 0,
   }: SaleParams): Promise<SaleResult> => {
     if (cartItems.length === 0) {
@@ -58,7 +59,7 @@ export function useSalesDomain({
 
       if (cartItems.every(item => item.variantId)) {
         const rpcResult = await SalesService.completeSale({
-          storeId: activeStoreId, cartItems, buyerName, cpf, paymentMethod,
+          storeId: activeStoreId, cartItems, buyerName, cpf, customerId, paymentMethod,
           installments, discountValue: discountValue + creditUsed,
           discountPercent, idempotencyKey: generateIdempotencyKey(),
         });
@@ -71,7 +72,7 @@ export function useSalesDomain({
                 : c
             ));
           }
-          await refreshDomains('products', 'sales', 'customers', 'transactions');
+          await refreshDomains('products', 'sales', 'transactions');
           return { success: true, message: 'Venda processada atomicamente no Supabase com sucesso!', totalFinal: rpcResult.totalFinal };
         }
 

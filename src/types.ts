@@ -55,6 +55,10 @@ export interface CustomerPurchase {
   valor: number;
   data: string;
   itens: string;
+  status?: 'CONCLUIDA' | 'DEVOLUCAO';
+  formaPagamento?: string;
+  parcelas?: number;
+  statusPagamento?: string;
 }
 
 export interface CustomerCreditMovement {
@@ -77,6 +81,10 @@ export interface Customer {
   endereco: string;
   dataNascimento: string;
   saldoCredito?: number;
+  totalCompras?: number;
+  totalGasto?: number;
+  ultimaCompra?: string;
+  detalhesCarregados?: boolean;
   historico: CustomerPurchase[];
   movimentacoesCredito?: CustomerCreditMovement[];
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   RotateCcw,
   Search,
@@ -16,6 +16,8 @@ import { useStore } from '../../contexts/StoreContext';
 import { ReturnItem, ReturnReason, ReturnRecord } from '../../types';
 import { formatMoeda } from '../../lib/utils';
 import { ReturnReceipt } from './ReturnReceipt';
+import { SalesService } from '../../services/sales.service';
+import type { SaleMovement } from '../../types';
 
 interface NewReturnModalProps {
   isOpen: boolean;
@@ -36,11 +38,13 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
   onClose,
   onSuccess
 }) => {
-  const { products, movements, customers, processReturn } = useStore();
+  const { products, activeStoreId, processReturn } = useStore();
 
   const [mode, setMode] = useState<'sale' | 'custom'>('sale');
   const [selectedSaleId, setSelectedSaleId] = useState<string>('');
   const [saleSearch, setSaleSearch] = useState<string>('');
+  const [sales, setSales] = useState<SaleMovement[]>([]);
+  const [salesLoading, setSalesLoading] = useState(false);
 
   const [customerName, setCustomerName] = useState('');
   const [customerCpf, setCustomerCpf] = useState('');
@@ -61,18 +65,32 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
   // Success print state
   const [completedReturn, setCompletedReturn] = useState<ReturnRecord | null>(null);
 
-  // Filter sales
-  const filteredSales = movements.filter(
-    m =>
-      m.vendaId.toLowerCase().includes(saleSearch.toLowerCase()) ||
-      m.comprador.toLowerCase().includes(saleSearch.toLowerCase()) ||
-      m.cpf.includes(saleSearch)
-  );
+  useEffect(() => {
+    if (!isOpen || mode !== 'sale' || !activeStoreId) {
+      setSales([]);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setSalesLoading(true);
+      try {
+        setSales(await SalesService.searchMovements(activeStoreId, saleSearch, 20));
+      } catch (error) {
+        console.error('Erro ao buscar vendas para devolução:', error);
+        setSales([]);
+      } finally {
+        setSalesLoading(false);
+      }
+    }, saleSearch.trim() ? 250 : 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeStoreId, isOpen, mode, saleSearch]);
+
+  const filteredSales = sales;
 
   const handleSelectSale = (saleId: string) => {
-    const selected = movements.find(m => m.vendaId === saleId);
-    setSelectedSaleId(selected?.uuid || saleId);
-    const sale = movements.find(m => m.vendaId === saleId);
+    const sale = sales.find(m => m.vendaId === saleId);
+    setSelectedSaleId(sale?.uuid || saleId);
     if (!sale) return;
 
     setCustomerName(sale.comprador !== 'Cliente não identificado' ? sale.comprador : '');
@@ -325,7 +343,9 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
                 </div>
 
                 <div style={{ maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-main)' }}>
-                  {filteredSales.length === 0 ? (
+                  {salesLoading ? (
+                  <div style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '12px' }}>Buscando vendas...</div>
+                ) : filteredSales.length === 0 ? (
                     <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
                       Nenhuma venda encontrada no histórico.
                     </div>

@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, CreditCard, Filter, Inbox, RefreshCw, Search, Wallet, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { FinanceService, FinanceFixedExpense, FinanceTransaction } from '../../services/finance.service';
-import { calculateFinanceSummary, filterFinanceTransactions } from '../../services/finance/finance.model';
+import { FinanceService, FinanceFixedExpense, FinanceTransaction, type FinanceSummary } from '../../services/finance.service';
 import './finance.css';
 
 type Period = 'today' | '7d' | '30d' | 'all';
@@ -22,6 +21,8 @@ export const FinanceView:React.FC = () => {
   const { activeStoreId } = useStore();
   const [transactions,setTransactions]=useState<FinanceTransaction[]>([]);
   const [expenses,setExpenses]=useState<FinanceFixedExpense[]>([]);
+  const [total,setTotal]=useState(0);
+  const [summary,setSummary]=useState<FinanceSummary>({income:0,expense:0,balance:0,pending:0});
   const [loading,setLoading]=useState(true);
   const [query,setQuery]=useState('');
   const [period,setPeriod]=useState<Period>('30d');
@@ -30,33 +31,72 @@ export const FinanceView:React.FC = () => {
   const [page,setPage]=useState(1);
   const [selected,setSelected]=useState<FinanceTransaction|null>(null);
 
-  const load=async()=>{
-    if(!activeStoreId){setTransactions([]);setExpenses([]);setLoading(false);return;}
+  const loadTransactions=async()=>{
+    if(!activeStoreId){
+      setTransactions([]);
+      setTotal(0);
+      setSummary({income:0,expense:0,balance:0,pending:0});
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try{
-      const [tx,fx]=await Promise.all([FinanceService.getTransactionRecords(activeStoreId),FinanceService.getExpenseRecords(activeStoreId)]);
-      setTransactions(tx); setExpenses(fx);
-    } catch(error){ console.error('Erro ao sincronizar financeiro:',error); setTransactions([]);setExpenses([]); }
-    finally{setLoading(false);}
+      const start=startDate(period);
+      const result=await FinanceService.getPage({
+        storeId:activeStoreId,
+        page,
+        pageSize:PAGE_SIZE,
+        startDate:start?.toISOString()||null,
+        type,
+        status,
+        search:query,
+      });
+      setTransactions(result.rows);
+      setTotal(result.total);
+      setSummary(result.summary);
+      const lastPage=Math.max(1,Math.ceil(result.total/PAGE_SIZE));
+      if(page>lastPage)setPage(lastPage);
+    }catch(error){
+      console.error('Erro ao sincronizar financeiro:',error);
+      setTransactions([]);
+      setTotal(0);
+      setSummary({income:0,expense:0,balance:0,pending:0});
+    }finally{
+      setLoading(false);
+    }
   };
-  useEffect(()=>{void load();},[activeStoreId]);
 
-  const filtered=useMemo(()=>filterFinanceTransactions(transactions,{
-    type,status,query,startDate:startDate(period),
-  }),[transactions,period,type,status,query]);
+  const loadExpenses=async()=>{
+    if(!activeStoreId){setExpenses([]);return;}
+    try{
+      setExpenses(await FinanceService.getExpenseRecords(activeStoreId));
+    }catch(error){
+      console.error('Erro ao carregar despesas fixas:',error);
+      setExpenses([]);
+    }
+  };
 
-  useEffect(()=>setPage(1),[period,type,status,query]);
-  const pages=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));
-  const rows=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
-  useEffect(()=>{if(page>pages)setPage(pages);},[page,pages]);
+  useEffect(()=>setPage(1),[activeStoreId,period,type,status,query]);
 
-  const summary=useMemo(()=>calculateFinanceSummary(filtered),[filtered]);
-  const due=useMemo(()=>expenses.filter(e=>!e.paid).reduce((s,e)=>s+e.amount,0),[expenses]);
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>{void loadTransactions();},query.trim()?250:0);
+    return ()=>window.clearTimeout(timer);
+  },[activeStoreId,page,period,type,status,query]);
+
+  useEffect(()=>{void loadExpenses();},[activeStoreId]);
+
+  const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+  const rows=transactions;
+  const due=useMemo(()=>expenses.filter(e=>!e.paid).reduce((sum,e)=>sum+e.amount,0),[expenses]);
+
+  const loadAll=async()=>{
+    await Promise.all([loadTransactions(),loadExpenses()]);
+  };
 
   return <div className="finance-page module-fade">
     <header className="finance-hero">
       <div><div className="finance-eyebrow"><Wallet size={14}/>Visão financeira</div><h1 className="page-title">Financeiro</h1><p className="page-subtitle">Fluxo de caixa, lançamentos e contas da loja em uma única visão.</p></div>
-      <button className="btn btn-outline finance-refresh" onClick={()=>void load()} disabled={loading}><RefreshCw size={15} className={loading?'spin':''}/>Atualizar</button>
+      <button className="btn btn-outline finance-refresh" onClick={()=>void loadAll()} disabled={loading}><RefreshCw size={15} className={loading?'spin':''}/>Atualizar</button>
     </header>
 
     <section className="finance-kpis">
@@ -74,7 +114,7 @@ export const FinanceView:React.FC = () => {
     </section>
 
     <section className="finance-table-card">
-      <div className="finance-table-head"><div><strong>Lançamentos financeiros</strong><p>Registros sincronizados diretamente com a loja ativa.</p></div><span>{num(filtered.length)} resultados</span></div>
+      <div className="finance-table-head"><div><strong>Lançamentos financeiros</strong><p>Registros sincronizados diretamente com a loja ativa.</p></div><span>{num(total)} resultados</span></div>
       {loading?<TableSkeleton/>:rows.length===0?<EmptyState/>:<>
         <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Status</th><th>Referência</th><th className="align-right">Valor</th></tr></thead>
         <tbody>{rows.map(t=><tr key={t.id} onClick={()=>setSelected(t)}>
@@ -86,7 +126,7 @@ export const FinanceView:React.FC = () => {
           <td><span className="finance-reference">{t.referenceType||'—'}</span></td>
           <td className={'finance-value '+(t.type==='INCOME'?'income':'expense')}>{t.type==='INCOME'?'+':'-'} {money(t.amount)}</td>
         </tr>)}</tbody></table></div>
-        <div className="finance-pagination"><span>Exibindo {((page-1)*PAGE_SIZE)+1}–{Math.min(page*PAGE_SIZE,filtered.length)} de {filtered.length}</span><div><button disabled={page===1} onClick={()=>setPage(v=>v-1)}><ChevronLeft size={16}/></button><strong>{page}/{pages}</strong><button disabled={page===pages} onClick={()=>setPage(v=>v+1)}><ChevronRight size={16}/></button></div></div>
+        <div className="finance-pagination"><span>Exibindo {((page-1)*PAGE_SIZE)+1}–{Math.min(page*PAGE_SIZE,total)} de {total}</span><div><button disabled={page===1} onClick={()=>setPage(v=>v-1)}><ChevronLeft size={16}/></button><strong>{page}/{pages}</strong><button disabled={page===pages} onClick={()=>setPage(v=>v+1)}><ChevronRight size={16}/></button></div></div>
       </>}
     </section>
 

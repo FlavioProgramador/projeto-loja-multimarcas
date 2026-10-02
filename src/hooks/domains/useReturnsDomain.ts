@@ -52,7 +52,7 @@ export function useReturnsDomain({
           customerCpf: clienteCpf, items: normalizedItems, resolutionType: tipoResolucao, observations: observacoes,
         });
         if (!result.success) return { success: false, message: result.message, returnRecord: {} as ReturnRecord };
-        await refreshDomains('returns', 'products', 'transactions', 'customers');
+        await refreshDomains('products', 'transactions');
         return { success: true, message: result.message, returnRecord: result.returnRecord };
       } catch (err) {
         return { success: false, message: err instanceof Error ? err.message : 'Erro ao processar devolução.', returnRecord: {} as ReturnRecord };

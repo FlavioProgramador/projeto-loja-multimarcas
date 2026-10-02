@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Plus, X, Boxes } from 'lucide-react';
+import { Edit2, Plus, X, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 import { Product, ProductSku } from '../../types';
@@ -7,10 +7,11 @@ import { Product, ProductSku } from '../../types';
 interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
   product: Product | null;
 }
 
-export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, product }) => {
+export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, onSuccess, product }) => {
   const { updateProduct } = useStore();
 
   const [nome, setNome] = useState('');
@@ -18,6 +19,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
   const [categoria, setCategoria] = useState('');
   const [preco, setPreco] = useState('');
   const [skus, setSkus] = useState<ProductSku[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (product) {
@@ -26,6 +29,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
       setCategoria(product.categoria);
       setPreco(product.preco.toString());
       setSkus(product.skus.map(s => ({ ...s })));
+      setError(null);
     }
   }, [product]);
 
@@ -37,9 +41,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
   const handleRemoveSku = (index: number) => {
     if (skus.length <= 1) {
-      alert('Mantenha pelo menos uma variação cadastrada.');
+      setError('Mantenha pelo menos uma variação cadastrada.');
       return;
     }
+    setError(null);
     setSkus(prev => prev.filter((_, idx) => idx !== index));
   };
 
@@ -51,34 +56,42 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const numPreco = parseFloat(preco);
     if (!nome.trim() || !marca.trim() || !categoria.trim() || isNaN(numPreco) || numPreco <= 0) {
-      alert('Preencha todos os campos obrigatórios.');
+      setError('Preencha todos os campos obrigatórios e informe um preço válido.');
       return;
     }
 
     if (skus.length === 0) {
-      alert('Adicione pelo menos uma variação.');
+      setError('Adicione pelo menos uma variação.');
       return;
     }
 
-    updateProduct(product.id, {
-      nome: nome.trim(),
-      marca: marca.trim(),
-      categoria: categoria.trim(),
-      preco: numPreco,
-      skus: skus.map(s => ({
-        id: s.id,
-        sku: s.sku,
-        tamanho: s.tamanho.trim() || 'Único',
-        cor: s.cor.trim() || 'Padrão',
-        qtd: Number(s.qtd) || 0
-      }))
-    });
+    setSaving(true);
+    setError(null);
+    try {
+      await updateProduct(product.id, {
+        nome: nome.trim(),
+        marca: marca.trim(),
+        categoria: categoria.trim(),
+        preco: numPreco,
+        skus: skus.map(s => ({
+          id: s.id,
+          sku: s.sku,
+          tamanho: s.tamanho.trim() || 'Único',
+          cor: s.cor.trim() || 'Padrão',
+          qtd: Number(s.qtd) || 0
+        }))
+      });
 
-    onClose();
-    alert('Produto atualizado com sucesso!');
+      onSuccess?.('Produto atualizado com sucesso.');
+      onClose();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Não foi possível atualizar o produto.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -166,9 +179,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
         </button>
       </div>
 
+      {error && (
+        <div className="inventory-form-message error" role="alert">
+          <AlertCircle size={15} />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '8px', marginTop: '18px' }}>
-        <button type="button" className="btn" onClick={handleSave} style={{ flex: 1 }}>
-          Salvar Alterações
+        <button type="button" className="btn" onClick={() => void handleSave()} style={{ flex: 1 }} disabled={saving}>
+          {saving ? 'Salvando...' : 'Salvar Alterações'}
         </button>
         <button type="button" className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
           Cancelar

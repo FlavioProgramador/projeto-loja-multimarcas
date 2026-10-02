@@ -1,13 +1,14 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { ReturnRecord } from '../../types';
-import { formatMoeda, maskCpf } from '../../lib/utils';
+import { formatMoeda, formatCpf } from '../../lib/utils';
 
 interface ReturnReceiptProps {
   returnRecord: ReturnRecord;
 }
 
 export const ReturnReceipt: React.FC<ReturnReceiptProps> = ({ returnRecord }) => {
-  return (
+  const receipt = (
     <div className="print-only print-receipt" style={{ padding: '16px', maxWidth: '300px', margin: '0 auto', fontFamily: 'monospace', fontSize: '11px', color: '#000', background: '#fff' }}>
       <div style={{ textAlign: 'center', marginBottom: '12px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 4px 0' }}>VESTRA MULTIMARCAS</h2>
@@ -43,7 +44,7 @@ export const ReturnReceipt: React.FC<ReturnReceiptProps> = ({ returnRecord }) =>
         {returnRecord.clienteCpf && returnRecord.clienteCpf !== 'Não informado' && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
             <span>CPF:</span>
-            <span>{maskCpf(returnRecord.clienteCpf)}</span>
+            <span>{formatCpf(returnRecord.clienteCpf)}</span>
           </div>
         )}
       </div>
@@ -97,4 +98,7 @@ export const ReturnReceipt: React.FC<ReturnReceiptProps> = ({ returnRecord }) =>
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return receipt;
+  return createPortal(receipt, document.body);
 };

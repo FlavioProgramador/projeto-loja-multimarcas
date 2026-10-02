@@ -17,9 +17,20 @@ import {
   SalesService,
 } from '../services';
 import { ReturnsService } from '../services/returns.service';
-import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
+import { isSupabaseConfigured } from '../lib/supabase/client';
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
+
+export type StoreDataDomain =
+  | 'products'
+  | 'transactions'
+  | 'fixedExpenses'
+  | 'sales'
+  | 'customers'
+  | 'suppliers'
+  | 'returns';
+
+export type RefreshDomains = (...domains: StoreDataDomain[]) => Promise<void>;
 
 interface UseStoreDataParams {
   userId?: string;
@@ -37,6 +48,16 @@ interface UseStoreDataParams {
   setIsLoading: Setter<boolean>;
 }
 
+const FULL_REFRESH_DOMAINS: StoreDataDomain[] = [
+  'products',
+  'transactions',
+  'fixedExpenses',
+  'sales',
+  'customers',
+  'suppliers',
+  'returns',
+];
+
 export const useStoreData = ({
   userId,
   accessToken,
@@ -53,111 +74,166 @@ export const useStoreData = ({
   setIsLoading,
 }: UseStoreDataParams) => {
   const refreshSequenceRef = useRef(0);
-  const inFlightRefreshRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
+  const inFlightRefreshesRef = useRef(new Map<string, Promise<void>>());
 
   useEffect(() => {
     refreshSequenceRef.current += 1;
   }, [accessToken, activeStoreId, isAuthorized, userId]);
 
-  const refreshData = useCallback((): Promise<void> => {
-    if (!isSupabaseConfigured || !isAuthorized || authLoading || !accessToken || !activeStoreId) {
-      return Promise.resolve();
-    }
+  const runScopedRefresh = useCallback(
+    function runScopedRefresh<T>(
+      domain: StoreDataDomain,
+      loader: () => Promise<T>,
+      setter: Setter<T>,
+      source: string,
+    ): Promise<void> {
+      if (
+        !isSupabaseConfigured ||
+        !isAuthorized ||
+        authLoading ||
+        !accessToken ||
+        !activeStoreId
+      ) {
+        return Promise.resolve();
+      }
 
-    const refreshKey = `${userId ?? 'anonymous'}:${activeStoreId}:${accessToken}`;
-    const currentRefresh = inFlightRefreshRef.current;
+      const refreshKey = `${domain}:${userId ?? 'anonymous'}:${activeStoreId}:${accessToken}`;
+      const currentRefresh = inFlightRefreshesRef.current.get(refreshKey);
+      if (currentRefresh) return currentRefresh;
 
-    if (currentRefresh?.key === refreshKey) {
-      return currentRefresh.promise;
-    }
-
-    const requestSequence = ++refreshSequenceRef.current;
-
-    const operation = (async () => {
-      try {
-        setIsLoading(true);
-
-        const {
-          data: { session: verifiedSession },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError) throw sessionError;
-        if (!verifiedSession?.access_token || verifiedSession.user.id !== userId) {
-          throw new Error('Sessão autenticada indisponível para carregar os dados da loja.');
-        }
-
-        const results = await Promise.allSettled([
-          ProductsService.getAll(activeStoreId),
-          FinanceService.getTransactions(activeStoreId),
-          FinanceService.getFixedExpenses(activeStoreId),
-          SalesService.getMovements(activeStoreId),
-          CustomersService.getAll(activeStoreId),
-          SuppliersService.getAll(),
-          ReturnsService.getAll(activeStoreId),
-        ]);
-
-        if (requestSequence !== refreshSequenceRef.current) return;
-
-        const applyResult = <T,>(
-          result: PromiseSettledResult<T>,
-          setter: Setter<T>,
-          source: string
-        ) => {
-          if (result.status === 'fulfilled') {
-            setter(result.value);
-            return;
-          }
-
+      const requestSequence = refreshSequenceRef.current;
+      const operation = (async () => {
+        try {
+          const value = await loader();
+          if (requestSequence !== refreshSequenceRef.current) return;
+          setter(value);
+        } catch (error) {
           console.warn(
             'Falha ao carregar ' + source + '; mantendo dados atuais.',
-            result.reason
+            error,
           );
-        };
-
-        applyResult(results[0], setProducts, 'produtos/estoque');
-        applyResult(results[1], setTransactions, 'financeiro');
-        applyResult(results[2], setFixedExpenses, 'despesas fixas');
-        applyResult(results[3], setMovements, 'vendas do PDV');
-        applyResult(results[4], setCustomers, 'clientes');
-        applyResult(results[5], setSuppliers, 'fornecedores');
-        applyResult(results[6], setReturns, 'devoluções');
-      } catch (err) {
-        console.warn(
-          'Sincronização com Supabase falhou; mantendo estado atual.',
-          err
-        );
-      } finally {
-        if (requestSequence === refreshSequenceRef.current) {
-          setIsLoading(false);
         }
+      })();
+
+      inFlightRefreshesRef.current.set(refreshKey, operation);
+
+      void operation.finally(() => {
+        if (inFlightRefreshesRef.current.get(refreshKey) === operation) {
+          inFlightRefreshesRef.current.delete(refreshKey);
+        }
+      });
+
+      return operation;
+    },
+    [accessToken, activeStoreId, authLoading, isAuthorized, userId],
+  );
+
+  const refreshDomain = useCallback(
+    (domain: StoreDataDomain): Promise<void> => {
+      if (!activeStoreId) return Promise.resolve();
+
+      switch (domain) {
+        case 'products':
+          return runScopedRefresh(
+            domain,
+            () => ProductsService.getAll(activeStoreId),
+            setProducts,
+            'produtos/estoque',
+          );
+        case 'transactions':
+          return runScopedRefresh(
+            domain,
+            () => FinanceService.getTransactions(activeStoreId),
+            setTransactions,
+            'financeiro',
+          );
+        case 'fixedExpenses':
+          return runScopedRefresh(
+            domain,
+            () => FinanceService.getFixedExpenses(activeStoreId),
+            setFixedExpenses,
+            'despesas fixas',
+          );
+        case 'sales':
+          return runScopedRefresh(
+            domain,
+            () => SalesService.getMovements(activeStoreId),
+            setMovements,
+            'vendas do PDV',
+          );
+        case 'customers':
+          return runScopedRefresh(
+            domain,
+            () => CustomersService.getAll(activeStoreId),
+            setCustomers,
+            'clientes',
+          );
+        case 'suppliers':
+          return runScopedRefresh(
+            domain,
+            () => SuppliersService.getAll(),
+            setSuppliers,
+            'fornecedores',
+          );
+        case 'returns':
+          return runScopedRefresh(
+            domain,
+            () => ReturnsService.getAll(activeStoreId),
+            setReturns,
+            'devoluções',
+          );
       }
-    })();
+    },
+    [
+      activeStoreId,
+      runScopedRefresh,
+      setCustomers,
+      setFixedExpenses,
+      setMovements,
+      setProducts,
+      setReturns,
+      setSuppliers,
+      setTransactions,
+    ],
+  );
 
-    inFlightRefreshRef.current = { key: refreshKey, promise: operation };
+  const refreshDomains = useCallback<RefreshDomains>(
+    async (...domains) => {
+      const uniqueDomains = [...new Set(domains)];
+      await Promise.all(uniqueDomains.map(refreshDomain));
+    },
+    [refreshDomain],
+  );
 
-    void operation.finally(() => {
-      if (inFlightRefreshRef.current?.promise === operation) {
-        inFlightRefreshRef.current = null;
+  const refreshData = useCallback(async (): Promise<void> => {
+    if (
+      !isSupabaseConfigured ||
+      !isAuthorized ||
+      authLoading ||
+      !accessToken ||
+      !activeStoreId
+    ) {
+      return;
+    }
+
+    const requestSequence = refreshSequenceRef.current;
+
+    try {
+      setIsLoading(true);
+      await refreshDomains(...FULL_REFRESH_DOMAINS);
+    } finally {
+      if (requestSequence === refreshSequenceRef.current) {
+        setIsLoading(false);
       }
-    });
-
-    return operation;
+    }
   }, [
     accessToken,
     activeStoreId,
     authLoading,
     isAuthorized,
-    setCustomers,
-    setFixedExpenses,
+    refreshDomains,
     setIsLoading,
-    setMovements,
-    setProducts,
-    setReturns,
-    setSuppliers,
-    setTransactions,
-    userId,
   ]);
 
-  return { refreshData };
+  return { refreshData, refreshDomains };
 };

@@ -54,7 +54,7 @@ BEGIN
       AND c.contype='p'
       AND pg_get_constraintdef(c.oid) = 'PRIMARY KEY (idempotency_key, store_id, user_id)'
   ), 'sale_idempotency primary key must include idempotency key, store and user';
-END $;
+END $$;
 
 DO $$
 DECLARE

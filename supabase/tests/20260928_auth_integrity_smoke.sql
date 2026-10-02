@@ -186,7 +186,7 @@ BEGIN
   SELECT si.quantity,pv.stock_quantity INTO v_before_store,v_before_global
   FROM public.store_inventory si JOIN public.product_variants pv ON pv.id=si.product_variant_id
   WHERE si.store_id=v_store AND si.product_variant_id=v_variant
-  FOR UPDATE;
+  ;
   IF v_before_store IS NULL THEN RAISE EXCEPTION 'stock fixture missing'; END IF;
 
   PERFORM public.register_stock_entry(v_variant,1,0,'SMOKE',v_store,'Teste','ENTRY');

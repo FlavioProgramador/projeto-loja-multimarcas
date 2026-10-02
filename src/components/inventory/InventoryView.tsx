@@ -60,6 +60,7 @@ export const InventoryView: React.FC = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const brands = useMemo(
     () => Array.from(new Set(products.map(product => product.marca).filter(Boolean))).sort(),
@@ -220,6 +221,7 @@ export const InventoryView: React.FC = () => {
 
   return (
     <div className="module-fade inventory-page">
+      {notice && <div className="inventory-notice" role="status">{notice}</div>}
       <div className="inventory-breadcrumbs">
         <span>Produtos</span>
         <ChevronRight size={13} />
@@ -419,7 +421,15 @@ export const InventoryView: React.FC = () => {
 
       <NewProductModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} />
       <StockEntryModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} />
-      <EditProductModal isOpen={!!editingProduct} onClose={() => setEditingProduct(null)} product={editingProduct} />
+      <EditProductModal
+        isOpen={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        onSuccess={message => {
+          setNotice(message);
+          window.setTimeout(() => setNotice(null), 3500);
+        }}
+        product={editingProduct}
+      />
     </div>
   );
 };

@@ -94,6 +94,15 @@ BEGIN
   ON CONFLICT (store_id, product_variant_id) DO UPDATE
     SET quantity=excluded.quantity,
         minimum_stock=excluded.minimum_stock;
+
+
+  -- Cross-store fixture must be created before SET ROLE authenticated.
+  -- It intentionally has no user_store_access link for the smoke admin.
+  INSERT INTO public.stores(id,name,is_active)
+  VALUES('00000000-0000-0000-0000-00000000c001','SMOKE-UNLINKED',true)
+  ON CONFLICT (id) DO UPDATE
+    SET name=excluded.name,
+        is_active=true;
 END $$;
 
 SET LOCAL ROLE authenticated;
@@ -110,7 +119,7 @@ DECLARE
   v_after_store integer;
   v_after_global integer;
   v_inventory_id uuid;
-  v_other_store uuid := gen_random_uuid();
+  v_other_store uuid := '00000000-0000-0000-0000-00000000c001';
   v_err text;
 BEGIN
   -- Establish the ADMIN JWT before querying RLS-protected fixtures.
@@ -166,7 +175,6 @@ BEGIN
 
   -- Cross-store / unlinked store denied for report.
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub',v_admin::text,'role','authenticated')::text, true);
-  INSERT INTO public.stores(id,name,is_active) VALUES(v_other_store,'SMOKE-UNLINKED',true);
   BEGIN
     PERFORM * FROM public.report_stock_status(v_other_store);
     RAISE EXCEPTION 'expected store access denial not raised';

@@ -40,13 +40,21 @@ BEGIN
   v_def := pg_get_functiondef('public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text)'::regprocedure);
   ASSERT position('hashtextextended' IN v_def) > 0, 'complete_sale must serialize idempotency attempts';
   ASSERT position('sale_idempotency' IN v_def) > 0, 'complete_sale must use sale_idempotency';
-  ASSERT position('v_scoped_key' IN v_def) > 0, 'complete_sale must use scoped idempotency keys';
+  ASSERT position('store_id=p_store_id' IN lower(v_def)) > 0 AND position('user_id=v_user_id' IN lower(v_def)) > 0, 'complete_sale must scope idempotency by store and user';
 
   v_def := pg_get_functiondef('public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric,uuid,text)'::regprocedure);
   ASSERT position('hashtextextended' IN v_def) > 0, 'create_mp_pix_sale must serialize idempotency attempts';
   ASSERT position('sale_idempotency' IN v_def) > 0, 'create_mp_pix_sale must use sale_idempotency';
-  ASSERT position('v_scoped_key' IN v_def) > 0, 'create_mp_pix_sale must use scoped idempotency keys';
-END $$;
+  ASSERT position('store_id=p_store_id' IN lower(v_def)) > 0 AND position('user_id=v_user_id' IN lower(v_def)) > 0, 'create_mp_pix_sale must scope idempotency by store and user';
+
+  ASSERT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    WHERE c.conrelid='public.sale_idempotency'::regclass
+      AND c.contype='p'
+      AND pg_get_constraintdef(c.oid) = 'PRIMARY KEY (idempotency_key, store_id, user_id)'
+  ), 'sale_idempotency primary key must include idempotency key, store and user';
+END $;
 
 DO $$
 DECLARE

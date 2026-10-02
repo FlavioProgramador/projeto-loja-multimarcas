@@ -182,12 +182,23 @@ export const CustomersView: React.FC = () => {
           resultCount={total} totalCount={stats.totalCustomers} />
         <CustomerList customers={customers} onView={customer=>void openDetails(customer)}
           onEdit={openEdit} onDelete={setDeletingCustomer}/>
-        {total>0&&<div className="finance-pagination">
-          <span>Exibindo {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE,total)} de {total}</span>
-          <div>
-            <button disabled={page===1||loading} onClick={()=>setPage(value=>Math.max(1,value-1))}><ChevronLeft size={16}/></button>
-            <strong>{page}/{pages}</strong>
-            <button disabled={page===pages||loading} onClick={()=>setPage(value=>Math.min(pages,value+1))}><ChevronRight size={16}/></button>
+        {total>0&&<div className="customers-pagination-footer">
+          <div className="customers-pagination" aria-label="Paginação de clientes">
+            <button
+              disabled={page===1||loading}
+              onClick={()=>setPage(value=>Math.max(1,value-1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft size={16}/>
+            </button>
+            <strong>{page} / {pages}</strong>
+            <button
+              disabled={page===pages||loading}
+              onClick={()=>setPage(value=>Math.min(pages,value+1))}
+              aria-label="Próxima página"
+            >
+              <ChevronRight size={16}/>
+            </button>
           </div>
         </div>}
       </section>

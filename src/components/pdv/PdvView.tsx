@@ -306,6 +306,7 @@ export const PdvView: React.FC = () => {
       cartItems: cart,
       buyerName: buyerName.trim() || 'Cliente não identificado',
       cpf: cpf.trim() || 'Não informado',
+      customerId: matchedCustomer?.uuid,
       paymentMethod,
       installments,
       discountValue: numDescVal,

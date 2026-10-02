@@ -55,6 +55,7 @@ export interface CustomerPurchase {
   valor: number;
   data: string;
   itens: string;
+  status?: 'CONCLUIDA' | 'DEVOLUCAO';
 }
 
 export interface CustomerCreditMovement {

@@ -300,6 +300,36 @@ BEGIN
           ) THEN 'DEVOLUCAO'
           ELSE 'CONCLUIDA'
         END,
+        'payment_method', (
+          SELECT p.method
+          FROM public.payments p
+          WHERE p.sale_id = s.id
+            AND p.status <> 'CANCELLED'
+          ORDER BY
+            CASE WHEN p.status = 'APPROVED' THEN 0 ELSE 1 END,
+            p.created_at DESC
+          LIMIT 1
+        ),
+        'payment_installments', COALESCE((
+          SELECT p.installments
+          FROM public.payments p
+          WHERE p.sale_id = s.id
+            AND p.status <> 'CANCELLED'
+          ORDER BY
+            CASE WHEN p.status = 'APPROVED' THEN 0 ELSE 1 END,
+            p.created_at DESC
+          LIMIT 1
+        ), 1),
+        'payment_status', (
+          SELECT p.status
+          FROM public.payments p
+          WHERE p.sale_id = s.id
+            AND p.status <> 'CANCELLED'
+          ORDER BY
+            CASE WHEN p.status = 'APPROVED' THEN 0 ELSE 1 END,
+            p.created_at DESC
+          LIMIT 1
+        ),
         'items', COALESCE((
           SELECT string_agg(si.product_name || ' x' || si.quantity::text, ', ' ORDER BY si.created_at)
           FROM public.sale_items si

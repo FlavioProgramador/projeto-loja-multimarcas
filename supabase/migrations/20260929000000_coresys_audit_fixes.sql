@@ -914,7 +914,7 @@ GRANT EXECUTE ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,
 ALTER FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) SET search_path = public;
 
 -- 7) Harden report functions with mandatory store_id filtering and search_path
-CREATE OR REPLACE FUNCTION public.report_stock_status(p_store_id uuid)
+CREATE OR REPLACE FUNCTION public.report_stock_status(p_store_id uuid DEFAULT NULL)
 RETURNS TABLE(product_id uuid, product_name text, variant_id uuid, variant_sku text, stock_quantity integer, reserved_quantity integer, minimum_stock integer, status text)
 LANGUAGE plpgsql
 STABLE
@@ -949,7 +949,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.report_top_selling_products(p_limit integer, p_store_id uuid)
+CREATE OR REPLACE FUNCTION public.report_top_selling_products(p_limit integer DEFAULT 10, p_store_id uuid DEFAULT NULL)
 RETURNS TABLE(product_id uuid, product_name text, total_quantity_sold bigint, total_revenue numeric)
 LANGUAGE plpgsql
 STABLE
@@ -983,9 +983,9 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.report_inventory_movements_summary(
-  p_start_date timestamptz,
-  p_end_date timestamptz,
-  p_store_id uuid
+  p_start_date timestamptz DEFAULT now()-interval '30 days',
+  p_end_date timestamptz DEFAULT now(),
+  p_store_id uuid DEFAULT NULL
 )
 RETURNS TABLE(movement_type text, total_quantity bigint)
 LANGUAGE plpgsql

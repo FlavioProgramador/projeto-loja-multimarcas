@@ -120,7 +120,10 @@ function normalizeCommercialSummary(value: unknown): ReportCommercialSummary {
 
 function isMissingCommercialSummaryRpc(error: { code?: string; message?: string }): boolean {
   return error.code === 'PGRST202'
-    || error.message?.includes('report_commercial_summary') === true;
+    || (
+      error.message?.includes('Could not find the function') === true
+      && error.message.includes('report_commercial_summary')
+    );
 }
 
 async function getLegacyCommercialSummary(

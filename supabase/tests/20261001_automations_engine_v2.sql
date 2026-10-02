@@ -119,11 +119,16 @@ BEGIN
   ASSERT position('next_run_at <= now()' IN v_def) > 0,
     'automation worker must use next_run_at rather than exact HH:MM matching';
 
+  ASSERT position('for update skip locked' IN lower(v_def)) > 0,
+    'automation worker must claim due work with FOR UPDATE SKIP LOCKED';
+
   v_def := pg_get_functiondef('public.execute_automation_rule(uuid,text,text,uuid)'::regprocedure);
   ASSERT position('cooldown_minutes' IN v_def) > 0,
     'automation executor must enforce cooldown';
   ASSERT position('jsonb_array_elements' IN v_def) > 0,
     'automation executor must interpret configured actions';
+  ASSERT position('automation_runs.status = ''FAILED''' IN v_def) > 0,
+    'automation executor must retry FAILED idempotent runs';
 
   v_def := pg_get_functiondef('public.evaluate_automation_rule(uuid,jsonb)'::regprocedure);
   ASSERT position('store_inventory' IN v_def) > 0,
@@ -157,7 +162,41 @@ BEGIN
 
   ASSERT has_table_privilege('authenticated', 'public.automation_rules', 'DELETE') = false,
     'authenticated must archive rules through the RPC instead of deleting history';
-END $$;
+  ASSERT has_table_privilege('authenticated', 'public.automation_rules', 'INSERT') = false,
+    'direct INSERT on automation_rules must stay blocked';
+  ASSERT has_table_privilege('authenticated', 'public.automation_rules', 'UPDATE') = false,
+    'direct UPDATE on automation_rules must stay blocked';
+
+  ASSERT (
+    SELECT qual ILIKE '%get_user_store_role(store_id)%'
+       AND qual ILIKE '%ADMIN%'
+       AND qual ILIKE '%MANAGER%'
+    FROM pg_policies
+    WHERE schemaname='public'
+      AND tablename='automation_rules'
+      AND policyname='automation_rules_select'
+  ), 'automation_rules SELECT must be limited to ADMIN/MANAGER';
+
+  ASSERT (
+    SELECT qual ILIKE '%get_user_store_role(store_id)%'
+       AND qual ILIKE '%ADMIN%'
+       AND qual ILIKE '%MANAGER%'
+    FROM pg_policies
+    WHERE schemaname='public'
+      AND tablename='automation_runs'
+      AND policyname='automation_runs_select'
+  ), 'automation_runs SELECT must be limited to ADMIN/MANAGER';
+
+  ASSERT (
+    SELECT qual ILIKE '%get_user_store_role(store_id)%'
+       AND qual ILIKE '%ADMIN%'
+       AND qual ILIKE '%MANAGER%'
+    FROM pg_policies
+    WHERE schemaname='public'
+      AND tablename='automation_events'
+      AND policyname='automation_events_select'
+  ), 'automation_events SELECT must be limited to ADMIN/MANAGER';
+END $;
 
 DO $$
 DECLARE

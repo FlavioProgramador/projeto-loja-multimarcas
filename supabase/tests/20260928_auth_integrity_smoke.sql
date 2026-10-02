@@ -42,6 +42,58 @@ BEGIN
     (v_employee, v_store, 'EMPLOYEE', true)
   ON CONFLICT (user_id, store_id)
   DO UPDATE SET role=excluded.role, is_active=true;
+
+
+  -- Create a deterministic inventory fixture instead of depending on seed data.
+  INSERT INTO public.products (
+    id, name, cost_price, sale_price, minimum_stock, is_active
+  )
+  VALUES (
+    '00000000-0000-0000-0000-00000000b001',
+    'SMOKE-PRODUCT-001',
+    10,
+    20,
+    2,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET name=excluded.name,
+        cost_price=excluded.cost_price,
+        sale_price=excluded.sale_price,
+        minimum_stock=excluded.minimum_stock,
+        is_active=true;
+
+  INSERT INTO public.product_variants (
+    id, product_id, sku, size, color, stock_quantity, is_active
+  )
+  VALUES (
+    '00000000-0000-0000-0000-00000000b002',
+    '00000000-0000-0000-0000-00000000b001',
+    'SMOKE-SKU-001',
+    'Único',
+    'Padrão',
+    5,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET product_id=excluded.product_id,
+        sku=excluded.sku,
+        stock_quantity=excluded.stock_quantity,
+        is_active=true;
+
+  INSERT INTO public.store_inventory (
+    id, store_id, product_variant_id, quantity, minimum_stock
+  )
+  VALUES (
+    '00000000-0000-0000-0000-00000000b003',
+    v_store,
+    '00000000-0000-0000-0000-00000000b002',
+    5,
+    2
+  )
+  ON CONFLICT (store_id, product_variant_id) DO UPDATE
+    SET quantity=excluded.quantity,
+        minimum_stock=excluded.minimum_stock;
 END $$;
 
 SET LOCAL ROLE authenticated;
@@ -61,6 +113,13 @@ DECLARE
   v_other_store uuid := gen_random_uuid();
   v_err text;
 BEGIN
+  -- Establish the ADMIN JWT before querying RLS-protected fixtures.
+  PERFORM set_config(
+    'request.jwt.claims',
+    jsonb_build_object('sub',v_admin::text,'role','authenticated')::text,
+    true
+  );
+
   SELECT usa.store_id INTO v_store
   FROM public.user_store_access usa
   JOIN public.stores s ON s.id=usa.store_id AND s.is_active

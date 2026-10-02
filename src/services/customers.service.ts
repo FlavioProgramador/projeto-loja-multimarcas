@@ -74,46 +74,59 @@ function isMissingRpc(error: { code?: string; message?: string }, name: string):
 }
 
 async function getLegacyAll(storeId: string): Promise<Customer[]> {
-  const { data, error } = await supabase
-    .from('customers')
-    .select(`
-      id,
-      name,
-      cpf,
-      rg,
-      phone,
-      email,
-      address,
-      birth_date,
-      sales (
+  const [customersResult, salesResult, creditResult] = await Promise.all([
+    supabase
+      .from('customers')
+      .select('id,name,cpf,rg,phone,email,address,birth_date')
+      .eq('is_active', true)
+      .eq('store_id', storeId)
+      .order('name', { ascending: true }),
+    supabase
+      .from('sales')
+      .select(`
         id,
         sale_number,
-        store_id,
+        customer_id,
+        customer_cpf,
         total,
         created_at,
         sale_items (
           product_name,
           quantity
         )
-      ),
-      customer_credit_movements (
-        id,
-        type,
-        amount,
-        description,
-        created_at,
-        reference_id
+      `)
+      .eq('store_id', storeId)
+      .eq('status', 'COMPLETED')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('customer_credit_movements')
+      .select('id,customer_id,type,amount,description,created_at,reference_id')
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  if (customersResult.error) throw customersResult.error;
+  if (salesResult.error) throw salesResult.error;
+  if (creditResult.error) throw creditResult.error;
+
+  const normalizedCpf = (value?: string | null) =>
+    (value || '').replace(/\D/g, '');
+
+  const sales = salesResult.data || [];
+  const creditMovements = creditResult.data || [];
+
+  return (customersResult.data || []).map((customer: any, index: number) => {
+    const customerCpf = normalizedCpf(customer.cpf);
+    const customerSales = sales.filter((sale: any) =>
+      sale.customer_id === customer.id
+      || (
+        !sale.customer_id
+        && customerCpf
+        && normalizedCpf(sale.customer_cpf) === customerCpf
       )
-    `)
-    .eq('is_active', true)
-    .eq('store_id', storeId)
-    .order('name', { ascending: true });
+    );
 
-  if (error) throw error;
-
-  return (data || []).map((c: any, index: number) => {
-    const sales = c.sales || [];
-    const historico = sales.map((sale: any) => ({
+    const historico = customerSales.map((sale: any) => ({
       vendaId: sale.sale_number,
       uuid: sale.id,
       valor: toNumber(sale.total),
@@ -122,20 +135,27 @@ async function getLegacyAll(storeId: string): Promise<Customer[]> {
         .map((item: any) => `${item.product_name} x${item.quantity}`)
         .join(', ') || 'Venda PDV',
     }));
-    const creditMovements = (c.customer_credit_movements || []).map((movement: any, movementIndex: number) => ({
-      id: movementIndex + 1,
-      tipo: movement.type === 'CREDIT' ? 'entrada' as const : 'saida' as const,
-      valor: toNumber(movement.amount),
-      descricao: movement.description,
-      data: (movement.created_at || '').slice(0, 10),
-      referenciaId: movement.reference_id || undefined,
-    }));
-    const creditBalance = creditMovements.reduce(
+
+    const customerCredits = creditMovements
+      .filter((movement: any) => movement.customer_id === customer.id)
+      .map((movement: any, movementIndex: number) => ({
+        id: movementIndex + 1,
+        tipo: movement.type === 'CREDIT' ? 'entrada' as const : 'saida' as const,
+        valor: toNumber(movement.amount),
+        descricao: movement.description,
+        data: (movement.created_at || '').slice(0, 10),
+        referenciaId: movement.reference_id || undefined,
+      }));
+
+    const creditBalance = customerCredits.reduce(
       (total: number, movement: any) =>
         total + (movement.tipo === 'entrada' ? movement.valor : -movement.valor),
       0,
     );
-    const totalSpent = historico.reduce((total: number, sale: any) => total + sale.valor, 0);
+    const totalSpent = historico.reduce(
+      (total: number, sale: any) => total + sale.valor,
+      0,
+    );
     const lastPurchase = historico.reduce(
       (latest: string, sale: any) => sale.data > latest ? sale.data : latest,
       '',
@@ -143,20 +163,20 @@ async function getLegacyAll(storeId: string): Promise<Customer[]> {
 
     return {
       id: index + 1,
-      uuid: c.id,
-      nome: c.name,
-      cpf: c.cpf || 'Não informado',
-      rg: c.rg || '',
-      telefone: c.phone || '',
-      email: c.email || '',
-      endereco: c.address || '',
-      dataNascimento: c.birth_date || '',
+      uuid: customer.id,
+      nome: customer.name,
+      cpf: customer.cpf || 'Não informado',
+      rg: customer.rg || '',
+      telefone: customer.phone || '',
+      email: customer.email || '',
+      endereco: customer.address || '',
+      dataNascimento: customer.birth_date || '',
       saldoCredito: Math.max(0, creditBalance),
       totalCompras: historico.length,
       totalGasto: totalSpent,
       ultimaCompra: lastPurchase,
       detalhesCarregados: true,
-      movimentacoesCredito: creditMovements,
+      movimentacoesCredito: customerCredits,
       historico,
     };
   });

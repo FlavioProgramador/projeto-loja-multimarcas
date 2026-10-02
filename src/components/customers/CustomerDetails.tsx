@@ -1,7 +1,7 @@
 import React from 'react';
 import { CalendarDays, CreditCard, Mail, MapPin, Phone, ShoppingBag, UserRound } from 'lucide-react';
 import type { Customer } from '../../types';
-import { formatMoeda, maskCpf } from '../../lib/utils';
+import { formatMoeda, formatCpf } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 
 interface CustomerDetailsProps {
@@ -38,7 +38,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({
           <div className="customer-profile-avatar">{initials(customer.nome)}</div>
           <div className="customer-profile-identity">
             <h2>{customer.nome}</h2>
-            <span>{customer.cpf ? `CPF ${maskCpf(customer.cpf)}` : 'CPF não informado'}</span>
+            <span>{customer.cpf ? `CPF ${formatCpf(customer.cpf)}` : 'CPF não informado'}</span>
           </div>
           <button className="btn btn-sm" onClick={() => onEdit(customer)}>Editar cadastro</button>
         </header>
@@ -54,7 +54,7 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({
           <section className="customer-detail-panel">
             <h3><UserRound size={15} /> Dados pessoais</h3>
             <div className="customer-info-list">
-              <div><span>CPF</span><strong>{customer.cpf ? maskCpf(customer.cpf) : 'Não informado'}</strong></div>
+              <div><span>CPF</span><strong>{customer.cpf ? formatCpf(customer.cpf) : 'Não informado'}</strong></div>
               <div><span>RG</span><strong>{customer.rg || 'Não informado'}</strong></div>
               <div><span>Data de nascimento</span><strong><CalendarDays size={14}/> {dateLabel(customer.dataNascimento)}</strong></div>
             </div>

@@ -28,6 +28,7 @@ function getCheckoutSignature(params: {
   cartItems: CartItem[];
   buyerName: string;
   cpf: string;
+  customerId?: string;
   paymentMethod: string;
   installments: number;
   discountValue: number;
@@ -37,6 +38,7 @@ function getCheckoutSignature(params: {
     storeId: params.storeId,
     buyerName: params.buyerName.trim(),
     cpf: params.cpf.trim(),
+    customerId: params.customerId || null,
     paymentMethod: params.paymentMethod,
     installments: params.installments || 1,
     discountValue: params.discountValue || 0,
@@ -91,6 +93,7 @@ export const SalesService = {
     cartItems: CartItem[];
     buyerName: string;
     cpf: string;
+    customerId?: string;
     paymentMethod: string;
     installments: number;
     discountValue: number;
@@ -122,6 +125,7 @@ export const SalesService = {
 
       const { data, error } = await supabase.rpc('complete_sale', {
         p_store_id: params.storeId,
+        p_customer_id: params.customerId || null,
         p_customer_name: params.buyerName.trim() || 'Cliente não identificado',
         p_customer_cpf: params.cpf.trim() || 'Não informado',
         p_items: rpcItems,

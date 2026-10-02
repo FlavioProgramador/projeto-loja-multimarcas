@@ -22,12 +22,14 @@ export const AutomationsView: React.FC = () => {
   const { activeStoreId, activeStoreRole } = useStore();
   const canManage = can(activeStoreRole, 'automations.manage');
   const canView = can(activeStoreRole, 'automations.view');
+  const canArchive = activeStoreRole === 'ADMIN';
   const [rules, setRules] = useState<AutomationRule[]>([]);
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [events, setEvents] = useState<Awaited<ReturnType<typeof AutomationsService.listEvents>>>([]);
   const [tab, setTab] = useState<'overview' | 'rules' | 'runs' | 'alerts' | 'settings'>('overview');
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editing, setEditing] = useState<AutomationRule | null>(null);
+  const [presetIndex, setPresetIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -68,6 +70,7 @@ export const AutomationsView: React.FC = () => {
     else await AutomationsService.create(activeStoreId, input);
     setBuilderOpen(false);
     setEditing(null);
+    setPresetIndex(null);
     setMessage({ type: 'success', text: editing ? 'Automação atualizada.' : 'Automação criada como pausada. Ative-a quando estiver pronta.' });
     await load();
   };
@@ -90,7 +93,8 @@ export const AutomationsView: React.FC = () => {
     setWorkingId(rule.id);
     try {
       const result = await AutomationsService.test(activeStoreId, rule.id);
-      setMessage({ type: 'success', text: result.message || 'Teste concluído. Nenhuma ação operacional foi executada.' });
+      const details = `${result.matched_count} registro(s) atendem às condições${result.in_cooldown ? ' · cooldown ativo' : ''}.`;
+      setMessage({ type: 'success', text: `${result.message} ${details}` });
     } catch (error) {
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Falha no teste.' });
     } finally {
@@ -98,17 +102,17 @@ export const AutomationsView: React.FC = () => {
     }
   };
 
-  const deleteRule = async (rule: AutomationRule) => {
-    if (!activeStoreId || !canManage || workingId) return;
-    const confirmed = window.confirm(`Excluir a automação "${rule.name}"? O histórico de execuções relacionado também será removido.`);
+  const archiveRule = async (rule: AutomationRule) => {
+    if (!activeStoreId || !canArchive || workingId) return;
+    const confirmed = window.confirm(`Arquivar a automação "${rule.name}"? O histórico de execuções será preservado.`);
     if (!confirmed) return;
     setWorkingId(rule.id);
     try {
       await AutomationsService.remove(activeStoreId, rule.id);
-      setMessage({ type: 'success', text: 'Automação excluída.' });
+      setMessage({ type: 'success', text: 'Automação arquivada. O histórico foi preservado.' });
       await load();
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Não foi possível excluir a automação.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Não foi possível arquivar a automação.' });
     } finally {
       setWorkingId(null);
     }
@@ -127,7 +131,7 @@ export const AutomationsView: React.FC = () => {
         <div><h1 className="page-title">Automações</h1><p className="page-subtitle">Configure regras para acompanhar a operação da loja e agir no momento certo.</p></div>
         <div className="automation-header-actions">
           <button className="btn btn-outline" onClick={() => void load()} disabled={loading}><RefreshCw size={16} /> Atualizar</button>
-          {canManage && <button className="btn" onClick={() => { setEditing(null); setBuilderOpen(true); }}><Plus size={16} /> Nova automação</button>}
+          {canManage && <button className="btn" onClick={() => { setEditing(null); setPresetIndex(null); setBuilderOpen(true); }}><Plus size={16} /> Nova automação</button>}
         </div>
       </div>
 
@@ -136,7 +140,7 @@ export const AutomationsView: React.FC = () => {
       <div className="automation-stat-grid">
         <div className="automation-stat"><div><span>Automações ativas</span><strong>{stats.active}</strong></div><Play size={18} /></div>
         <div className="automation-stat"><div><span>Execuções hoje</span><strong>{stats.today}</strong></div><Clock3 size={18} /></div>
-        <div className="automation-stat"><div><span>Falhas</span><strong>{stats.failed}</strong></div><XCircle size={18} /></div>
+        <div className="automation-stat"><div><span>Falhas (últimas 100)</span><strong>{stats.failed}</strong></div><XCircle size={18} /></div>
         <div className="automation-stat"><div><span>Concluídas</span><strong>{stats.completed}</strong></div><CheckCircle2 size={18} /></div>
       </div>
 
@@ -151,16 +155,16 @@ export const AutomationsView: React.FC = () => {
           <div className="automation-category-list">{Object.entries(categoryLabels).map(([key, label]) => <div key={key}><span>{label}</span><strong>{rules.filter(r => r.category === key).length}</strong></div>)}</div>
         </div>
         <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Modelos prontos</h2><p>Comece com uma configuração predefinida.</p></div><Settings2 size={20} /></div>
-          <div className="automation-preset-grid">{AUTOMATION_PRESETS.slice(0, 4).map(p => <button key={p.name} onClick={() => { setEditing(null); setBuilderOpen(true); }}><strong>{p.name}</strong><span>{p.description}</span></button>)}</div>
+          <div className="automation-preset-grid">{AUTOMATION_PRESETS.slice(0, 4).map((p, index) => <button key={p.name} onClick={() => { setEditing(null); setPresetIndex(index); setBuilderOpen(true); }}><strong>{p.name}</strong><span>{p.description}</span></button>)}</div>
         </div>
         <div className="card automation-panel full"><div className="automation-panel-head"><div><h2>Últimas execuções</h2><p>Processamento recente das regras.</p></div><History size={20} /></div>
           <div className="automation-run-list">{runs.slice(0, 8).map(run => <div key={run.id}><span>{triggerLabels[run.event_type] || run.event_type}</span><strong className={'run-status ' + run.status.toLowerCase()}>{run.status}</strong><time>{new Date(run.started_at).toLocaleString('pt-BR')}</time></div>)}{!runs.length && <div className="automation-empty">Ainda não existem execuções registradas.</div>}</div>
         </div>
       </div>}
 
-      {tab === 'rules' && <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Suas automações</h2><p>Ative, pause e teste suas regras.</p></div>{canManage && <button className="btn" onClick={() => { setEditing(null); setBuilderOpen(true); }}><Plus size={16} /> Nova</button>}</div>
+      {tab === 'rules' && <div className="card automation-panel"><div className="automation-panel-head"><div><h2>Suas automações</h2><p>Ative, pause e teste suas regras.</p></div>{canManage && <button className="btn" onClick={() => { setEditing(null); setPresetIndex(null); setBuilderOpen(true); }}><Plus size={16} /> Nova</button>}</div>
         <div className="automation-table-wrap"><table><thead><tr><th>Automação</th><th>Categoria</th><th>Gatilho</th><th>Status</th><th>Execuções</th><th>Ações</th></tr></thead>
-          <tbody>{rules.map(rule => <tr key={rule.id}><td><strong>{rule.name}</strong><small>{rule.description || 'Sem descrição'}</small></td><td>{categoryLabels[rule.category] || rule.category}</td><td>{triggerLabels[rule.trigger] || rule.trigger}</td><td><span className={'automation-status ' + rule.status.toLowerCase()}>{rule.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}</span></td><td>{rule.execution_count}</td><td><div className="automation-row-actions">{canManage && <><button title="Editar" onClick={() => { setEditing(rule); setBuilderOpen(true); }}><Settings2 size={15} /></button><button title={rule.status === 'ACTIVE' ? 'Pausar' : 'Ativar'} onClick={() => void setStatus(rule)} disabled={workingId === rule.id}>{rule.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}</button><button title="Testar" onClick={() => void testRule(rule)} disabled={workingId === rule.id}><Zap size={15} /></button><button title="Excluir" onClick={() => void deleteRule(rule)} disabled={workingId === rule.id}><Trash2 size={15} /></button></>}</div></td></tr>)}{!rules.length && <tr><td colSpan={6} className="automation-empty">Nenhuma automação cadastrada.</td></tr>}</tbody>
+          <tbody>{rules.map(rule => <tr key={rule.id}><td><strong>{rule.name}</strong><small>{rule.description || 'Sem descrição'}</small></td><td>{categoryLabels[rule.category] || rule.category}</td><td>{triggerLabels[rule.trigger] || rule.trigger}</td><td><span className={'automation-status ' + rule.status.toLowerCase()}>{rule.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}</span></td><td>{rule.execution_count}</td><td><div className="automation-row-actions">{canManage && <><button title="Editar" onClick={() => { setEditing(rule); setPresetIndex(null); setBuilderOpen(true); }}><Settings2 size={15} /></button><button title={rule.status === 'ACTIVE' ? 'Pausar' : 'Ativar'} onClick={() => void setStatus(rule)} disabled={workingId === rule.id}>{rule.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}</button><button title="Testar" onClick={() => void testRule(rule)} disabled={workingId === rule.id}><Zap size={15} /></button>{canArchive && <button title="Arquivar" onClick={() => void archiveRule(rule)} disabled={workingId === rule.id}><Trash2 size={15} /></button>}</>}</div></td></tr>)}{!rules.length && <tr><td colSpan={6} className="automation-empty">Nenhuma automação cadastrada.</td></tr>}</tbody>
         </table></div>
       </div>}
 
@@ -180,7 +184,7 @@ export const AutomationsView: React.FC = () => {
         <div className="automation-preset-list">{AUTOMATION_PRESETS.map(p => <div key={p.name}><strong>{p.name}</strong><span>{categoryLabels[p.category]}</span></div>)}</div>
       </div></div>}
 
-      {builderOpen && <AutomationBuilder initial={editing} onClose={() => { setBuilderOpen(false); setEditing(null); }} onSave={saveRule} />}
+      {builderOpen && <AutomationBuilder initial={editing} initialPresetIndex={presetIndex} onClose={() => { setBuilderOpen(false); setEditing(null); setPresetIndex(null); }} onSave={saveRule} />}
     </div>
   );
 };

@@ -47,10 +47,10 @@ CREATE TABLE IF NOT EXISTS public.sale_idempotency (
 );
 
 -- Adicionar colunas store_id nas tabelas operacionais
-ALTER TABLE public.sales ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
-ALTER TABLE public.inventory_movements ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
-ALTER TABLE public.financial_transactions ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
-ALTER TABLE public.fixed_expenses ADD COLUMN store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.inventory_movements ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.financial_transactions ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
+ALTER TABLE public.fixed_expenses ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE;
 
 -- ============================================================================
 -- 2. MIGRAÇÃO DE DADOS (Preservação de Histórico)
@@ -60,29 +60,53 @@ DO $$
 DECLARE
   v_default_store_id UUID;
 BEGIN
-  -- Verificar se já existe a loja principal (para ser reentrante)
-  SELECT id INTO v_default_store_id FROM public.stores WHERE name = 'Loja Principal' LIMIT 1;
+  -- Reutilizar a loja já existente para manter a migration realmente reentrante.
+  -- A migration de estoque anterior cria "Loja Principal (Padrão)", portanto
+  -- procurar somente o nome "Loja Principal" gerava uma segunda loja no rebuild.
+  SELECT id
+    INTO v_default_store_id
+  FROM public.stores
+  WHERE is_active = true
+  ORDER BY
+    CASE WHEN coalesce(is_main, false) THEN 0 ELSE 1 END,
+    created_at ASC,
+    id ASC
+  LIMIT 1;
   
   IF v_default_store_id IS NULL THEN
-    -- Inserir loja padrão
-    INSERT INTO public.stores (name) VALUES ('Loja Principal') RETURNING id INTO v_default_store_id;
-
-    -- Inserir acesso para todos os usuários existentes
-    INSERT INTO public.user_store_access (user_id, store_id, role)
-    SELECT id, v_default_store_id, role FROM public.profiles
-    ON CONFLICT DO NOTHING;
-
-    -- Migrar o estoque para a nova tabela de inventário
-    INSERT INTO public.store_inventory (store_id, product_variant_id, quantity)
-    SELECT v_default_store_id, id, COALESCE(stock_quantity, 0) FROM public.product_variants
-    ON CONFLICT DO NOTHING;
-
-    -- Atualizar registros existentes com a loja padrão
-    UPDATE public.sales SET store_id = v_default_store_id WHERE store_id IS NULL;
-    UPDATE public.inventory_movements SET store_id = v_default_store_id WHERE store_id IS NULL;
-    UPDATE public.financial_transactions SET store_id = v_default_store_id WHERE store_id IS NULL;
-    UPDATE public.fixed_expenses SET store_id = v_default_store_id WHERE store_id IS NULL;
+    -- Inserir loja padrão somente quando não existe nenhuma loja ativa.
+    INSERT INTO public.stores (name)
+    VALUES ('Loja Principal')
+    RETURNING id INTO v_default_store_id;
   END IF;
+
+  -- O backfill precisa ocorrer tanto para uma loja recém-criada quanto para uma
+  -- loja já existente de migrations anteriores.
+  INSERT INTO public.user_store_access (user_id, store_id, role)
+  SELECT id, v_default_store_id, role
+  FROM public.profiles
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.store_inventory (store_id, product_variant_id, quantity)
+  SELECT v_default_store_id, id, COALESCE(stock_quantity, 0)
+  FROM public.product_variants
+  ON CONFLICT DO NOTHING;
+
+  UPDATE public.sales
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
+
+  UPDATE public.inventory_movements
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
+
+  UPDATE public.financial_transactions
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
+
+  UPDATE public.fixed_expenses
+     SET store_id = v_default_store_id
+   WHERE store_id IS NULL;
 END $$;
 
 -- Tornar store_id NOT NULL para garantir consistência daqui pra frente

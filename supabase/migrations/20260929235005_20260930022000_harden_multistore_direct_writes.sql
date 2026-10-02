@@ -1,14 +1,11 @@
 BEGIN;
 DROP POLICY IF EXISTS "Sales updatable by Admin and Manager" ON public.sales;
-CREATE POLICY "Sales updatable by store managers" ON public.sales
-FOR UPDATE TO authenticated
-USING (get_user_store_role(store_id) IN ('ADMIN','MANAGER'))
-WITH CHECK (get_user_store_role(store_id) IN ('ADMIN','MANAGER'));
+CREATE POLICY "Sales updatable by store managers" ON public.sales FOR UPDATE TO authenticated USING (get_user_store_role(store_id) IN ('ADMIN','MANAGER')) WITH CHECK (get_user_store_role(store_id) IN ('ADMIN','MANAGER'));
 DROP POLICY IF EXISTS "Inventory manageable by Admin and Manager" ON public.store_inventory;
 DROP POLICY IF EXISTS "Inventory updatable by Admin and Manager" ON public.store_inventory;
 DROP POLICY IF EXISTS "Inventory deletable by Admin and Manager" ON public.store_inventory;
-REVOKE INSERT,UPDATE,DELETE ON public.store_inventory FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.store_inventory FROM authenticated;
 DROP POLICY IF EXISTS "Movements insertable by store roles" ON public.inventory_movements;
-REVOKE INSERT,UPDATE,DELETE ON public.inventory_movements FROM authenticated;
-REVOKE UPDATE,DELETE ON public.sales FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.inventory_movements FROM authenticated;
+REVOKE UPDATE, DELETE ON public.sales FROM authenticated;
 COMMIT;

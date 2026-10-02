@@ -914,6 +914,9 @@ GRANT EXECUTE ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,
 ALTER FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) SET search_path = public;
 
 -- 7) Harden report functions with mandatory store_id filtering and search_path
+-- Drop only the store-scoped overloads so defaults/parameter metadata can be
+-- normalized without touching the legacy overloads.
+DROP FUNCTION IF EXISTS public.report_stock_status(uuid);
 CREATE OR REPLACE FUNCTION public.report_stock_status(p_store_id uuid)
 RETURNS TABLE(product_id uuid, product_name text, variant_id uuid, variant_sku text, stock_quantity integer, reserved_quantity integer, minimum_stock integer, status text)
 LANGUAGE plpgsql
@@ -949,6 +952,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.report_top_selling_products(integer,uuid);
 CREATE OR REPLACE FUNCTION public.report_top_selling_products(p_limit integer, p_store_id uuid)
 RETURNS TABLE(product_id uuid, product_name text, total_quantity_sold bigint, total_revenue numeric)
 LANGUAGE plpgsql
@@ -982,6 +986,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.report_inventory_movements_summary(timestamptz,timestamptz,uuid);
 CREATE OR REPLACE FUNCTION public.report_inventory_movements_summary(
   p_start_date timestamptz,
   p_end_date timestamptz,
@@ -1018,10 +1023,11 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.get_profitability_by_product(uuid,date,date);
 CREATE OR REPLACE FUNCTION public.get_profitability_by_product(
   p_store_id uuid,
-  p_start_date date DEFAULT NULL,
-  p_end_date date DEFAULT NULL
+  start_date date,
+  end_date date
 )
 RETURNS TABLE(product_id uuid, product_name text, category_id uuid, total_quantity bigint, total_revenue numeric, total_cost numeric, margin_value numeric, margin_percentage numeric)
 LANGUAGE plpgsql
@@ -1051,17 +1057,18 @@ BEGIN
   JOIN public.products p ON p.id = si.product_id
   WHERE s.store_id = p_store_id
     AND s.status = 'COMPLETED'
-    AND (p_start_date IS NULL OR s.completed_at::date >= p_start_date)
-    AND (p_end_date IS NULL OR s.completed_at::date <= p_end_date)
+    AND (start_date IS NULL OR s.completed_at::date >= start_date)
+    AND (end_date IS NULL OR s.completed_at::date <= end_date)
   GROUP BY p.id, p.name, p.category_id
   ORDER BY margin_value DESC;
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.get_profitability_by_category(uuid,date,date);
 CREATE OR REPLACE FUNCTION public.get_profitability_by_category(
   p_store_id uuid,
-  p_start_date date DEFAULT NULL,
-  p_end_date date DEFAULT NULL
+  start_date date,
+  end_date date
 )
 RETURNS TABLE(category_id uuid, category_name text, total_quantity bigint, total_revenue numeric, total_cost numeric, margin_value numeric, margin_percentage numeric)
 LANGUAGE plpgsql
@@ -1092,8 +1099,8 @@ BEGIN
   LEFT JOIN public.categories c ON c.id = p.category_id
   WHERE s.store_id = p_store_id
     AND s.status = 'COMPLETED'
-    AND (p_start_date IS NULL OR s.completed_at::date >= p_start_date)
-    AND (p_end_date IS NULL OR s.completed_at::date <= p_end_date)
+    AND (start_date IS NULL OR s.completed_at::date >= start_date)
+    AND (end_date IS NULL OR s.completed_at::date <= end_date)
   GROUP BY c.id, c.name
   ORDER BY margin_value DESC;
 END;

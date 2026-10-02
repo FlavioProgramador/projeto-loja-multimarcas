@@ -3,12 +3,116 @@
 -- Requires at least one active ADMIN and the current active store.
 
 BEGIN;
+
+
+SELECT plan(1);
+-- O banco local do CI não possui usuários de Auth por padrão. Criamos fixtures
+-- transacionais e determinísticas; todo o bloco é revertido no ROLLBACK final.
+DO $$
+DECLARE
+  v_admin uuid := '00000000-0000-0000-0000-00000000a001';
+  v_employee uuid := '00000000-0000-0000-0000-00000000a002';
+  v_store uuid;
+BEGIN
+  SELECT s.id INTO v_store
+  FROM public.stores s
+  WHERE s.is_active
+  ORDER BY coalesce(s.is_main, false) DESC, s.created_at, s.id
+  LIMIT 1;
+
+  IF v_store IS NULL THEN
+    RAISE EXCEPTION 'Fixture de loja ausente para smoke tests.';
+  END IF;
+
+  INSERT INTO auth.users (id, email, raw_user_meta_data, created_at, updated_at)
+  VALUES
+    (v_admin, 'smoke-admin@coresys.test', '{"full_name":"Smoke Admin"}'::jsonb, now(), now()),
+    (v_employee, 'smoke-employee@coresys.test', '{"full_name":"Smoke Employee"}'::jsonb, now(), now())
+  ON CONFLICT (id) DO NOTHING;
+
+  UPDATE public.profiles
+     SET role='ADMIN', is_active=true
+   WHERE id=v_admin;
+
+  UPDATE public.profiles
+     SET role='EMPLOYEE', is_active=true
+   WHERE id=v_employee;
+
+  INSERT INTO public.user_store_access(user_id, store_id, role, is_active)
+  VALUES
+    (v_admin, v_store, 'ADMIN', true),
+    (v_employee, v_store, 'EMPLOYEE', true)
+  ON CONFLICT (user_id, store_id)
+  DO UPDATE SET role=excluded.role, is_active=true;
+
+
+  -- Create a deterministic inventory fixture instead of depending on seed data.
+  INSERT INTO public.products (
+    id, name, cost_price, sale_price, minimum_stock, is_active
+  )
+  VALUES (
+    '00000000-0000-0000-0000-00000000b001',
+    'SMOKE-PRODUCT-001',
+    10,
+    20,
+    2,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET name=excluded.name,
+        cost_price=excluded.cost_price,
+        sale_price=excluded.sale_price,
+        minimum_stock=excluded.minimum_stock,
+        is_active=true;
+
+  INSERT INTO public.product_variants (
+    id, product_id, sku, size, color, stock_quantity, is_active
+  )
+  VALUES (
+    '00000000-0000-0000-0000-00000000b002',
+    '00000000-0000-0000-0000-00000000b001',
+    'SMOKE-SKU-001',
+    'Único',
+    'Padrão',
+    5,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET product_id=excluded.product_id,
+        sku=excluded.sku,
+        stock_quantity=excluded.stock_quantity,
+        is_active=true;
+
+  INSERT INTO public.store_inventory (
+    id, store_id, product_variant_id, quantity, minimum_stock
+  )
+  VALUES (
+    '00000000-0000-0000-0000-00000000b003',
+    v_store,
+    '00000000-0000-0000-0000-00000000b002',
+    5,
+    2
+  )
+  ON CONFLICT (store_id, product_variant_id) DO UPDATE
+    SET quantity=excluded.quantity,
+        minimum_stock=excluded.minimum_stock;
+
+
+  -- Cross-store fixture must be created before SET ROLE authenticated.
+  -- It intentionally has no user_store_access link for the smoke admin.
+  INSERT INTO public.stores(id,name,is_active)
+  VALUES('00000000-0000-0000-0000-00000000c001','SMOKE-UNLINKED',true)
+  ON CONFLICT (id) DO UPDATE
+    SET name=excluded.name,
+        is_active=true;
+END $$;
+
 SET LOCAL ROLE authenticated;
 
 DO $$
 DECLARE
-  v_admin uuid;
-  v_employee uuid;
+  v_admin uuid := '00000000-0000-0000-0000-00000000a001';
+  v_employee uuid := '00000000-0000-0000-0000-00000000a002';
   v_store uuid;
   v_variant uuid;
   v_claims text;
@@ -17,21 +121,31 @@ DECLARE
   v_after_store integer;
   v_after_global integer;
   v_inventory_id uuid;
-  v_other_store uuid := gen_random_uuid();
+  v_other_store uuid := '00000000-0000-0000-0000-00000000c001';
   v_err text;
 BEGIN
-  SELECT p.id INTO v_admin FROM public.profiles p
-  JOIN public.user_store_access usa ON usa.user_id=p.id AND usa.is_active
-  WHERE p.is_active AND p.role='ADMIN' LIMIT 1;
-  SELECT p.id INTO v_employee FROM public.profiles p
-  JOIN public.user_store_access usa ON usa.user_id=p.id AND usa.is_active
-  WHERE p.is_active AND p.role='EMPLOYEE' LIMIT 1;
-  SELECT s.id INTO v_store FROM public.stores s WHERE s.is_active LIMIT 1;
-  SELECT pv.id INTO v_variant FROM public.product_variants pv JOIN public.products p ON p.id=pv.product_id
-  WHERE pv.is_active AND p.is_active LIMIT 1;
+  -- Establish the ADMIN JWT before querying RLS-protected fixtures.
+  PERFORM set_config(
+    'request.jwt.claims',
+    jsonb_build_object('sub',v_admin::text,'role','authenticated')::text,
+    true
+  );
 
-  IF v_admin IS NULL OR v_employee IS NULL OR v_store IS NULL OR v_variant IS NULL THEN
-    RAISE EXCEPTION 'Fixture insuficiente para smoke tests.';
+  SELECT usa.store_id INTO v_store
+  FROM public.user_store_access usa
+  JOIN public.stores s ON s.id=usa.store_id AND s.is_active
+  WHERE usa.user_id=v_admin AND usa.is_active
+  LIMIT 1;
+
+  SELECT pv.id INTO v_variant
+  FROM public.product_variants pv
+  JOIN public.products p ON p.id=pv.product_id
+  JOIN public.store_inventory si ON si.product_variant_id=pv.id AND si.store_id=v_store
+  WHERE pv.is_active AND p.is_active
+  LIMIT 1;
+
+  IF v_store IS NULL OR v_variant IS NULL THEN
+    RAISE EXCEPTION 'Fixture de loja/estoque insuficiente para smoke tests.';
   END IF;
 
   -- Missing/invalid auth context.
@@ -40,7 +154,7 @@ BEGIN
     PERFORM public.complete_sale(v_store,NULL,'x','x','[]'::jsonb,'PIX',1,0,0,'smoke-no-sub');
     RAISE EXCEPTION 'expected auth failure not raised';
   EXCEPTION WHEN OTHERS THEN
-    IF SQLERRM NOT LIKE '%Autenticação%' THEN RAISE; END IF;
+    IF SQLERRM NOT LIKE '%Perfil autenticado inexistente ou inativo.%' THEN RAISE; END IF;
   END;
 
   -- ADMIN allowed boundary: should pass auth/store/role and fail only on empty cart.
@@ -63,7 +177,6 @@ BEGIN
 
   -- Cross-store / unlinked store denied for report.
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub',v_admin::text,'role','authenticated')::text, true);
-  INSERT INTO public.stores(id,name,is_active) VALUES(v_other_store,'SMOKE-UNLINKED',true);
   BEGIN
     PERFORM * FROM public.report_stock_status(v_other_store);
     RAISE EXCEPTION 'expected store access denial not raised';
@@ -75,7 +188,7 @@ BEGIN
   SELECT si.quantity,pv.stock_quantity INTO v_before_store,v_before_global
   FROM public.store_inventory si JOIN public.product_variants pv ON pv.id=si.product_variant_id
   WHERE si.store_id=v_store AND si.product_variant_id=v_variant
-  FOR UPDATE;
+  ;
   IF v_before_store IS NULL THEN RAISE EXCEPTION 'stock fixture missing'; END IF;
 
   PERFORM public.register_stock_entry(v_variant,1,0,'SMOKE',v_store,'Teste','ENTRY');
@@ -100,4 +213,7 @@ BEGIN
   RAISE NOTICE 'CORE_SYS_SMOKE_TESTS_PASS';
 END $$;
 
+RESET ROLE;
+SELECT pass('auth/integrity smoke assertions completed');
+SELECT * FROM finish();
 ROLLBACK;

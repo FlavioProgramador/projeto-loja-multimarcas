@@ -1,0 +1,10 @@
+do $$ begin if not exists (select 1 from information_schema.columns where table_schema='public' and table_name='product_costs' and column_name='product_id') then create table public.product_costs (product_id uuid primary key references public.products(id) on delete restrict, cost_price numeric not null default 0, updated_at timestamptz not null default now()); end if; end $$;
+insert into public.product_costs(product_id,cost_price) select id,cost_price from public.products where cost_price is not null on conflict (product_id) do update set cost_price=excluded.cost_price,updated_at=now();
+alter table public.product_costs enable row level security;
+drop policy if exists "Product costs admin manager" on public.product_costs;
+create policy "Product costs admin manager" on public.product_costs for select to authenticated using (exists (select 1 from public.products p where p.id=product_costs.product_id and (select current_user_role()) in ('ADMIN','MANAGER')));
+revoke all on public.product_costs from anon;
+revoke all on public.product_costs from authenticated;
+grant select on public.product_costs to authenticated;
+drop policy if exists "Products viewable by authenticated" on public.products;
+create policy "Products viewable without cost" on public.products for select to authenticated using (true);

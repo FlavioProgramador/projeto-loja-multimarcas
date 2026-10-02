@@ -69,6 +69,11 @@ BEGIN
   ASSERT position('public.returns' IN v_def) > 0,
     'customer detail return status must be derived from returns';
 
+  ASSERT position('public.payments' IN v_def) > 0,
+    'customer detail must expose payment method and installments';
+  ASSERT position('payment_installments' IN v_def) > 0,
+    'customer detail must expose installment count';
+
   v_def := pg_get_functiondef(
     'public.get_finance_page(uuid,timestamptz,text,text,text,integer,integer)'::regprocedure
   );

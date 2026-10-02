@@ -290,6 +290,16 @@ BEGIN
         'sale_number', s.sale_number,
         'total', s.total,
         'created_at', s.created_at,
+        'status', CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM public.returns r
+            WHERE r.original_sale_id = s.id
+              AND r.store_id = p_store_id
+              AND r.status = 'CONCLUIDO'
+          ) THEN 'DEVOLUCAO'
+          ELSE 'CONCLUIDA'
+        END,
         'items', COALESCE((
           SELECT string_agg(si.product_name || ' x' || si.quantity::text, ', ' ORDER BY si.created_at)
           FROM public.sale_items si

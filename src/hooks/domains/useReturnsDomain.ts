@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { ReturnsService } from '../../services/returns.service';
 import { Product, ReturnItem, ReturnRecord } from '../../types';
 import { hoje } from '../../lib/utils';
+import type { RefreshDomains } from '../useStoreData';
 
 type ReturnParams = {
   clienteNome: string;
@@ -18,7 +19,7 @@ type ReturnsDomainArgs = {
   returns: ReturnRecord[];
   setReturns: Dispatch<SetStateAction<ReturnRecord[]>>;
   setProducts: Dispatch<SetStateAction<Product[]>>;
-  refreshData: () => Promise<void>;
+  refreshDomains: RefreshDomains;
 };
 
 export function useReturnsDomain({
@@ -27,7 +28,7 @@ export function useReturnsDomain({
   returns,
   setReturns,
   setProducts,
-  refreshData,
+  refreshDomains,
 }: ReturnsDomainArgs) {
   const processReturn = useCallback(async ({
     clienteNome, clienteCpf, vendaOriginalId, itens, tipoResolucao, observacoes,
@@ -51,7 +52,7 @@ export function useReturnsDomain({
           customerCpf: clienteCpf, items: normalizedItems, resolutionType: tipoResolucao, observations: observacoes,
         });
         if (!result.success) return { success: false, message: result.message, returnRecord: {} as ReturnRecord };
-        await refreshData();
+        await refreshDomains('returns', 'products', 'transactions', 'customers');
         return { success: true, message: result.message, returnRecord: result.returnRecord };
       } catch (err) {
         return { success: false, message: err instanceof Error ? err.message : 'Erro ao processar devolução.', returnRecord: {} as ReturnRecord };
@@ -88,7 +89,7 @@ export function useReturnsDomain({
       message: `Troca/Devolução #${returnCode} processada com sucesso!`,
       returnRecord: newReturnRecord,
     };
-  }, [activeStoreId, isSupabaseConfigured, returns, setReturns, setProducts, refreshData]);
+  }, [activeStoreId, isSupabaseConfigured, returns, setReturns, setProducts, refreshDomains]);
 
   return { processReturn };
 }

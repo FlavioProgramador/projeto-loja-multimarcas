@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { InventoryService } from '../../services';
 import { hoje } from '../../lib/utils';
 import type { Product, FinancialTransaction } from '../../types';
+import type { RefreshDomains } from '../useStoreData';
 
 interface RegisterStockEntryParams {
   productName: string;
@@ -21,7 +22,7 @@ interface UseInventoryDomainParams {
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   setTransactions: React.Dispatch<React.SetStateAction<FinancialTransaction[]>>;
   activeStoreId: string | null;
-  refreshData: () => Promise<void>;
+  refreshDomains: RefreshDomains;
   isSupabaseConfigured: boolean;
 }
 
@@ -31,14 +32,14 @@ export const useInventoryDomain = ({
   setProducts,
   setTransactions,
   activeStoreId,
-  refreshData,
+  refreshDomains,
   isSupabaseConfigured,
 }: UseInventoryDomainParams) => {
   const registerStockEntry = useCallback(async (params: RegisterStockEntryParams) => {
     if (isSupabaseConfigured) {
       if (!activeStoreId) throw new Error('Nenhuma loja ativa selecionada.');
       await InventoryService.registerStockEntry({ ...params, storeId: activeStoreId });
-      await refreshData();
+      await refreshDomains('products', 'transactions');
       return;
     }
 
@@ -77,7 +78,7 @@ export const useInventoryDomain = ({
       valor: params.custoUnitario * params.qtd,
       data: hoje(),
     }]);
-  }, [activeStoreId, isSupabaseConfigured, products, refreshData, setProducts, setTransactions, transactions]);
+  }, [activeStoreId, isSupabaseConfigured, products, refreshDomains, setProducts, setTransactions, transactions]);
 
   return { registerStockEntry };
 };

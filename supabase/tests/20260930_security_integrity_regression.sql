@@ -30,7 +30,7 @@ BEGIN
   v_def := pg_get_functiondef('public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text)'::regprocedure);
   ASSERT position('for update' IN lower(v_def)) > 0, 'process_return must retain transaction row locking';
   ASSERT position('group by x.variant_id' IN lower(v_def)) > 0, 'process_return must aggregate duplicate variants before validation';
-  ASSERT position('sum(x.quantity::bigint)' IN lower(v_def)) > 0, 'process_return must validate aggregated quantity';
+  ASSERT position('sum(x.quantity)' IN lower(v_def)) > 0, 'process_return must validate aggregated quantity';
 END $$;
 
 DO $$

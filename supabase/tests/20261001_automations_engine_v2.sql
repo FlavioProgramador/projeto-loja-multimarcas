@@ -196,7 +196,7 @@ BEGIN
       AND tablename='automation_events'
       AND policyname='automation_events_select'
   ), 'automation_events SELECT must be limited to ADMIN/MANAGER';
-END $;
+END $$;
 
 DO $$
 DECLARE

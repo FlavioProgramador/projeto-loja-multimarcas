@@ -143,7 +143,7 @@ BEGIN
     PERFORM public.complete_sale(v_store,NULL,'x','x','[]'::jsonb,'PIX',1,0,0,'smoke-no-sub');
     RAISE EXCEPTION 'expected auth failure not raised';
   EXCEPTION WHEN OTHERS THEN
-    IF SQLERRM NOT LIKE '%Autenticação%' THEN RAISE; END IF;
+    IF SQLERRM NOT LIKE '%Perfil autenticado inexistente ou inativo.%' THEN RAISE; END IF;
   END;
 
   -- ADMIN allowed boundary: should pass auth/store/role and fail only on empty cart.

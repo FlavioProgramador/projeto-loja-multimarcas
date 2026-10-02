@@ -41,7 +41,7 @@ export function useCustomersDomain(
       setCustomers(snapshot);
       throw error;
     }
-  }, [customers, refreshData, setCustomers]);
+  }, [customers, refreshDomains, setCustomers]);
 
   return { addCustomer, updateCustomer, deleteCustomer };
 }

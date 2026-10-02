@@ -34,7 +34,7 @@ interface StoreContextType {
   updateProduct: (id: number, updated: Partial<Product>) => Promise<void>;
   deleteProduct: (id: number) => Promise<void>;
   registerStockEntry: (params: { productName: string; brand?: string; category?: string; price?: number; skuIndex: number; qtd: number; custoUnitario: number; newSize?: string; newColor?: string; }) => Promise<void>;
-  processSale: (params: { cartItems: CartItem[]; buyerName: string; cpf: string; paymentMethod: string; installments: number; discountValue: number; discountPercent: number; creditUsed?: number; }) => Promise<{ success: boolean; message: string; totalFinal: number }>;
+  processSale: (params: { cartItems: CartItem[]; buyerName: string; cpf: string; customerId?: string; paymentMethod: string; installments: number; discountValue: number; discountPercent: number; creditUsed?: number; }) => Promise<{ success: boolean; message: string; totalFinal: number }>;
   processReturn: (params: { clienteNome: string; clienteCpf: string; vendaOriginalId?: string; itens: ReturnItem[]; tipoResolucao: 'credito_cliente' | 'vale_troca' | 'estorno_dinheiro'; observacoes?: string; }) => Promise<{ success: boolean; message: string; returnRecord: ReturnRecord }>;
   toggleExpensePaid: (id: number) => Promise<void>;
   addCustomer: (customer: Omit<Customer, 'id' | 'historico'>) => Promise<void>;

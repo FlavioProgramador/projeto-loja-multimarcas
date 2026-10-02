@@ -222,6 +222,11 @@ grant execute on function public.test_automation_rule(uuid,uuid) to authenticate
 revoke all on function public.run_automation_cycle(uuid,text) from public, anon, authenticated;
 grant execute on function public.run_automation_cycle(uuid,text) to service_role;
 
+-- Supabase Cron usa a extensão pg_cron, que cria o schema cron.
+-- Em produção ela já está habilitada; no rebuild local do CI precisamos
+-- garantir explicitamente sua instalação antes de consultar cron.job.
+create extension if not exists pg_cron with schema pg_catalog;
+
 do $cron$
 begin
   if not exists (select 1 from cron.job where jobname = 'coresys-automation-engine') then

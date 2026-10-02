@@ -1,14 +1,13 @@
 import { useCallback } from 'react';
 import { ProductsService, InventoryService } from '../../services';
 import { Product } from '../../types';
-
-type RefreshData = () => Promise<void>;
+import type { RefreshDomains } from '../useStoreData';
 
 type Params = {
   products: Product[];
   setProducts: import('react').Dispatch<import('react').SetStateAction<Product[]>>;
   activeStoreId: string | null;
-  refreshData: RefreshData;
+  refreshDomains: RefreshDomains;
   isSupabaseConfigured: boolean;
 };
 
@@ -16,7 +15,7 @@ export function useProductsDomain({
   products,
   setProducts,
   activeStoreId,
-  refreshData,
+  refreshDomains,
   isSupabaseConfigured,
 }: Params) {
   const addProduct = useCallback(async (prodData: Omit<Product, 'id'>) => {
@@ -53,12 +52,12 @@ export function useProductsDomain({
           variantId: variant.id,
         });
       }
-      await refreshData();
+      await refreshDomains('products', 'transactions');
     } catch (error) {
       setProducts(prev => prev.filter(product => product.id !== newId));
       throw error;
     }
-  }, [activeStoreId, isSupabaseConfigured, products, refreshData, setProducts]);
+  }, [activeStoreId, isSupabaseConfigured, products, refreshDomains, setProducts]);
 
   const updateProduct = useCallback(async (id: number, updated: Partial<Product>) => {
     const target = products.find(p => p.id === id);
@@ -68,12 +67,12 @@ export function useProductsDomain({
     if (!isSupabaseConfigured || !target.uuid) return;
     try {
       await ProductsService.update(target.uuid, updated);
-      await refreshData();
+      await refreshDomains('products');
     } catch (error) {
       setProducts(snapshot);
       throw error;
     }
-  }, [isSupabaseConfigured, products, refreshData, setProducts]);
+  }, [isSupabaseConfigured, products, refreshDomains, setProducts]);
 
   const deleteProduct = useCallback(async (id: number) => {
     const target = products.find(p => p.id === id);
@@ -83,12 +82,12 @@ export function useProductsDomain({
     if (!isSupabaseConfigured || !target.uuid) return;
     try {
       await ProductsService.remove(target.uuid);
-      await refreshData();
+      await refreshDomains('products');
     } catch (error) {
       setProducts(snapshot);
       throw error;
     }
-  }, [isSupabaseConfigured, products, refreshData, setProducts]);
+  }, [isSupabaseConfigured, products, refreshDomains, setProducts]);
 
   return { addProduct, updateProduct, deleteProduct };
 }

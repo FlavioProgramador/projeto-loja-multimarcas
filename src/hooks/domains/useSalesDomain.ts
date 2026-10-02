@@ -3,6 +3,7 @@ import { SalesService } from '../../services';
 import { CartItem, Customer, FinancialTransaction, Product, SaleMovement } from '../../types';
 import { hoje } from '../../lib/utils';
 import { generateIdempotencyKey } from '../../lib/idempotency';
+import type { RefreshDomains } from '../useStoreData';
 
 type SaleParams = {
   cartItems: CartItem[];
@@ -25,7 +26,7 @@ type SalesDomainArgs = {
   setCustomers: Dispatch<SetStateAction<Customer[]>>;
   setTransactions: Dispatch<SetStateAction<FinancialTransaction[]>>;
   checkAlerts: () => void;
-  refreshData: () => Promise<void>;
+  refreshDomains: RefreshDomains;
 };
 
 type SaleResult = { success: boolean; message: string; totalFinal: number };
@@ -40,7 +41,7 @@ export function useSalesDomain({
   setCustomers,
   setTransactions,
   checkAlerts,
-  refreshData,
+  refreshDomains,
 }: SalesDomainArgs) {
   const processSale = useCallback(async ({
     cartItems, buyerName, cpf, paymentMethod, installments,
@@ -70,7 +71,7 @@ export function useSalesDomain({
                 : c
             ));
           }
-          await refreshData();
+          await refreshDomains('products', 'sales', 'customers', 'transactions');
           return { success: true, message: 'Venda processada atomicamente no Supabase com sucesso!', totalFinal: rpcResult.totalFinal };
         }
 
@@ -171,7 +172,7 @@ export function useSalesDomain({
     return { success: true, message: 'Venda realizada com sucesso!', totalFinal };
   }, [
     activeStoreId, isSupabaseConfigured, movements, transactions,
-    setProducts, setMovements, setCustomers, setTransactions, checkAlerts, refreshData,
+    setProducts, setMovements, setCustomers, setTransactions, checkAlerts, refreshDomains,
   ]);
 
   return { processSale };

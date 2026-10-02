@@ -87,10 +87,10 @@ export const ReportsView: React.FC = () => {
         storeName, currentMonth, previousMonth,
         generatedAt: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date()),
         metrics: [
-          { label: 'Faturamento', value: formatMoeda(data.revenue), comparison: `${data.salesCount} vendas concluÃ­das` },
-          { label: 'Ticket mÃ©dio', value: formatMoeda(data.averageTicket), comparison: `${data.salesCount} pedidos no perÃ­odo` },
+          { label: 'Faturamento', value: formatMoeda(data.revenue), comparison: `${data.salesCount} vendas concluídas` },
+          { label: 'Ticket médio', value: formatMoeda(data.averageTicket), comparison: `${data.salesCount} pedidos no período` },
           { label: 'Resultado operacional', value: formatMoeda(data.operatingResult), comparison: `Despesas: ${formatMoeda(data.expenses)}` },
-          { label: 'Estoque disponÃ­vel', value: `${data.inventoryUnits} un.`, comparison: `${lowStock} baixo estoque Â· ${outStock} sem estoque` },
+          { label: 'Estoque disponível', value: `${data.inventoryUnits} un.`, comparison: `${lowStock} baixo estoque · ${outStock} sem estoque` },
         ],
         revenueByPayment: payments.map(x => ({ method: x.method, amount: x.amount })),
         topProducts: top.map(x => ({ name: x.product_name, quantity: x.total_quantity_sold })),
@@ -99,7 +99,7 @@ export const ReportsView: React.FC = () => {
           .map(x => ({ date: x.data, sale: x.vendaId, customer: x.comprador, payment: x.formaPagamento, amount: x.valor, products: x.produtos })),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'NÃ£o foi possÃ­vel gerar o PDF.');
+      setError(e instanceof Error ? e.message : 'Não foi possível gerar o PDF.');
     } finally {
       setLoading(false);
     }

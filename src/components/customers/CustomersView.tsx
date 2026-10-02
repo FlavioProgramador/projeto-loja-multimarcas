@@ -183,6 +183,9 @@ export const CustomersView: React.FC = () => {
         <CustomerList customers={customers} onView={customer=>void openDetails(customer)}
           onEdit={openEdit} onDelete={setDeletingCustomer}/>
         {total>0&&<div className="customers-pagination-footer">
+          <span>
+            Exibindo {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE,total)} de {total}
+          </span>
           <div className="customers-pagination" aria-label="Paginação de clientes">
             <button
               disabled={page===1||loading}

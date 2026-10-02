@@ -57,11 +57,33 @@ function monthBr(value: string): string {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
 }
 
-function text(doc: jsPDF, value: string, x: number, y: number, size = 9, bold = false, color: readonly [number, number, number] = COLORS.text) {
+function text(
+  doc: jsPDF,
+  value: string,
+  x: number,
+  y: number,
+  size = 9,
+  bold = false,
+  color: readonly [number, number, number] = COLORS.text,
+  align: 'left' | 'center' | 'right' = 'left',
+) {
   doc.setFont('helvetica', bold ? 'bold' : 'normal');
   doc.setFontSize(size);
   doc.setTextColor(...color);
-  doc.text(value, x, y);
+  doc.text(value, x, y, { align });
+}
+
+function fitSingleLine(doc: jsPDF, value: string, maxWidth: number, size = 8, bold = false): string {
+  doc.setFont('helvetica', bold ? 'bold' : 'normal');
+  doc.setFontSize(size);
+  const textValue = value || '-';
+  if (doc.getTextWidth(textValue) <= maxWidth) return textValue;
+
+  let shortened = textValue;
+  while (shortened.length > 1 && doc.getTextWidth(shortened + '…') > maxWidth) {
+    shortened = shortened.slice(0, -1);
+  }
+  return shortened + '…';
 }
 
 function wrapText(doc: jsPDF, value: string, width: number, size = 8): string[] {
@@ -81,24 +103,51 @@ function drawHeader(doc: jsPDF, data: SalesReportPdfData, pageNumber: number) {
   doc.rect(0, 0, PAGE.width, 26, 'F');
 
   text(doc, 'COREsys', PAGE.margin, 10, 9, true, [255, 255, 255]);
-  text(doc, 'Relatorio de Vendas', PAGE.margin, 19, 16, true, [255, 255, 255]);
-  text(doc, data.storeName, PAGE.width - PAGE.margin, 10, 8, false, [255, 255, 255]);
+  text(doc, 'Relatório de Vendas', PAGE.margin, 19, 16, true, [255, 255, 255]);
+  text(
+    doc,
+    fitSingleLine(doc, data.storeName, 72, 8),
+    PAGE.width - PAGE.margin,
+    10,
+    8,
+    false,
+    [255, 255, 255],
+    'right',
+  );
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(255, 255, 255);
-  doc.text(`Pagina ${pageNumber}`, PAGE.width - PAGE.margin, 19, { align: 'right' });
+  doc.text(`Página ${pageNumber}`, PAGE.width - PAGE.margin, 19, { align: 'right' });
 
-  text(doc, `Periodo: ${monthBr(data.currentMonth)}`, PAGE.margin, 35, 8.5, true);
+  text(doc, `Período: ${monthBr(data.currentMonth)}`, PAGE.margin, 35, 8.5, true);
   text(doc, `Comparativo: ${monthBr(data.previousMonth)}`, PAGE.margin, 41, 8, false, COLORS.muted);
-  text(doc, `Gerado em ${data.generatedAt}`, PAGE.width - PAGE.margin, 35, 8, false, COLORS.muted);
-  doc.text('Documento gerado diretamente a partir dos dados do ERP.', PAGE.width - PAGE.margin, 41, { align: 'right' });
+  text(
+    doc,
+    fitSingleLine(doc, `Gerado em ${data.generatedAt}`, 72, 8),
+    PAGE.width - PAGE.margin,
+    35,
+    8,
+    false,
+    COLORS.muted,
+    'right',
+  );
+  text(
+    doc,
+    'Documento gerado diretamente a partir dos dados do ERP.',
+    PAGE.width - PAGE.margin,
+    41,
+    8,
+    false,
+    COLORS.muted,
+    'right',
+  );
 }
 
 function drawFooter(doc: jsPDF) {
   const y = PAGE.height - 9;
   doc.setDrawColor(...COLORS.border);
   doc.line(PAGE.margin, y - 3, PAGE.width - PAGE.margin, y - 3);
-  text(doc, 'COREsys - Relatorio operacional', PAGE.margin, y, 7, false, COLORS.muted);
+  text(doc, 'COREsys - Relatório operacional', PAGE.margin, y, 7, false, COLORS.muted);
 }
 
 export function downloadSalesReportPdf(data: SalesReportPdfData): void {
@@ -169,12 +218,12 @@ export function downloadSalesReportPdf(data: SalesReportPdfData): void {
 
   const productRows = data.topProducts.length
     ? data.topProducts
-    : [{ name: 'Nenhuma venda registrada no periodo', quantity: 0 }];
+    : [{ name: 'Nenhuma venda registrada no período', quantity: 0 }];
 
   roundedBox(doc, PAGE.margin, y, PAGE.width - PAGE.margin * 2, 10 + productRows.length * 8, [255, 255, 255]);
   text(doc, '#', PAGE.margin + 6, y + 7, 7, true, COLORS.muted);
   text(doc, 'Produto', PAGE.margin + 15, y + 7, 7, true, COLORS.muted);
-  text(doc, 'Quantidade', PAGE.width - PAGE.margin - 6, y + 7, 7, true, COLORS.muted);
+  text(doc, 'Quantidade', PAGE.width - PAGE.margin - 6, y + 7, 7, true, COLORS.muted, 'right');
   productRows.forEach((row, index) => {
     const rowY = y + 14 + index * 8;
     if (index > 0) {
@@ -183,7 +232,7 @@ export function downloadSalesReportPdf(data: SalesReportPdfData): void {
     }
     text(doc, `${index + 1}`, PAGE.margin + 6, rowY, 8, true);
     text(doc, wrapText(doc, row.name, 127, 8)[0], PAGE.margin + 15, rowY, 8);
-    text(doc, `${row.quantity} un`, PAGE.width - PAGE.margin - 6, rowY, 8, true);
+    text(doc, `${row.quantity} un`, PAGE.width - PAGE.margin - 6, rowY, 8, true, COLORS.text, 'right');
   });
   y += 16 + productRows.length * 8;
 
@@ -193,7 +242,7 @@ export function downloadSalesReportPdf(data: SalesReportPdfData): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...COLORS.muted);
-  doc.text(`${data.sales.length} venda(s) no periodo`, PAGE.width - PAGE.margin, y, { align: 'right' });
+  doc.text(`${data.sales.length} venda(s) no período`, PAGE.width - PAGE.margin, y, { align: 'right' });
   y += 5;
 
   const columns = [
@@ -223,7 +272,7 @@ export function downloadSalesReportPdf(data: SalesReportPdfData): void {
 
     if (y + rowH > PAGE.height - 18) {
       newPage();
-      text(doc, 'Vendas detalhadas - continuacao', PAGE.margin, y, 10, true);
+      text(doc, 'Vendas detalhadas - continuação', PAGE.margin, y, 10, true);
       y += 5;
       drawTableHeader();
     }
@@ -251,7 +300,7 @@ export function downloadSalesReportPdf(data: SalesReportPdfData): void {
   ensureSpace(18);
   y += 5;
   roundedBox(doc, PAGE.margin, y, PAGE.width - PAGE.margin * 2, 14, COLORS.primarySoft);
-  text(doc, 'Total de vendas no periodo', PAGE.margin + 6, y + 9, 8, true, COLORS.primary);
+  text(doc, 'Total de vendas no período', PAGE.margin + 6, y + 9, 8, true, COLORS.primary);
   const total = data.sales.reduce((sum, sale) => sum + sale.amount, 0);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);

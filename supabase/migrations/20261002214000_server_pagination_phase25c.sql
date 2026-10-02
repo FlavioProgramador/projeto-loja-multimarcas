@@ -601,7 +601,7 @@ $$;
 WITH customer_match AS (
   SELECT
     s.id AS sale_id,
-    min(c.id) AS customer_id,
+    min(c.id::text)::uuid AS customer_id,
     count(*) AS matches
   FROM public.sales s
   JOIN public.customers c
@@ -650,7 +650,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  SELECT min(c.id), count(*)
+  SELECT min(c.id::text)::uuid, count(*)
     INTO v_customer_id, v_matches
   FROM public.customers c
   WHERE c.store_id = NEW.store_id

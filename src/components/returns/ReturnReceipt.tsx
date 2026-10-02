@@ -1,6 +1,6 @@
 import React from 'react';
 import { ReturnRecord } from '../../types';
-import { formatMoeda, maskCpf } from '../../lib/utils';
+import { formatMoeda, formatCpf } from '../../lib/utils';
 
 interface ReturnReceiptProps {
   returnRecord: ReturnRecord;
@@ -43,7 +43,7 @@ export const ReturnReceipt: React.FC<ReturnReceiptProps> = ({ returnRecord }) =>
         {returnRecord.clienteCpf && returnRecord.clienteCpf !== 'Não informado' && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
             <span>CPF:</span>
-            <span>{maskCpf(returnRecord.clienteCpf)}</span>
+            <span>{formatCpf(returnRecord.clienteCpf)}</span>
           </div>
         )}
       </div>

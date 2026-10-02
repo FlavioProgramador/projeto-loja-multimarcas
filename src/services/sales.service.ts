@@ -120,7 +120,7 @@ export const SalesService = {
     }
   },
 
-  async getMovements(storeId?: string): Promise<SaleMovement[]> {
+  async getMovements(storeId?: string, period?: { startDate?: string; endDate?: string }): Promise<SaleMovement[]> {
     if (!isSupabaseConfigured) return [];
 
     let query = supabase
@@ -139,6 +139,8 @@ export const SalesService = {
       .order('created_at', { ascending: false });
 
     if (storeId) query = query.eq('store_id', storeId);
+    if (period?.startDate) query = query.gte('created_at', period.startDate + 'T00:00:00.000Z');
+    if (period?.endDate) query = query.lte('created_at', period.endDate + 'T23:59:59.999Z');
 
     const { data, error } = await query;
     if (error) {

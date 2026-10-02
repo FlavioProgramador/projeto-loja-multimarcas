@@ -2,16 +2,8 @@ do $$
 declare
   v_store_id uuid;
   v_store_count integer;
+  v_customers_to_backfill bigint;
 begin
-  select count(*), (array_agg(id))[1]
-    into v_store_count, v_store_id
-  from public.stores
-  where is_active=true;
-
-  if v_store_count <> 1 then
-    raise exception 'Expected exactly one active store for safe customer backfill; found %', v_store_count;
-  end if;
-
   if not exists (
     select 1
     from information_schema.columns
@@ -22,7 +14,28 @@ begin
     alter table public.customers add column store_id uuid;
   end if;
 
-  update public.customers set store_id=v_store_id where store_id is null;
+  select count(*)
+    into v_customers_to_backfill
+  from public.customers
+  where store_id is null;
+
+  if v_customers_to_backfill > 0 then
+    select count(*), (array_agg(id))[1]
+      into v_store_count, v_store_id
+    from public.stores
+    where is_active=true;
+
+    if v_store_count <> 1 then
+      raise exception
+        'Expected exactly one active store for safe customer backfill; found % for % customer(s)',
+        v_store_count,
+        v_customers_to_backfill;
+    end if;
+
+    update public.customers
+       set store_id=v_store_id
+     where store_id is null;
+  end if;
 
   alter table public.customers drop constraint if exists customers_store_id_fkey;
   alter table public.customers

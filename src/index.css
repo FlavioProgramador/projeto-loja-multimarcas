@@ -2019,6 +2019,73 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { color: var
   font-size: 11px;
 }
 
+.customers-pagination-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.customers-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customers-pagination button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.customers-pagination button:hover:not(:disabled) {
+  border-color: var(--outline-variant);
+  background: var(--surface-hover);
+  color: var(--primary);
+}
+
+.customers-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+.customers-pagination strong {
+  min-width: 42px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.customer-purchase-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px !important;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.customer-purchase-status.completed {
+  background: var(--badge-green-bg);
+  color: var(--badge-green);
+}
+
+.customer-purchase-status.returned {
+  background: var(--badge-yellow-bg);
+  color: var(--badge-yellow);
+}
+
 .customer-details {
   display: flex;
   flex-direction: column;

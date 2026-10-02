@@ -18,6 +18,30 @@ const dateLabel = (value?: string) =>
 const initials = (name: string) =>
   name.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'CL';
 
+const paymentLabel = (method?: string) => {
+  if (!method) return 'Não informado';
+  const labels: Record<string, string> = {
+    CASH: 'Dinheiro',
+    PIX: 'PIX',
+    CREDIT_CARD: 'Crédito',
+    DEBIT_CARD: 'Débito',
+  };
+  return labels[method] || method.replaceAll('_', ' ');
+};
+
+const estimatedInstallmentsRemaining = (date: string, installments?: number) => {
+  const total = Math.max(1, installments || 1);
+  if (total <= 1 || !date) return null;
+
+  const saleDate = new Date(`${date}T00:00:00`);
+  const now = new Date();
+  const elapsedMonths = Math.max(
+    0,
+    (now.getFullYear() - saleDate.getFullYear()) * 12 + now.getMonth() - saleDate.getMonth(),
+  );
+  return Math.max(0, total - elapsedMonths);
+};
+
 export const CustomerDetails: React.FC<CustomerDetailsProps> = ({
   customer, loading = false, error, onClose, onEdit,
 }) => {
@@ -91,6 +115,20 @@ export const CustomerDetails: React.FC<CustomerDetailsProps> = ({
                     </div>
                     <strong>{formatMoeda(item.valor)}</strong>
                     <small>{item.itens || 'Itens não informados'}</small>
+                    <div className="customer-purchase-payment">
+                      <CreditCard size={13} />
+                      <span>
+                        {paymentLabel(item.formaPagamento)}
+                        {item.formaPagamento === 'CREDIT_CARD' && (item.parcelas || 1) > 1
+                          ? ` · ${item.parcelas}x`
+                          : ''}
+                      </span>
+                      {item.formaPagamento === 'CREDIT_CARD' && (item.parcelas || 1) > 1 && (
+                        <em>
+                          estimativa: {estimatedInstallmentsRemaining(item.data, item.parcelas)} parcela(s) restante(s)
+                        </em>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>

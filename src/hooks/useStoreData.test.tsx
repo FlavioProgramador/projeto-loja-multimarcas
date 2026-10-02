@@ -107,7 +107,7 @@ describe('useStoreData - refresh por domínio', () => {
     expect(ReturnsService.getAll).not.toHaveBeenCalled();
   });
 
-  it('mantém o refresh global para sincronização completa', async () => {
+  it('mantém o refresh global somente para os domínios necessários ao shell/dashboard', async () => {
     const params = buildParams();
     const { result } = renderHook(() => useStoreData(params));
 
@@ -119,9 +119,9 @@ describe('useStoreData - refresh por domínio', () => {
     expect(FinanceService.getTransactions).toHaveBeenCalledTimes(1);
     expect(FinanceService.getFixedExpenses).toHaveBeenCalledTimes(1);
     expect(SalesService.getMovements).toHaveBeenCalledTimes(1);
-    expect(CustomersService.getAll).toHaveBeenCalledTimes(1);
+    expect(CustomersService.getAll).not.toHaveBeenCalled();
     expect(SuppliersService.getAll).toHaveBeenCalledTimes(1);
-    expect(ReturnsService.getAll).toHaveBeenCalledTimes(1);
+    expect(ReturnsService.getAll).not.toHaveBeenCalled();
     expect(params.setIsLoading).toHaveBeenNthCalledWith(1, true);
     expect(params.setIsLoading).toHaveBeenLastCalledWith(false);
   });

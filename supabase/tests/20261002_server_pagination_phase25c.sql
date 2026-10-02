@@ -62,6 +62,14 @@ BEGIN
   ASSERT position('LIMIT p_limit OFFSET p_offset' IN v_def) > 0;
 
   v_def := pg_get_functiondef(
+    'public.get_customer_detail(uuid,uuid)'::regprocedure
+  );
+  ASSERT position('DEVOLUCAO' IN v_def) > 0,
+    'customer detail must expose returned purchases';
+  ASSERT position('public.returns' IN v_def) > 0,
+    'customer detail return status must be derived from returns';
+
+  v_def := pg_get_functiondef(
     'public.get_finance_page(uuid,timestamptz,text,text,text,integer,integer)'::regprocedure
   );
   ASSERT position('get_user_store_role' IN v_def) > 0;
@@ -80,7 +88,7 @@ BEGIN
     'sale customer link must be store-scoped';
   ASSERT position('v_matches = 1' IN v_def) > 0,
     'CPF fallback must only link an unambiguous customer';
-END $;
+END $$;
 
 SELECT pass('phase 2.5C pagination assertions completed');
 SELECT * FROM finish();

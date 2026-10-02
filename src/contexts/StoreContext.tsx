@@ -72,7 +72,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [activeStoreId, userStores]
   );
   useStoreAuthReset({ userId: user?.id, isAuthorized, resetStoreState });
-  const { refreshData } = useStoreData({
+  const { refreshData, refreshDomains } = useStoreData({
     userId: user?.id, accessToken: session?.access_token, isAuthorized, authLoading,
     activeStoreId, setProducts, setTransactions,
     setMovements, setCustomers, setReturns, setSuppliers, setFixedExpenses, setIsLoading,
@@ -109,14 +109,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => { if (isAuthorized) localStorage.setItem('erp_fixed_expenses', JSON.stringify(fixedExpenses)); }, [isAuthorized, fixedExpenses]);
   useEffect(() => { if (isAuthorized) localStorage.setItem('erp_notifications', JSON.stringify(notifications)); }, [isAuthorized, notifications]);
 
-  const customersDomain = useCustomersDomain(customers, setCustomers, activeStoreId, refreshData);
-  const productsDomain = useProductsDomain({ products, setProducts, activeStoreId, refreshData, isSupabaseConfigured });
-  const suppliersDomain = useSuppliersDomain(suppliers, setSuppliers, refreshData);
+  const customersDomain = useCustomersDomain(customers, setCustomers, activeStoreId, refreshDomains);
+  const productsDomain = useProductsDomain({ products, setProducts, activeStoreId, refreshDomains, isSupabaseConfigured });
+  const suppliersDomain = useSuppliersDomain(suppliers, setSuppliers, refreshDomains);
   const financeDomain = useFinanceDomain(fixedExpenses, setFixedExpenses);
-  const inventoryDomain = useInventoryDomain({ products, transactions, setProducts, setTransactions, activeStoreId, refreshData, isSupabaseConfigured });
+  const inventoryDomain = useInventoryDomain({ products, transactions, setProducts, setTransactions, activeStoreId, refreshDomains, isSupabaseConfigured });
   const alertsDomain = useInventoryAlerts({ products, fixedExpenses, setNotifications });
-  const { processSale } = useSalesDomain({ activeStoreId, isSupabaseConfigured, movements, transactions, setProducts, setMovements, setCustomers, setTransactions, checkAlerts: alertsDomain.checkAlerts, refreshData });
-  const { processReturn } = useReturnsDomain({ activeStoreId, isSupabaseConfigured, returns, setReturns, setProducts, refreshData });
+  const { processSale } = useSalesDomain({ activeStoreId, isSupabaseConfigured, movements, transactions, setProducts, setMovements, setCustomers, setTransactions, checkAlerts: alertsDomain.checkAlerts, refreshDomains });
+  const { processReturn } = useReturnsDomain({ activeStoreId, isSupabaseConfigured, returns, setReturns, setProducts, refreshDomains });
 
   return (
     <StoreContext.Provider value={{

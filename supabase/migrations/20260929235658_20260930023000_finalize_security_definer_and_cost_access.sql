@@ -1,13 +1,28 @@
 BEGIN;
 
 -- Remove client access to legacy overloads that do not carry store scope.
-REVOKE ALL ON FUNCTION public.complete_sale(uuid,text,text,jsonb,text,integer,numeric,numeric,text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.get_profitability_by_category(date,date) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.get_profitability_by_product(date,date) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.report_stock_status() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.report_top_selling_products(integer) FROM PUBLIC, anon, authenticated;
+-- Some historical overloads exist in production but are absent when this repository
+-- is rebuilt from its available baseline, so revoke only signatures that exist.
+DO $legacy_rpc_hardening$
+DECLARE
+  v_sig text;
+BEGIN
+  FOREACH v_sig IN ARRAY ARRAY[
+    'public.complete_sale(uuid,text,text,jsonb,text,integer,numeric,numeric,text)',
+    'public.create_mp_pix_sale(uuid,text,text,jsonb,numeric,numeric)',
+    'public.get_profitability_by_category(date,date)',
+    'public.get_profitability_by_product(date,date)',
+    'public.report_inventory_movements_summary(timestamptz,timestamptz)',
+    'public.report_stock_status()',
+    'public.report_top_selling_products(integer)'
+  ]
+  LOOP
+    IF to_regprocedure(v_sig) IS NOT NULL THEN
+      EXECUTE 'REVOKE ALL ON FUNCTION ' || v_sig || ' FROM PUBLIC, anon, authenticated';
+    END IF;
+  END LOOP;
+END
+$legacy_rpc_hardening$;
 
 -- Privileged operations remain callable only through their current scoped RPCs.
 REVOKE ALL ON FUNCTION public.admin_set_user_role(uuid,text) FROM PUBLIC, anon, authenticated;

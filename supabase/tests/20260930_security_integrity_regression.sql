@@ -9,7 +9,7 @@ DECLARE
   v_fn record;
 BEGIN
   -- Privileged sale/return RPCs must require an authenticated caller.
-  FOR v_fn IN SELECT oid::regprocedure fn FROM pg_proc p
+  FOR v_fn IN SELECT p.oid::regprocedure fn FROM pg_proc p
     JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public'
       AND p.proname IN ('complete_sale','create_mp_pix_sale','process_return')
@@ -28,9 +28,9 @@ DECLARE
   v_def text;
 BEGIN
   v_def := pg_get_functiondef('public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text)'::regprocedure);
-  ASSERT position('FOR UPDATE' IN v_def) > 0, 'process_return must retain transaction row locking';
-  ASSERT position('GROUP BY x.variant_id' IN v_def) > 0, 'process_return must aggregate duplicate variants before validation';
-  ASSERT position('sum(x.quantity::bigint)' IN v_def) > 0, 'process_return must validate aggregated quantity';
+  ASSERT position('for update' IN lower(v_def)) > 0, 'process_return must retain transaction row locking';
+  ASSERT position('group by x.variant_id' IN lower(v_def)) > 0, 'process_return must aggregate duplicate variants before validation';
+  ASSERT position('sum(x.quantity::bigint)' IN lower(v_def)) > 0, 'process_return must validate aggregated quantity';
 END $$;
 
 DO $$

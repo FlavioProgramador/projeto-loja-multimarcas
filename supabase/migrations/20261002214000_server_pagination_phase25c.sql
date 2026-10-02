@@ -607,10 +607,10 @@ WITH customer_match AS (
   JOIN public.customers c
     ON c.store_id = s.store_id
    AND c.is_active = true
-   AND nullif(regexp_replace(coalesce(c.cpf, ''), '\\D', '', 'g'), '') =
-       nullif(regexp_replace(coalesce(s.customer_cpf, ''), '\\D', '', 'g'), '')
+   AND nullif(regexp_replace(coalesce(c.cpf, ''), '[^0-9]', '', 'g'), '') =
+       nullif(regexp_replace(coalesce(s.customer_cpf, ''), '[^0-9]', '', 'g'), '')
   WHERE s.customer_id IS NULL
-    AND nullif(regexp_replace(coalesce(s.customer_cpf, ''), '\\D', '', 'g'), '') IS NOT NULL
+    AND nullif(regexp_replace(coalesce(s.customer_cpf, ''), '[^0-9]', '', 'g'), '') IS NOT NULL
   GROUP BY s.id
 )
 UPDATE public.sales s
@@ -626,7 +626,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $resolve_sale_customer_link$
 DECLARE
   v_customer_id uuid;
   v_matches integer := 0;
@@ -645,7 +645,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  v_cpf := nullif(regexp_replace(coalesce(NEW.customer_cpf, ''), '\\D', '', 'g'), '');
+  v_cpf := nullif(regexp_replace(coalesce(NEW.customer_cpf, ''), '[^0-9]', '', 'g'), '');
   IF v_cpf IS NULL THEN
     RETURN NEW;
   END IF;
@@ -655,7 +655,7 @@ BEGIN
   FROM public.customers c
   WHERE c.store_id = NEW.store_id
     AND c.is_active = true
-    AND nullif(regexp_replace(coalesce(c.cpf, ''), '\\D', '', 'g'), '') = v_cpf;
+    AND nullif(regexp_replace(coalesce(c.cpf, ''), '[^0-9]', '', 'g'), '') = v_cpf;
 
   IF v_matches = 1 THEN
     NEW.customer_id := v_customer_id;
@@ -663,7 +663,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$;
+$resolve_sale_customer_link$;
 
 DROP TRIGGER IF EXISTS trg_resolve_sale_customer_link ON public.sales;
 CREATE TRIGGER trg_resolve_sale_customer_link

@@ -1392,12 +1392,26 @@ BEGIN
 END;
 $$;
 
--- Replace report grants with the new signatures and remove the old API signatures.
-REVOKE ALL ON FUNCTION public.report_stock_status() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.report_top_selling_products(integer) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.get_profitability_by_product(date,date) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.get_profitability_by_category(date,date) FROM PUBLIC, anon, authenticated;
+-- Replace report grants with the new signatures and remove old API signatures
+-- only when those historical overloads are actually present in a clean rebuild.
+DO $legacy_reports$
+DECLARE
+  v_sig text;
+BEGIN
+  FOREACH v_sig IN ARRAY ARRAY[
+    'public.report_stock_status()',
+    'public.report_top_selling_products(integer)',
+    'public.report_inventory_movements_summary(timestamptz,timestamptz)',
+    'public.get_profitability_by_product(date,date)',
+    'public.get_profitability_by_category(date,date)'
+  ]
+  LOOP
+    IF to_regprocedure(v_sig) IS NOT NULL THEN
+      EXECUTE 'REVOKE ALL ON FUNCTION ' || v_sig || ' FROM PUBLIC, anon, authenticated';
+    END IF;
+  END LOOP;
+END
+$legacy_reports$;
 
 GRANT EXECUTE ON FUNCTION public.report_stock_status(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.report_top_selling_products(integer,uuid) TO authenticated;

@@ -116,9 +116,13 @@ describe('useStoreData - refresh por domínio', () => {
     });
 
     expect(ProductsService.getAll).toHaveBeenCalledTimes(1);
-    expect(FinanceService.getTransactions).toHaveBeenCalledTimes(1);
+    expect(FinanceService.getTransactions).toHaveBeenCalledWith('store-a', {
+      startDate: `${new Date().getFullYear()}-01-01T00:00:00.000Z`,
+    });
     expect(FinanceService.getFixedExpenses).toHaveBeenCalledTimes(1);
-    expect(SalesService.getMovements).toHaveBeenCalledTimes(1);
+    expect(SalesService.getMovements).toHaveBeenCalledWith('store-a', {
+      startDate: `${new Date().getFullYear()}-01-01`,
+    });
     expect(CustomersService.getAll).not.toHaveBeenCalled();
     expect(SuppliersService.getAll).toHaveBeenCalledTimes(1);
     expect(ReturnsService.getAll).not.toHaveBeenCalled();

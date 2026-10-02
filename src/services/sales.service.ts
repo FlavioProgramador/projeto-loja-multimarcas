@@ -49,6 +49,42 @@ function getCheckoutSignature(params: {
   });
 }
 
+function mapSales(rows: SaleListRow[]): SaleMovement[] {
+  return rows.map((sale, index) => {
+    const payment = sale.payments?.[0];
+    const paymentStr = payment
+      ? `${payment.method}${payment.installments > 1 ? ` ${payment.installments}x` : ''}`
+      : 'PIX';
+    const itemsStr = (sale.sale_items || [])
+      .map(item => `${item.product_name} (${item.variant_description}) x${item.quantity}`)
+      .join(', ');
+
+    return {
+      id: index + 1,
+      uuid: sale.id,
+      tipo: 'INCOME',
+      valor: Number(sale.total) || 0,
+      formaPagamento: paymentStr,
+      comprador: sale.customer_name || 'Consumidor Final',
+      cpf: sale.customer_cpf || 'Não informado',
+      produtos: itemsStr || 'Venda PDV',
+      data: (sale.created_at || '').slice(0, 10),
+      vendaId: sale.sale_number
+    };
+  });
+}
+
+const SALE_SELECT = `
+  id,
+  sale_number,
+  customer_name,
+  customer_cpf,
+  total,
+  created_at,
+  payments ( method, installments ),
+  sale_items ( product_name, variant_description, quantity )
+`;
+
 export const SalesService = {
   async completeSale(params: {
     storeId: string;
@@ -120,21 +156,15 @@ export const SalesService = {
     }
   },
 
-  async getMovements(storeId?: string, period?: { startDate?: string; endDate?: string }): Promise<SaleMovement[]> {
+  async getMovements(
+    storeId?: string,
+    period?: { startDate?: string; endDate?: string }
+  ): Promise<SaleMovement[]> {
     if (!isSupabaseConfigured) return [];
 
     let query = supabase
       .from('sales')
-      .select(`
-        id,
-        sale_number,
-        customer_name,
-        customer_cpf,
-        total,
-        created_at,
-        payments ( method, installments ),
-        sale_items ( product_name, variant_description, quantity )
-      `)
+      .select(SALE_SELECT)
       .eq('status', 'COMPLETED')
       .order('created_at', { ascending: false });
 
@@ -148,27 +178,34 @@ export const SalesService = {
       throw error;
     }
 
-    return ((data || []) as unknown as SaleListRow[]).map((s, index) => {
-      const payment = s.payments?.[0];
-      const paymentStr = payment
-        ? `${payment.method}${payment.installments > 1 ? ` ${payment.installments}x` : ''}`
-        : 'PIX';
-      const itemsStr = (s.sale_items || [])
-        .map(i => `${i.product_name} (${i.variant_description}) x${i.quantity}`)
-        .join(', ');
+    return mapSales((data || []) as unknown as SaleListRow[]);
+  },
 
-      return {
-        id: index + 1,
-        uuid: s.id,
-        tipo: 'INCOME',
-        valor: Number(s.total) || 0,
-        formaPagamento: paymentStr,
-        comprador: s.customer_name || 'Consumidor Final',
-        cpf: s.customer_cpf || 'Não informado',
-        produtos: itemsStr || 'Venda PDV',
-        data: (s.created_at || '').slice(0, 10),
-        vendaId: s.sale_number
-      };
-    });
+  async searchMovements(storeId: string, search = '', limit = 20): Promise<SaleMovement[]> {
+    if (!isSupabaseConfigured || !storeId) return [];
+
+    let query = supabase
+      .from('sales')
+      .select(SALE_SELECT)
+      .eq('store_id', storeId)
+      .eq('status', 'COMPLETED')
+      .order('created_at', { ascending: false })
+      .limit(Math.min(50, Math.max(1, limit)));
+
+    const normalizedSearch = search.trim().replace(/[(),]/g, ' ');
+    if (normalizedSearch) {
+      const pattern = `%${normalizedSearch}%`;
+      query = query.or(
+        `sale_number.ilike.${pattern},customer_name.ilike.${pattern},customer_cpf.ilike.${pattern}`
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Erro ao buscar vendas para devolução:', error);
+      throw error;
+    }
+
+    return mapSales((data || []) as unknown as SaleListRow[]);
   }
 };

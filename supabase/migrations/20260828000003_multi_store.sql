@@ -60,11 +60,21 @@ DO $$
 DECLARE
   v_default_store_id UUID;
 BEGIN
-  -- Verificar se já existe a loja principal (para ser reentrante)
-  SELECT id INTO v_default_store_id FROM public.stores WHERE name = 'Loja Principal' LIMIT 1;
+  -- Reutilizar a loja já existente para manter a migration realmente reentrante.
+  -- A migration de estoque anterior cria "Loja Principal (Padrão)", portanto
+  -- procurar somente o nome "Loja Principal" gerava uma segunda loja no rebuild.
+  SELECT id
+    INTO v_default_store_id
+  FROM public.stores
+  WHERE is_active = true
+  ORDER BY
+    CASE WHEN coalesce(is_main, false) THEN 0 ELSE 1 END,
+    created_at ASC,
+    id ASC
+  LIMIT 1;
   
   IF v_default_store_id IS NULL THEN
-    -- Inserir loja padrão
+    -- Inserir loja padrão somente quando não existe nenhuma loja ativa.
     INSERT INTO public.stores (name) VALUES ('Loja Principal') RETURNING id INTO v_default_store_id;
 
     -- Inserir acesso para todos os usuários existentes

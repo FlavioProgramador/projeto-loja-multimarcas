@@ -4,6 +4,8 @@
 
 BEGIN;
 
+
+SELECT plan(1);
 DO $$
 DECLARE
   v_fn record;
@@ -154,4 +156,6 @@ BEGIN
   ASSERT position('provider_transaction_id' IN v_def) > 0, 'PIX reconciliation candidates must require provider transaction id';
 END $$;
 
+SELECT pass('security/integrity structural assertions completed');
+SELECT * FROM finish();
 ROLLBACK;

@@ -4,6 +4,8 @@
 
 BEGIN;
 
+
+SELECT plan(1);
 -- O banco local do CI não possui usuários de Auth por padrão. Criamos fixtures
 -- transacionais e determinísticas; todo o bloco é revertido no ROLLBACK final.
 DO $$
@@ -211,4 +213,7 @@ BEGIN
   RAISE NOTICE 'CORE_SYS_SMOKE_TESTS_PASS';
 END $$;
 
+RESET ROLE;
+SELECT pass('auth/integrity smoke assertions completed');
+SELECT * FROM finish();
 ROLLBACK;

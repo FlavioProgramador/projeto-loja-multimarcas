@@ -4,6 +4,8 @@
 
 BEGIN;
 
+
+SELECT plan(1);
 -- 1) Test legacy complete_sale signature revocation for authenticated users
 DO $$
 BEGIN
@@ -44,4 +46,6 @@ BEGIN
 END;
 $$;
 
+SELECT pass('audit security assertions completed');
+SELECT * FROM finish();
 ROLLBACK;

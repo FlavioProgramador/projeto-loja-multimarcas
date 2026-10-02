@@ -3,6 +3,8 @@
 
 BEGIN;
 
+
+SELECT plan(1);
 DO $$
 DECLARE
   v_rls boolean;
@@ -212,4 +214,6 @@ BEGIN
     'automation worker cron must remain active';
 END $$;
 
+SELECT pass('automation engine v2 structural assertions completed');
+SELECT * FROM finish();
 ROLLBACK;

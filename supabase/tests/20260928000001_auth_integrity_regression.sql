@@ -25,3 +25,37 @@
 -- Return quantity > sold minus previous returns: denied.
 --
 -- Run before and after the migration in a non-production test transaction/session.
+
+BEGIN;
+SELECT plan(3);
+
+SELECT ok(
+  to_regprocedure('public.complete_sale(uuid,text,text,jsonb,text,integer,numeric,numeric,text)') IS NULL
+  OR NOT has_function_privilege(
+    'authenticated',
+    to_regprocedure('public.complete_sale(uuid,text,text,jsonb,text,integer,numeric,numeric,text)'),
+    'EXECUTE'
+  ),
+  'legacy complete_sale is not executable by authenticated'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'anon',
+    'public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text)'::regprocedure,
+    'EXECUTE'
+  ),
+  'modern complete_sale is not executable by anon'
+);
+
+SELECT ok(
+  has_function_privilege(
+    'authenticated',
+    'public.complete_sale(uuid,uuid,text,text,jsonb,text,integer,numeric,numeric,text)'::regprocedure,
+    'EXECUTE'
+  ),
+  'modern complete_sale remains executable by authenticated'
+);
+
+SELECT * FROM finish();
+ROLLBACK;

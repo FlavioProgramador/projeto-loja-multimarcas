@@ -1,3 +1,6 @@
+BEGIN;
+SELECT plan(1);
+
 -- Fase 3: checks that can run in CI/read-only environments.
 -- These assertions intentionally inspect authorization and locking primitives
 -- without mutating production business data.
@@ -77,3 +80,7 @@ BEGIN
       AND p.oid::regprocedure::text='list_stale_pix_reconciliation_candidates(integer)'
   ) THEN RAISE EXCEPTION 'PIX reconciliation candidate function missing'; END IF;
 END $$;
+
+SELECT pass('multitenant/concurrency structural assertions completed');
+SELECT * FROM finish();
+ROLLBACK;

@@ -1,0 +1,12 @@
+BEGIN;
+ALTER TABLE public.sale_idempotency ADD COLUMN IF NOT EXISTS store_id uuid;
+ALTER TABLE public.sale_idempotency ADD COLUMN IF NOT EXISTS user_id uuid;
+UPDATE public.sale_idempotency i SET store_id=s.store_id,user_id=s.user_id FROM public.sales s WHERE s.id=i.sale_id;
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM public.sale_idempotency WHERE store_id IS NULL OR user_id IS NULL) THEN RAISE EXCEPTION 'Não foi possível preencher o escopo da idempotência existente.'; END IF; END $$;
+ALTER TABLE public.sale_idempotency ALTER COLUMN store_id SET NOT NULL;
+ALTER TABLE public.sale_idempotency ALTER COLUMN user_id SET NOT NULL;
+ALTER TABLE public.sale_idempotency DROP CONSTRAINT IF EXISTS sale_idempotency_pkey;
+ALTER TABLE public.sale_idempotency ADD CONSTRAINT sale_idempotency_pkey PRIMARY KEY (store_id,user_id,idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_sale_idempotency_sale_id ON public.sale_idempotency(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sale_idempotency_user_store ON public.sale_idempotency(user_id,store_id);
+COMMIT;

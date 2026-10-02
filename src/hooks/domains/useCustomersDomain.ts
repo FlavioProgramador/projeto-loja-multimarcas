@@ -12,7 +12,6 @@ export function useCustomersDomain(
   const addCustomer = useCallback(async (data: Omit<Customer, 'id' | 'historico'>) => {
     if (!activeStoreId) throw new Error('Nenhuma loja ativa selecionada.');
     await CustomersService.create(data, activeStoreId);
-    await refreshDomains('customers');
   }, [activeStoreId, refreshDomains]);
 
   const updateCustomer = useCallback(async (id: number | string, data: Partial<Customer>) => {
@@ -25,8 +24,7 @@ export function useCustomersDomain(
     setCustomers(prev => prev.map(c => String(c.uuid || c.id) === String(id) ? { ...c, ...data } : c));
     try {
       await CustomersService.update(targetUuid, data);
-      await refreshDomains('customers');
-    } catch (error) {
+      } catch (error) {
       setCustomers(snapshot);
       throw error;
     }
@@ -42,8 +40,7 @@ export function useCustomersDomain(
     setCustomers(prev => prev.filter(c => String(c.uuid || c.id) !== String(id)));
     try {
       await CustomersService.remove(targetUuid);
-      await refreshDomains('customers');
-    } catch (error) {
+      } catch (error) {
       setCustomers(snapshot);
       throw error;
     }

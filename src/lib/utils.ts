@@ -41,6 +41,13 @@ export function mesAnterior(): string {
   return d.toISOString().slice(0, 7);
 }
 
+export function formatCpf(value?: string | null): string {
+  if (!value || value === 'Não informado') return 'Não informado';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 11) return value;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
 export function maskCpf(value?: string | null): string {
   if (!value || value === 'Não informado') return 'Não informado';
   const digits = value.replace(/\D/g, '');

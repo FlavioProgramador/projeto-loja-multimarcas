@@ -74,7 +74,7 @@ function isMissingRpc(error: { code?: string; message?: string }, name: string):
 }
 
 async function getLegacyAll(storeId: string): Promise<Customer[]> {
-  const [customersResult, salesResult, creditResult] = await Promise.all([
+  const [customersResult, salesResult, creditResult, returnsResult] = await Promise.all([
     supabase
       .from('customers')
       .select('id,name,cpf,rg,phone,email,address,birth_date')
@@ -103,17 +103,28 @@ async function getLegacyAll(storeId: string): Promise<Customer[]> {
       .select('id,customer_id,type,amount,description,created_at,reference_id')
       .eq('store_id', storeId)
       .order('created_at', { ascending: false }),
+    supabase
+      .from('returns')
+      .select('original_sale_id,status')
+      .eq('store_id', storeId)
+      .eq('status', 'CONCLUIDO'),
   ]);
 
   if (customersResult.error) throw customersResult.error;
   if (salesResult.error) throw salesResult.error;
   if (creditResult.error) throw creditResult.error;
+  if (returnsResult.error) throw returnsResult.error;
 
   const normalizedCpf = (value?: string | null) =>
     (value || '').replace(/\D/g, '');
 
   const sales = salesResult.data || [];
   const creditMovements = creditResult.data || [];
+  const returnedSaleIds = new Set(
+    (returnsResult.data || [])
+      .map((record: any) => record.original_sale_id)
+      .filter(Boolean),
+  );
 
   return (customersResult.data || []).map((customer: any, index: number) => {
     const customerCpf = normalizedCpf(customer.cpf);
@@ -131,6 +142,7 @@ async function getLegacyAll(storeId: string): Promise<Customer[]> {
       uuid: sale.id,
       valor: toNumber(sale.total),
       data: (sale.created_at || '').slice(0, 10),
+      status: returnedSaleIds.has(sale.id) ? 'DEVOLUCAO' as const : 'CONCLUIDA' as const,
       itens: (sale.sale_items || [])
         .map((item: any) => `${item.product_name} x${item.quantity}`)
         .join(', ') || 'Venda PDV',
@@ -349,6 +361,7 @@ export const CustomersService = {
         uuid: sale.sale_id,
         valor: toNumber(sale.total),
         data: (sale.created_at || '').slice(0, 10),
+        status: sale.status === 'DEVOLUCAO' ? 'DEVOLUCAO' as const : 'CONCLUIDA' as const,
         itens: sale.items || 'Venda PDV',
       }));
       const creditMovements = (payload?.credit_movements || []).map((movement: any, index: number) => ({

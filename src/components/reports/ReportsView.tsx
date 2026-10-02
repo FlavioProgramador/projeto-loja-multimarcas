@@ -3,6 +3,7 @@ import { BarChart3, Download, FileText, Package, RefreshCw, ShoppingBag, Trendin
 import { useStore } from '../../contexts/StoreContext';
 import { formatMoeda } from '../../lib/utils';
 import { ReportsService } from '../../services/reports.service';
+import type { ReportMonthlySeries, ReportOverview, ReportPaymentBreakdown } from '../../services/reports.service';
 import { SalesService } from '../../services/sales.service';
 import { downloadSalesReportPdf } from '../../lib/pdf/reports-pdf';
 import { formatMovementType, formatPaymentMethod } from '../../lib/display-labels';
@@ -25,15 +26,14 @@ export const ReportsView: React.FC = () => {
   const { activeStoreId, userStores } = useStore();
   const [preset,setPreset] = useState<PeriodPreset>('30d');
   const [[startDate,endDate],setRange] = useState<[string,string]>(presetRange('30d'));
-  const [data,setData] = useState<Awaited<ReturnType<typeof ReportsService.getOverview>>|null>(null);
+  const [data,setData] = useState<ReportOverview|null>(null);
   const [top,setTop] = useState<Awaited<ReturnType<typeof ReportsService.getTopProducts>>>([]);
   const [products,setProducts] = useState<Awaited<ReturnType<typeof ReportsService.getProfitabilityByProduct>>>([]);
   const [categories,setCategories] = useState<Awaited<ReturnType<typeof ReportsService.getProfitabilityByCategory>>>([]);
   const [stock,setStock] = useState<Awaited<ReturnType<typeof ReportsService.getStockStatus>>>([]);
   const [moves,setMoves] = useState<Awaited<ReturnType<typeof ReportsService.getMovementSummary>>>([]);
-  const [payments,setPayments] = useState<Awaited<ReturnType<typeof ReportsService.getPaymentBreakdown>>>([]);
-  const [series,setSeries] = useState<Awaited<ReturnType<typeof ReportsService.getMonthlySeries>>>([]);
-  const [sales,setSales] = useState<Awaited<ReturnType<typeof SalesService.getMovements>>>([]);
+  const [payments,setPayments] = useState<ReportPaymentBreakdown[]>([]);
+  const [series,setSeries] = useState<ReportMonthlySeries[]>([]);
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState('');
 
@@ -43,18 +43,22 @@ export const ReportsView: React.FC = () => {
     if(!activeStoreId || startDate>endDate) return;
     setLoading(true); setError('');
     try{
-      const [o,t,p,c,s,m,pay,ser,salesRows] = await Promise.all([
-        ReportsService.getOverview(activeStoreId,startDate,endDate),
+      const [summary,t,p,c,s,m] = await Promise.all([
+        ReportsService.getCommercialSummary(activeStoreId,startDate,endDate),
         ReportsService.getTopProducts(activeStoreId,10),
         ReportsService.getProfitabilityByProduct(activeStoreId,startDate,endDate),
         ReportsService.getProfitabilityByCategory(activeStoreId,startDate,endDate),
         ReportsService.getStockStatus(activeStoreId),
-        ReportsService.getMovementSummary(activeStoreId,startDate,endDate),
-        ReportsService.getPaymentBreakdown(activeStoreId,startDate,endDate),
-        ReportsService.getMonthlySeries(activeStoreId,startDate,endDate),
-        SalesService.getMovements(activeStoreId)
+        ReportsService.getMovementSummary(activeStoreId,startDate,endDate)
       ]);
-      setData(o); setTop(t); setProducts(p); setCategories(c); setStock(s); setMoves(m); setPayments(pay); setSeries(ser); setSales(salesRows);
+      setData(summary.overview);
+      setPayments(summary.payments);
+      setSeries(summary.series);
+      setTop(t);
+      setProducts(p);
+      setCategories(c);
+      setStock(s);
+      setMoves(m);
     }catch(e){ setError(e instanceof Error?e.message:'Erro ao carregar relatórios.'); }
     finally{ setLoading(false); }
   },[activeStoreId,startDate,endDate]);
@@ -71,10 +75,11 @@ export const ReportsView: React.FC = () => {
 
   const presetClick = (p:PeriodPreset)=>{setPreset(p); if(p!=='custom') setRange(presetRange(p));};
 
-  const exportPdf = () => {
-    if (!data) return;
+  const exportPdf = async () => {
+    if (!data || !activeStoreId) return;
     setLoading(true);
     try {
+      const salesRows = await SalesService.getMovements(activeStoreId, { startDate, endDate });
       const currentMonth = startDate.slice(0, 7);
       const previous = new Date(Number(currentMonth.slice(0, 4)), Number(currentMonth.slice(5, 7)) - 2, 1);
       const previousMonth = previous.getFullYear() + '-' + String(previous.getMonth() + 1).padStart(2, '0');
@@ -89,9 +94,8 @@ export const ReportsView: React.FC = () => {
         ],
         revenueByPayment: payments.map(x => ({ method: x.method, amount: x.amount })),
         topProducts: top.map(x => ({ name: x.product_name, quantity: x.total_quantity_sold })),
-        sales: sales
+        sales: salesRows
           .filter(x => x.tipo === 'INCOME')
-          .filter(x => !x.data || (x.data >= startDate && x.data <= endDate))
           .map(x => ({ date: x.data, sale: x.vendaId, customer: x.comprador, payment: x.formaPagamento, amount: x.valor, products: x.produtos })),
       });
     } catch (e) {

@@ -77,6 +77,10 @@ export interface Customer {
   endereco: string;
   dataNascimento: string;
   saldoCredito?: number;
+  totalCompras?: number;
+  totalGasto?: number;
+  ultimaCompra?: string;
+  detalhesCarregados?: boolean;
   historico: CustomerPurchase[];
   movimentacoesCredito?: CustomerCreditMovement[];
 }

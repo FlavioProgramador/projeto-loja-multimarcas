@@ -11,6 +11,19 @@ import { ReturnsService } from '../services/returns.service';
 
 vi.mock('../lib/supabase/client', () => ({
   isSupabaseConfigured: true,
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: {
+          session: {
+            access_token: 'token-a',
+            user: { id: 'user-a' },
+          },
+        },
+        error: null,
+      }),
+    },
+  },
 }));
 
 vi.mock('../services', () => ({

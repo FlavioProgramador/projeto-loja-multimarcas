@@ -14,7 +14,7 @@ select ok(
   'process_return bloqueia quantidade acima do saldo disponível'
 );
 select ok(
-  position('FOR UPDATE' in pg_get_functiondef('public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text)'::regprocedure)) > 0,
+  position('for update' in lower(pg_get_functiondef('public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text)'::regprocedure))) > 0,
   'process_return mantém locks transacionais'
 );
 

@@ -17,7 +17,7 @@ import {
   SalesService,
 } from '../services';
 import { ReturnsService } from '../services/returns.service';
-import { isSupabaseConfigured } from '../lib/supabase/client';
+import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
 
@@ -75,6 +75,7 @@ export const useStoreData = ({
 }: UseStoreDataParams) => {
   const refreshSequenceRef = useRef(0);
   const inFlightRefreshesRef = useRef(new Map<string, Promise<void>>());
+  const inFlightFullRefreshRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
   useEffect(() => {
     refreshSequenceRef.current += 1;
@@ -183,6 +184,8 @@ export const useStoreData = ({
             'devoluções',
           );
       }
+
+      return Promise.resolve();
     },
     [
       activeStoreId,
@@ -205,7 +208,7 @@ export const useStoreData = ({
     [refreshDomain],
   );
 
-  const refreshData = useCallback(async (): Promise<void> => {
+  const refreshData = useCallback((): Promise<void> => {
     if (
       !isSupabaseConfigured ||
       !isAuthorized ||
@@ -213,19 +216,52 @@ export const useStoreData = ({
       !accessToken ||
       !activeStoreId
     ) {
-      return;
+      return Promise.resolve();
+    }
+
+    const refreshKey = `${userId ?? 'anonymous'}:${activeStoreId}:${accessToken}`;
+    const currentRefresh = inFlightFullRefreshRef.current;
+    if (currentRefresh?.key === refreshKey) {
+      return currentRefresh.promise;
     }
 
     const requestSequence = refreshSequenceRef.current;
+    const operation = (async () => {
+      try {
+        setIsLoading(true);
 
-    try {
-      setIsLoading(true);
-      await refreshDomains(...FULL_REFRESH_DOMAINS);
-    } finally {
-      if (requestSequence === refreshSequenceRef.current) {
-        setIsLoading(false);
+        const {
+          data: { session: verifiedSession },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) throw sessionError;
+        if (!verifiedSession?.access_token || verifiedSession.user.id !== userId) {
+          throw new Error('Sessão autenticada indisponível para carregar os dados da loja.');
+        }
+
+        await refreshDomains(...FULL_REFRESH_DOMAINS);
+      } catch (error) {
+        console.warn(
+          'Sincronização com Supabase falhou; mantendo estado atual.',
+          error,
+        );
+      } finally {
+        if (requestSequence === refreshSequenceRef.current) {
+          setIsLoading(false);
+        }
       }
-    }
+    })();
+
+    inFlightFullRefreshRef.current = { key: refreshKey, promise: operation };
+
+    void operation.finally(() => {
+      if (inFlightFullRefreshRef.current?.promise === operation) {
+        inFlightFullRefreshRef.current = null;
+      }
+    });
+
+    return operation;
   }, [
     accessToken,
     activeStoreId,
@@ -233,6 +269,7 @@ export const useStoreData = ({
     isAuthorized,
     refreshDomains,
     setIsLoading,
+    userId,
   ]);
 
   return { refreshData, refreshDomains };

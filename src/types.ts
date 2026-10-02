@@ -56,6 +56,9 @@ export interface CustomerPurchase {
   data: string;
   itens: string;
   status?: 'CONCLUIDA' | 'DEVOLUCAO';
+  formaPagamento?: string;
+  parcelas?: number;
+  statusPagamento?: string;
 }
 
 export interface CustomerCreditMovement {

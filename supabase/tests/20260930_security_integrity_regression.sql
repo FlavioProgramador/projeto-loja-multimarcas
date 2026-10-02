@@ -77,7 +77,7 @@ BEGIN
 END $$;
 
 
-DO $
+DO $$
 DECLARE
   v_rls boolean;
 BEGIN
@@ -97,9 +97,9 @@ BEGIN
     'authenticated must not read export audit directly';
   ASSERT has_table_privilege('authenticated', 'public.privacy_requests', 'SELECT') = false,
     'authenticated must not read privacy requests directly';
-END $;
+END $$;
 
-DO $
+DO $$
 BEGIN
   ASSERT has_function_privilege('anon', 'public.log_data_export(uuid,text,text,integer,boolean,jsonb)'::regprocedure, 'EXECUTE') = false;
   ASSERT has_function_privilege('anon', 'public.export_customer_personal_data(uuid,uuid)'::regprocedure, 'EXECUTE') = false;
@@ -112,9 +112,9 @@ BEGIN
   ASSERT has_function_privilege('authenticated', 'public.create_privacy_request(uuid,uuid,text,text)'::regprocedure, 'EXECUTE');
   ASSERT has_function_privilege('authenticated', 'public.check_customer_anonymization_eligibility(uuid,uuid)'::regprocedure, 'EXECUTE');
   ASSERT has_function_privilege('authenticated', 'public.resolve_privacy_request(uuid,uuid,text,text)'::regprocedure, 'EXECUTE');
-END $;
+END $$;
 
-DO $
+DO $$
 BEGIN
   ASSERT has_function_privilege('anon', 'public.get_pix_operational_health(integer)'::regprocedure, 'EXECUTE') = false;
   ASSERT has_function_privilege('authenticated', 'public.get_pix_operational_health(integer)'::regprocedure, 'EXECUTE') = false;
@@ -127,9 +127,9 @@ BEGIN
   ASSERT has_function_privilege('anon', 'public.get_slow_query_metrics(integer)'::regprocedure, 'EXECUTE') = false;
   ASSERT has_function_privilege('authenticated', 'public.get_slow_query_metrics(integer)'::regprocedure, 'EXECUTE') = false;
   ASSERT has_function_privilege('service_role', 'public.get_slow_query_metrics(integer)'::regprocedure, 'EXECUTE');
-END $;
+END $$;
 
-DO $
+DO $$
 DECLARE
   v_def text;
 BEGIN
@@ -144,6 +144,6 @@ BEGIN
   v_def := pg_get_functiondef('public.list_stale_pix_reconciliation_candidates(integer)'::regprocedure);
   ASSERT position('MERCADO_PAGO' IN v_def) > 0, 'PIX reconciliation candidates must be provider-scoped';
   ASSERT position('provider_transaction_id' IN v_def) > 0, 'PIX reconciliation candidates must require provider transaction id';
-END $;
+END $$;
 
 ROLLBACK;

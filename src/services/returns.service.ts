@@ -165,10 +165,32 @@ export const ReturnsService = {
       return searchMatch&&typeMatch;
     });
 
+    const {data:creditRows,error:creditError}=await supabase
+      .from('customer_credit_movements')
+      .select('customer_id,type,amount')
+      .eq('store_id',params.storeId);
+    if(creditError) throw creditError;
+
+    const balances=new Map<string,number>();
+    for(const movement of creditRows||[]){
+      const current=balances.get(movement.customer_id)||0;
+      const amount=toNumber(movement.amount);
+      balances.set(
+        movement.customer_id,
+        current+(movement.type==='CREDIT'?amount:-amount),
+      );
+    }
+    const baseSummary=legacySummary(all);
+    const positiveBalances=[...balances.values()].map(value=>Math.max(0,value));
+
     return {
       rows:filtered.slice(offset,offset+pageSize),
       total:filtered.length,
-      summary:legacySummary(all),
+      summary:{
+        ...baseSummary,
+        customerCreditBalance:positiveBalances.reduce((sum,value)=>sum+value,0),
+        customersWithCredit:positiveBalances.filter(value=>value>0).length,
+      },
     };
   },
 

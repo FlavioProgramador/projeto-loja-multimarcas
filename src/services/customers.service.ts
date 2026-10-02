@@ -90,6 +90,12 @@ async function getLegacyAll(storeId: string): Promise<Customer[]> {
         customer_cpf,
         total,
         created_at,
+        payments (
+          method,
+          installments,
+          status,
+          created_at
+        ),
         sale_items (
           product_name,
           quantity
@@ -137,16 +143,29 @@ async function getLegacyAll(storeId: string): Promise<Customer[]> {
       )
     );
 
-    const historico = customerSales.map((sale: any) => ({
-      vendaId: sale.sale_number,
-      uuid: sale.id,
-      valor: toNumber(sale.total),
-      data: (sale.created_at || '').slice(0, 10),
-      status: returnedSaleIds.has(sale.id) ? 'DEVOLUCAO' as const : 'CONCLUIDA' as const,
-      itens: (sale.sale_items || [])
-        .map((item: any) => `${item.product_name} x${item.quantity}`)
-        .join(', ') || 'Venda PDV',
-    }));
+    const historico = customerSales.map((sale: any) => {
+      const payment = [...(sale.payments || [])]
+        .filter((item: any) => item.status !== 'CANCELLED')
+        .sort((a: any, b: any) => {
+          if (a.status === 'APPROVED' && b.status !== 'APPROVED') return -1;
+          if (b.status === 'APPROVED' && a.status !== 'APPROVED') return 1;
+          return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+        })[0];
+
+      return {
+        vendaId: sale.sale_number,
+        uuid: sale.id,
+        valor: toNumber(sale.total),
+        data: (sale.created_at || '').slice(0, 10),
+        status: returnedSaleIds.has(sale.id) ? 'DEVOLUCAO' as const : 'CONCLUIDA' as const,
+        formaPagamento: payment?.method || undefined,
+        parcelas: Math.max(1, toNumber(payment?.installments) || 1),
+        statusPagamento: payment?.status || undefined,
+        itens: (sale.sale_items || [])
+          .map((item: any) => `${item.product_name} x${item.quantity}`)
+          .join(', ') || 'Venda PDV',
+      };
+    });
 
     const customerCredits = creditMovements
       .filter((movement: any) => movement.customer_id === customer.id)
@@ -362,6 +381,9 @@ export const CustomersService = {
         valor: toNumber(sale.total),
         data: (sale.created_at || '').slice(0, 10),
         status: sale.status === 'DEVOLUCAO' ? 'DEVOLUCAO' as const : 'CONCLUIDA' as const,
+        formaPagamento: sale.payment_method || undefined,
+        parcelas: Math.max(1, toNumber(sale.payment_installments) || 1),
+        statusPagamento: sale.payment_status || undefined,
         itens: sale.items || 'Venda PDV',
       }));
       const creditMovements = (payload?.credit_movements || []).map((movement: any, index: number) => ({

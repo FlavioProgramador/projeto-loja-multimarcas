@@ -196,7 +196,7 @@ export const LoginPage: React.FC = () => {
 };
 
 export const AuthBootScreen: React.FC<{ label?: string }> = ({ label = 'Inicializando sessão' }) => (
-  <div className="auth-boot" data-theme="light">
+  <div className="auth-boot">
     <span className="auth-spinner" aria-hidden="true" />
     {label}
   </div>

@@ -70,6 +70,11 @@
   --text-muted: #858585;
 }
 
+[data-theme='dark'] .supplier-search-field input {
+  background: #151515 !important;
+  border-color: #2d2d2d !important;
+}
+
 /* ============================================================================
    LIGHT MODE — force the visual layer over reference-theme.css.
    reference-theme.css intentionally contains !important dark tokens, so the
@@ -563,4 +568,3 @@ body.dark-mode button:disabled {
   outline: 0 !important;
   background: transparent !important;
 }
-

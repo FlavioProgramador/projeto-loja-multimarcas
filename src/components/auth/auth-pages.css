@@ -281,14 +281,14 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: #f6faf8;
-  color: #52625d;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
   font-size: 0.95rem;
 }
 
 .auth-boot .auth-spinner {
-  border-color: #d7e3df;
-  border-top-color: #00674f;
+  border-color: var(--border-color);
+  border-top-color: var(--brand-accent);
 }
 
 @keyframes auth-spin {

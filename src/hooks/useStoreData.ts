@@ -53,10 +53,10 @@ const FULL_REFRESH_DOMAINS: StoreDataDomain[] = [
   'transactions',
   'fixedExpenses',
   'sales',
-  'customers',
   'suppliers',
-  'returns',
 ];
+
+const currentYearStart = () => `${new Date().getFullYear()}-01-01`;
 
 export const useStoreData = ({
   userId,
@@ -144,7 +144,9 @@ export const useStoreData = ({
         case 'transactions':
           return runScopedRefresh(
             domain,
-            () => FinanceService.getTransactions(activeStoreId),
+            () => FinanceService.getTransactions(activeStoreId, {
+              startDate: currentYearStart() + 'T00:00:00.000Z',
+            }),
             setTransactions,
             'financeiro',
           );
@@ -158,7 +160,9 @@ export const useStoreData = ({
         case 'sales':
           return runScopedRefresh(
             domain,
-            () => SalesService.getMovements(activeStoreId),
+            () => SalesService.getMovements(activeStoreId, {
+              startDate: currentYearStart(),
+            }),
             setMovements,
             'vendas do PDV',
           );

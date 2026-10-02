@@ -294,7 +294,7 @@ export const ReturnsView: React.FC = () => {
         <NewReturnModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onSuccess={() => {setPage(1);void load();}}
+          onSuccess={() => { if (page === 1) void load(); else setPage(1); }}
         />
       </div>
 

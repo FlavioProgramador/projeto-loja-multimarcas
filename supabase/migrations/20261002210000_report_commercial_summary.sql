@@ -17,6 +17,7 @@ AS $$
 DECLARE
   v_uid uuid := (SELECT auth.uid());
   v_active boolean;
+  v_role text;
   v_start timestamptz;
   v_end_exclusive timestamptz;
   v_sales_count bigint := 0;
@@ -38,6 +39,11 @@ BEGIN
 
   IF p_store_id IS NULL OR NOT public.has_store_access(p_store_id) THEN
     RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+
+  v_role := public.get_user_store_role(p_store_id);
+  IF v_role IS NULL OR v_role NOT IN ('ADMIN', 'MANAGER') THEN
+    RAISE EXCEPTION 'Permissão negada para relatórios desta loja.';
   END IF;
 
   IF p_start_date IS NULL OR p_end_date IS NULL OR p_start_date > p_end_date THEN

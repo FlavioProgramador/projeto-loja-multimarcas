@@ -597,6 +597,84 @@ BEGIN
 END;
 $$;
 
+-- Reconcile historical sales that already contain a CPF but were not linked by customer_id.
+WITH customer_match AS (
+  SELECT
+    s.id AS sale_id,
+    min(c.id) AS customer_id,
+    count(*) AS matches
+  FROM public.sales s
+  JOIN public.customers c
+    ON c.store_id = s.store_id
+   AND c.is_active = true
+   AND nullif(regexp_replace(coalesce(c.cpf, ''), '\\D', '', 'g'), '') =
+       nullif(regexp_replace(coalesce(s.customer_cpf, ''), '\\D', '', 'g'), '')
+  WHERE s.customer_id IS NULL
+    AND nullif(regexp_replace(coalesce(s.customer_cpf, ''), '\\D', '', 'g'), '') IS NOT NULL
+  GROUP BY s.id
+)
+UPDATE public.sales s
+SET customer_id = cm.customer_id
+FROM customer_match cm
+WHERE s.id = cm.sale_id
+  AND cm.matches = 1
+  AND s.customer_id IS NULL;
+
+-- Keep the relationship correct for every future sale path (PDV, PIX and other RPCs).
+CREATE OR REPLACE FUNCTION public.resolve_sale_customer_link()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $
+DECLARE
+  v_customer_id uuid;
+  v_matches integer := 0;
+  v_cpf text;
+BEGIN
+  IF NEW.customer_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.customers c
+      WHERE c.id = NEW.customer_id
+        AND c.store_id = NEW.store_id
+        AND c.is_active = true
+    ) THEN
+      RAISE EXCEPTION 'Cliente inválido para esta loja.';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  v_cpf := nullif(regexp_replace(coalesce(NEW.customer_cpf, ''), '\\D', '', 'g'), '');
+  IF v_cpf IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT min(c.id), count(*)
+    INTO v_customer_id, v_matches
+  FROM public.customers c
+  WHERE c.store_id = NEW.store_id
+    AND c.is_active = true
+    AND nullif(regexp_replace(coalesce(c.cpf, ''), '\\D', '', 'g'), '') = v_cpf;
+
+  IF v_matches = 1 THEN
+    NEW.customer_id := v_customer_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS trg_resolve_sale_customer_link ON public.sales;
+CREATE TRIGGER trg_resolve_sale_customer_link
+BEFORE INSERT OR UPDATE OF customer_id, customer_cpf, store_id
+ON public.sales
+FOR EACH ROW
+EXECUTE FUNCTION public.resolve_sale_customer_link();
+
+REVOKE ALL ON FUNCTION public.resolve_sale_customer_link() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_sale_customer_link() TO service_role;
+
 REVOKE ALL ON FUNCTION public.get_customer_directory_page(uuid,text,text,text,integer,integer)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_customer_directory_page(uuid,text,text,text,integer,integer)

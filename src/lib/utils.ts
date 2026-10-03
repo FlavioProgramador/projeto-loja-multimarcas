@@ -78,3 +78,24 @@ export function downloadCSV(filename: string, content: string) {
   link.download = filename;
   link.click();
 }
+
+export function formatDiscountSummary(
+  discountValue?: number | string | null,
+  discountPercent?: number | string | null,
+  subtotal: number = 0
+): string {
+  const numVal = Math.max(0, parseFloat(String(discountValue ?? 0)) || 0);
+  const numPerc = Math.max(0, parseFloat(String(discountPercent ?? 0)) || 0);
+
+  if (numVal <= 0 && numPerc <= 0) return '';
+
+  const parts: string[] = [];
+  if (numVal > 0) {
+    parts.push(formatMoeda(numVal));
+  }
+  if (numPerc > 0) {
+    const percVal = Math.max(0, subtotal) * (numPerc / 100);
+    parts.push(`${numPerc}% (${formatMoeda(percVal)})`);
+  }
+  return parts.join(' + ');
+}

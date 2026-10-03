@@ -445,6 +445,9 @@ export const CustomersService = {
     dataNascimento?: string;
   }, storeId?: string): Promise<any> {
     if (!isSupabaseConfigured) return null;
+    if (!storeId) {
+      throw new Error('store_id é obrigatório para cadastrar cliente no Supabase.');
+    }
 
     const { data, error } = await supabase
       .from('customers')

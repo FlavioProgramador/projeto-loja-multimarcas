@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
-import { formatMoeda, formatCpf } from '../../lib/utils';
+import { formatMoeda, formatCpf, formatDiscountSummary } from '../../lib/utils';
 import { CheckoutModal } from './CheckoutModal';
 import { ReceiptPrinter } from './ReceiptPrinter';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -22,9 +22,6 @@ export const PdvView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedColecao, setSelectedColecao] = useState('');
-  const [selectedEstacao, setSelectedEstacao] = useState('');
-  const [selectedGenero, setSelectedGenero] = useState('');
   const [skuSelections, setSkuSelections] = useState<Record<number, number>>({});
 
   // Checkout inputs
@@ -72,12 +69,9 @@ export const PdvView: React.FC = () => {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = p.nome.toLowerCase().includes(searchLower) || p.marca.toLowerCase().includes(searchLower);
       const matchesCat = selectedCategory === '' || selectedCategory === 'Todos' || p.categoria === selectedCategory;
-      const matchesCol = selectedColecao === '' || selectedColecao === 'Todas' || p.colecao === selectedColecao;
-      const matchesEst = selectedEstacao === '' || selectedEstacao === 'Todas' || p.estacao === selectedEstacao;
-      const matchesGen = selectedGenero === '' || selectedGenero === 'Todos' || p.genero === selectedGenero;
-      return matchesSearch && matchesCat && matchesCol && matchesEst && matchesGen;
+      return matchesSearch && matchesCat;
     });
-  }, [products, searchTerm, selectedCategory, selectedColecao, selectedEstacao, selectedGenero]);
+  }, [products, searchTerm, selectedCategory]);
 
   useEffect(() => {
     const term = customerSearchTerm.trim();
@@ -133,6 +127,9 @@ export const PdvView: React.FC = () => {
   const numDescVal = parseFloat(discountValue) || 0;
   const numDescPerc = parseFloat(discountPercent) || 0;
   const discountTotal = numDescVal + subtotal * (numDescPerc / 100);
+  const discountSummary = useMemo(() => {
+    return formatDiscountSummary(numDescVal, numDescPerc, subtotal);
+  }, [numDescVal, numDescPerc, subtotal]);
   const maxCreditApplicable = Math.min(availableCredit, Math.max(0, subtotal - discountTotal));
   const creditUsed = useCustomerCredit ? maxCreditApplicable : 0;
   const calculatedTotal = Math.max(0, subtotal - discountTotal - creditUsed);
@@ -232,7 +229,7 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = useCallback(async () => {
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -336,7 +333,11 @@ export const PdvView: React.FC = () => {
     } else {
       showBanner(`⚠️ ${result.message}`);
     }
-  };
+  }, [
+    paymentMethod, activeStoreId, pixIdempotencyKey, cart, buyerName, cpf,
+    numDescVal, matchedCustomer, numDescPerc, processSale, installments,
+    creditUsed, calculatedTotal, amountPaid, clearCart
+  ]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {
@@ -702,7 +703,7 @@ export const PdvView: React.FC = () => {
         </div>
 
         {/* Modais */}
-        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={""} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
+        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={discountSummary} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
         <NewReturnModal isOpen={isReturnModalOpen} onClose={() => setIsReturnModalOpen(false)} />
 
         {/* Modal Customizado de Confirmação para Limpar o Carrinho */}

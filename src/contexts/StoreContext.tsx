@@ -111,7 +111,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const customersDomain = useCustomersDomain(customers, setCustomers, activeStoreId);
   const productsDomain = useProductsDomain({ products, setProducts, activeStoreId, refreshDomains, isSupabaseConfigured });
-  const suppliersDomain = useSuppliersDomain(suppliers, setSuppliers, refreshDomains);
+  const suppliersDomain = useSuppliersDomain(suppliers, setSuppliers, refreshDomains, activeStoreId);
   const financeDomain = useFinanceDomain(fixedExpenses, setFixedExpenses);
   const inventoryDomain = useInventoryDomain({ products, transactions, setProducts, setTransactions, activeStoreId, refreshDomains, isSupabaseConfigured });
   const alertsDomain = useInventoryAlerts({ products, fixedExpenses, setNotifications });

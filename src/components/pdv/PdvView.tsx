@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -11,6 +11,7 @@ import { NewCustomerModal } from '../customers/NewCustomerModal';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { generateIdempotencyKey } from '../../lib/idempotency';
 import { CustomersService } from '../../services/customers.service';
+import { filterProducts, findMatchingSkuIndex } from './pdvUtils';
 import type { Customer } from '../../types';
 
 export const PdvView: React.FC = () => {
@@ -22,9 +23,6 @@ export const PdvView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedColecao, setSelectedColecao] = useState('');
-  const [selectedEstacao, setSelectedEstacao] = useState('');
-  const [selectedGenero, setSelectedGenero] = useState('');
   const [skuSelections, setSkuSelections] = useState<Record<number, number>>({});
 
   // Checkout inputs
@@ -68,16 +66,8 @@ export const PdvView: React.FC = () => {
     [products]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = p.nome.toLowerCase().includes(searchLower) || p.marca.toLowerCase().includes(searchLower);
-      const matchesCat = selectedCategory === '' || selectedCategory === 'Todos' || p.categoria === selectedCategory;
-      const matchesCol = selectedColecao === '' || selectedColecao === 'Todas' || p.colecao === selectedColecao;
-      const matchesEst = selectedEstacao === '' || selectedEstacao === 'Todas' || p.estacao === selectedEstacao;
-      const matchesGen = selectedGenero === '' || selectedGenero === 'Todos' || p.genero === selectedGenero;
-      return matchesSearch && matchesCat && matchesCol && matchesEst && matchesGen;
-    });
-  }, [products, searchTerm, selectedCategory, selectedColecao, selectedEstacao, selectedGenero]);
+    return filterProducts(products, searchTerm, selectedCategory);
+  }, [products, searchTerm, selectedCategory]);
 
   useEffect(() => {
     const term = customerSearchTerm.trim();
@@ -165,7 +155,8 @@ export const PdvView: React.FC = () => {
   const handleAddToCart = (productId: number) => {
     const prod = products.find(p => p.id === productId);
     if (!prod) return;
-    const skuIndex = skuSelections[productId] !== undefined ? skuSelections[productId] : 0;
+    const explicitSelection = skuSelections[productId];
+    const skuIndex = findMatchingSkuIndex(prod, searchTerm, explicitSelection);
     const result = addItem(prod, skuIndex);
     if (!result.success) {
       showBanner(`⚠️ ${result.message || 'Estoque insuficiente.'}`);
@@ -232,7 +223,7 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = useCallback(async () => {
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -336,7 +327,23 @@ export const PdvView: React.FC = () => {
     } else {
       showBanner(`⚠️ ${result.message}`);
     }
-  };
+  }, [
+    paymentMethod,
+    activeStoreId,
+    pixIdempotencyKey,
+    cart,
+    buyerName,
+    cpf,
+    numDescVal,
+    matchedCustomer,
+    numDescPerc,
+    processSale,
+    installments,
+    creditUsed,
+    calculatedTotal,
+    amountPaid,
+    clearCart
+  ]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {
@@ -470,7 +477,8 @@ export const PdvView: React.FC = () => {
                     </tr>
                   ) : (
                     filteredProducts.map(p => {
-                      const currentSkuIdx = skuSelections[p.id] || 0;
+                      const explicitSelection = skuSelections[p.id];
+                      const currentSkuIdx = findMatchingSkuIndex(p, searchTerm, explicitSelection);
                       const selectedSku = p.skus[currentSkuIdx] || p.skus[0];
                       const currentSkuStock = selectedSku?.qtd || 0;
 

@@ -252,4 +252,13 @@ Novos documentos:
 
 ---
 
-**Última atualização:** 28/08/2026 — Auditoria consolidada concluída
+## 📅 HISTÓRICO DE AUDITORIAS TÉCNICAS RECENTES
+
+- **`AUDITORIA_TECNICA_2026-10-03.md`** ⭐ (ÚLTIMA AUDITORIA DIÁRIA)
+  - **Data:** 03 de Outubro de 2026
+  - **Foco:** Auditoria técnica diária de segurança, isolamento multi-tenant, funções `SECURITY DEFINER`/RLS, desempenho do banco de dados e qualidade do código frontend.
+  - **Destaques:** Identificação do achado crítico SEC-01 (mutações sem filtro de store_id em clientes/despesas/fornecedores no frontend) e achados de alta severidade BUG-01 (papel CASHIER bloqueado em devoluções paginadas) e PERF-01 (recalculo triplo de agregações na RPC de clientes).
+
+---
+
+**Última atualização:** 03/10/2026 — Auditoria diária CoreSys realizada

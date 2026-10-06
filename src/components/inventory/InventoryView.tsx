@@ -419,7 +419,14 @@ export const InventoryView: React.FC = () => {
         </div>
       </section>
 
-      <NewProductModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} />
+      <NewProductModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onSuccess={message => {
+          setNotice(message);
+          window.setTimeout(() => setNotice(null), 3500);
+        }}
+      />
       <StockEntryModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} />
       <EditProductModal
         isOpen={!!editingProduct}

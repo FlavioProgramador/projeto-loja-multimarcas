@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, CreditCard, Filter, Inbox, RefreshCw, Search, Wallet, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, CreditCard, Inbox, RefreshCw, Search, Wallet, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { FinanceService, FinanceFixedExpense, FinanceTransaction, type FinanceSummary } from '../../services/finance.service';
 import './finance.css';

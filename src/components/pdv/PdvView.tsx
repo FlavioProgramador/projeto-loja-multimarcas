@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -12,6 +12,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { generateIdempotencyKey } from '../../lib/idempotency';
 import { CustomersService } from '../../services/customers.service';
 import type { Customer } from '../../types';
+import { validateCashPayment } from './pdv-validation';
 
 export const PdvView: React.FC = () => {
   const { products, customers, processSale, activeStoreId } = useStore();
@@ -22,9 +23,6 @@ export const PdvView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedColecao, setSelectedColecao] = useState('');
-  const [selectedEstacao, setSelectedEstacao] = useState('');
-  const [selectedGenero, setSelectedGenero] = useState('');
   const [skuSelections, setSkuSelections] = useState<Record<number, number>>({});
 
   // Checkout inputs
@@ -72,12 +70,9 @@ export const PdvView: React.FC = () => {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = p.nome.toLowerCase().includes(searchLower) || p.marca.toLowerCase().includes(searchLower);
       const matchesCat = selectedCategory === '' || selectedCategory === 'Todos' || p.categoria === selectedCategory;
-      const matchesCol = selectedColecao === '' || selectedColecao === 'Todas' || p.colecao === selectedColecao;
-      const matchesEst = selectedEstacao === '' || selectedEstacao === 'Todas' || p.estacao === selectedEstacao;
-      const matchesGen = selectedGenero === '' || selectedGenero === 'Todos' || p.genero === selectedGenero;
-      return matchesSearch && matchesCat && matchesCol && matchesEst && matchesGen;
+      return matchesSearch && matchesCat;
     });
-  }, [products, searchTerm, selectedCategory, selectedColecao, selectedEstacao, selectedGenero]);
+  }, [products, searchTerm, selectedCategory]);
 
   useEffect(() => {
     const term = customerSearchTerm.trim();
@@ -232,7 +227,13 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = useCallback(async () => {
+    const cashValidation = validateCashPayment(paymentMethod, amountPaid, calculatedTotal);
+    if (!cashValidation.isValid) {
+      showBanner(cashValidation.message || '⚠️ Valor recebido em dinheiro inválido.');
+      return;
+    }
+
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -319,8 +320,8 @@ export const PdvView: React.FC = () => {
         cartItems: [...cart],
         totalFinal: calculatedTotal,
         paymentMethod,
-        amountPaid: parseFloat(amountPaid) || 0,
-        change: Math.max(0, (parseFloat(amountPaid) || 0) - calculatedTotal),
+        amountPaid: parseFloat(amountPaid) || calculatedTotal,
+        change: Math.max(0, (parseFloat(amountPaid) || calculatedTotal) - calculatedTotal),
         buyerName: buyerName.trim() || 'Consumidor Final',
         cpf: cpf.trim() || ''
       };
@@ -330,13 +331,30 @@ export const PdvView: React.FC = () => {
       handleClearCustomer();
       setDiscountValue('');
       setDiscountPercent('');
+      setAmountPaid('');
       showBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
 
       setTimeout(() => window.print(), 300);
     } else {
       showBanner(`⚠️ ${result.message}`);
     }
-  };
+  }, [
+    paymentMethod,
+    amountPaid,
+    calculatedTotal,
+    activeStoreId,
+    pixIdempotencyKey,
+    cart,
+    buyerName,
+    cpf,
+    numDescVal,
+    matchedCustomer?.uuid,
+    numDescPerc,
+    processSale,
+    installments,
+    creditUsed,
+    clearCart
+  ]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {

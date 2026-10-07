@@ -3,6 +3,7 @@ import { ShoppingCart, Check, ShieldCheck, CreditCard, User } from 'lucide-react
 import { Modal } from '../ui/Modal';
 import { CartItem } from '../../types';
 import { formatMoeda, formatCpf } from '../../lib/utils';
+import { validateCashPayment } from './pdv-validation';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -42,6 +43,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const amountNum = parseFloat(amountPaid) || 0;
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
+  const cashValidation = validateCashPayment(paymentMethod, amountPaid, totalFinal);
+  const isCashInsufficient = !cashValidation.isValid;
 
   return (
     <Modal
@@ -186,7 +189,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+            <button
+              className="btn"
+              onClick={onConfirm}
+              style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isCashInsufficient ? 0.6 : 1 }}
+              disabled={isGeneratingPix || isCashInsufficient}
+              title={isCashInsufficient ? 'Valor recebido em dinheiro é menor que o total' : undefined}
+            >
               <Check size={16} />
               <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
               <kbd className="kbd-key-primary">F4</kbd>

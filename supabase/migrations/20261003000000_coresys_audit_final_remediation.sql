@@ -37,7 +37,6 @@ DECLARE
   v_store_active boolean := false;
   v_role text;
   v_sale_id uuid;
-  v_scoped_key text;
   v_sale_number text;
   v_subtotal numeric(12,2) := 0;
   v_discount numeric(12,2) := 0;
@@ -47,15 +46,11 @@ DECLARE
   v_item record;
   v_inv record;
 BEGIN
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Autenticação obrigatória.';
-  END IF;
-
   SELECT p.is_active INTO v_profile_active
   FROM public.profiles p
   WHERE p.id = v_user_id;
 
-  IF COALESCE(v_profile_active, false) = false THEN
+  IF v_user_id IS NULL OR COALESCE(v_profile_active, false) = false THEN
     RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
   END IF;
 
@@ -76,8 +71,8 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada para vender nesta loja.';
   END IF;
 
-  IF p_idempotency_key IS NULL OR btrim(p_idempotency_key) = '' OR length(btrim(p_idempotency_key)) > 200 THEN
-    RAISE EXCEPTION 'Chave de idempotência obrigatória e inválida.';
+  IF NULLIF(btrim(p_idempotency_key), '') IS NULL OR length(btrim(p_idempotency_key)) > 200 THEN
+    RAISE EXCEPTION 'Chave de idempotência obrigatória.';
   END IF;
 
   IF jsonb_typeof(COALESCE(p_items, '[]'::jsonb)) <> 'array'
@@ -95,12 +90,13 @@ BEGIN
     RAISE EXCEPTION 'Desconto inválido.';
   END IF;
 
-  v_scoped_key := v_user_id::text || ':' || p_store_id::text || ':' || btrim(p_idempotency_key);
-  PERFORM pg_advisory_xact_lock(hashtextextended(v_scoped_key, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text || ':' || p_store_id::text || ':' || btrim(p_idempotency_key), 0));
 
   SELECT si.sale_id INTO v_sale_id
   FROM public.sale_idempotency si
-  WHERE si.idempotency_key = v_scoped_key
+  WHERE si.idempotency_key = btrim(p_idempotency_key)
+    AND si.store_id = p_store_id
+    AND si.user_id = v_user_id
   FOR SHARE;
 
   IF v_sale_id IS NOT NULL THEN
@@ -197,8 +193,8 @@ BEGIN
   )
   RETURNING id INTO v_sale_id;
 
-  INSERT INTO public.sale_idempotency(idempotency_key, sale_id)
-  VALUES(v_scoped_key, v_sale_id);
+  INSERT INTO public.sale_idempotency(idempotency_key, sale_id, store_id, user_id)
+  VALUES(btrim(p_idempotency_key), v_sale_id, p_store_id, v_user_id);
 
   FOR v_item IN
     SELECT x.variant_id, sum(x.quantity)::integer quantity
@@ -291,7 +287,6 @@ DECLARE
   v_store_active boolean := false;
   v_role text;
   v_sale_id uuid;
-  v_scoped_key text;
   v_sale_number text;
   v_subtotal numeric(12,2) := 0;
   v_discount numeric(12,2) := 0;
@@ -300,15 +295,11 @@ DECLARE
   v_item record;
   v_inv record;
 BEGIN
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Autenticação obrigatória.';
-  END IF;
-
   SELECT p.is_active INTO v_profile_active
   FROM public.profiles p
   WHERE p.id = v_user_id;
 
-  IF COALESCE(v_profile_active, false) = false THEN
+  IF v_user_id IS NULL OR COALESCE(v_profile_active, false) = false THEN
     RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
   END IF;
 
@@ -329,8 +320,8 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada para criar venda PIX nesta loja.';
   END IF;
 
-  IF p_idempotency_key IS NULL OR btrim(p_idempotency_key) = '' OR length(btrim(p_idempotency_key)) > 200 THEN
-    RAISE EXCEPTION 'Chave de idempotência obrigatória e inválida.';
+  IF NULLIF(btrim(p_idempotency_key), '') IS NULL OR length(btrim(p_idempotency_key)) > 200 THEN
+    RAISE EXCEPTION 'Chave de idempotência obrigatória.';
   END IF;
 
   IF jsonb_typeof(COALESCE(p_items, '[]'::jsonb)) <> 'array'
@@ -344,12 +335,13 @@ BEGIN
     RAISE EXCEPTION 'Desconto inválido.';
   END IF;
 
-  v_scoped_key := v_user_id::text || ':' || p_store_id::text || ':' || btrim(p_idempotency_key);
-  PERFORM pg_advisory_xact_lock(hashtextextended(v_scoped_key, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text || ':' || p_store_id::text || ':' || btrim(p_idempotency_key), 0));
 
   SELECT si.sale_id INTO v_sale_id
   FROM public.sale_idempotency si
-  WHERE si.idempotency_key = v_scoped_key
+  WHERE si.idempotency_key = btrim(p_idempotency_key)
+    AND si.store_id = p_store_id
+    AND si.user_id = v_user_id
   FOR SHARE;
 
   IF v_sale_id IS NOT NULL THEN
@@ -427,8 +419,8 @@ BEGIN
   )
   RETURNING id INTO v_sale_id;
 
-  INSERT INTO public.sale_idempotency(idempotency_key, sale_id)
-  VALUES(v_scoped_key, v_sale_id);
+  INSERT INTO public.sale_idempotency(idempotency_key, sale_id, store_id, user_id)
+  VALUES(btrim(p_idempotency_key), v_sale_id, p_store_id, v_user_id);
 
   FOR v_item IN
     SELECT x.variant_id, sum(x.quantity)::integer quantity
@@ -465,7 +457,7 @@ BEGIN
     WHERE si.store_id = p_store_id AND si.product_variant_id = v_item.variant_id;
 
     UPDATE public.product_variants pv
-    SET reserved_quantity = pv.reserved_quantity + v_item.quantity,
+    SET reserved_quantity = COALESCE(reserved_quantity, 0) + v_item.quantity,
         stock_quantity = (SELECT COALESCE(sum(si.quantity), 0)
                         FROM public.store_inventory si
                         WHERE si.product_variant_id = pv.id)
@@ -499,7 +491,7 @@ DECLARE
   v_before integer;
 BEGIN
   IF v_user IS NULL THEN
-    RAISE EXCEPTION 'Autenticação obrigatória.';
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
   END IF;
 
   SELECT is_active INTO v_profile_active FROM public.profiles WHERE id = v_user;

@@ -92,11 +92,9 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text || ':' || p_store_id::text || ':' || btrim(p_idempotency_key), 0));
 
-  SELECT si.sale_id INTO v_sale_id
-  FROM public.sale_idempotency si
-  WHERE si.idempotency_key = btrim(p_idempotency_key)
-    AND si.store_id = p_store_id
-    AND si.user_id = v_user_id
+  SELECT sale_id INTO v_sale_id
+  FROM public.sale_idempotency
+  WHERE idempotency_key=btrim(p_idempotency_key) AND store_id=p_store_id AND user_id=v_user_id
   FOR SHARE;
 
   IF v_sale_id IS NOT NULL THEN
@@ -337,11 +335,9 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text || ':' || p_store_id::text || ':' || btrim(p_idempotency_key), 0));
 
-  SELECT si.sale_id INTO v_sale_id
-  FROM public.sale_idempotency si
-  WHERE si.idempotency_key = btrim(p_idempotency_key)
-    AND si.store_id = p_store_id
-    AND si.user_id = v_user_id
+  SELECT sale_id INTO v_sale_id
+  FROM public.sale_idempotency
+  WHERE idempotency_key=btrim(p_idempotency_key) AND store_id=p_store_id AND user_id=v_user_id
   FOR SHARE;
 
   IF v_sale_id IS NOT NULL THEN

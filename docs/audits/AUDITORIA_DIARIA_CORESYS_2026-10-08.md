@@ -14,7 +14,7 @@ Esta auditoria diária avaliou a integridade do código-fonte frontend e backend
 | **Isolamento Multi-Tenant & RLS** | ⚠️ Atenção (Falta de escopo de `store_id` em mutações diretas do frontend) |
 | **Integridade de Dados & RPCs** | ✅ Bom (RPCs consolidadas para PDV, Vendas e Inventário) |
 | **Segurança do Backend (Supabase)** | ✅ Bom (Defesa em profundidade com `search_path`, RPCs restritas) |
-| **Segurança de Dependências** | ⚠️ 2 vulnerabilidades conhecidas (`proxy-addr`, `source-map-js`) |
+| **Segurança de Dependências** | ✅ Resolvido (`0 vulnerabilities` após `npm audit fix`) |
 | **Qualidade de Código & Frontend** | ⚠️ 27 avisos de ESLint (variáveis não utilizadas e hooks sem dependências) |
 
 ---
@@ -47,14 +47,10 @@ Esta auditoria diária avaliou a integridade do código-fonte frontend e backend
 
 ---
 
-### 3. 🟡 [MÉDIO] Vulnerabilidades de Segurança em Dependências NPM (`npm audit`)
-- **Descrição:** A auditoria automatizada de segurança de dependências (`npm run security:dependencies`) identificou 2 vulnerabilidades na árvore de pacotes:
-  1. **Critica:** `proxy-addr` (1.1.0 - 2.0.7) — Vulnerável a IP spoofing via sub-rede IPv4-mapped IPv6 confiável (GHSA-jqcg-44mw-7w3h).
-  2. **Alta:** `source-map-js` (1.0.0 - 1.2.1) — Permite Negação de Serviço (DoS) do event-loop por meio de offsets em mapas de origem indexados (GHSA-68fv-2mgg-jv7q).
-- **Arquivos Afetados:**
-  - `package-lock.json`
-- **Sugestão de Correção:**
-  Executar `npm audit fix` ou atualizar as dependências transitivas envolvidas para garantir que versões corrigidas sejam instaladas em produção.
+### 3. ✅ [MÉDIO - RESOLVIDO] Vulnerabilidades de Segurança em Dependências NPM (`npm audit`)
+- **Status:** Correção aplicada via `npm audit fix` no arquivo `package-lock.json`.
+- **Descrição Anterior:** Identificadas 2 vulnerabilidades em dependências transitivas (`proxy-addr` e `source-map-js`).
+- **Resolução:** Dependências atualizadas e auditadas via `npm run security:dependencies` resultando em **0 vulnerabilidades**.
 
 ---
 
@@ -81,6 +77,7 @@ Esta auditoria diária avaliou a integridade do código-fonte frontend e backend
 ## 📈 VERIFICAÇÃO DE TESTES E INTEGRIDADE DA APLICAÇÃO
 
 Foram executadas as suítes de verificação do projeto:
+- **Segurança de Dependências (`npm run security:dependencies`):** ✅ 0 vulnerabilidades encontradas.
 - **TypeScript Typecheck (`npm run typecheck`):** ✅ 0 erros de compilação.
 - **Testes Unitários Vitest (`npm test`):** ✅ 11 arquivos de teste e 39 testes executados com **100% de aprovação**.
 
@@ -89,5 +86,4 @@ Foram executadas as suítes de verificação do projeto:
 ## 📋 RECOMENDAÇÕES DE PRÓXIMOS PASSOS (Sprints Futuras)
 
 1. **Sprint de Hardening Tenant (P1):** Atualizar `customers.service.ts`, `products.service.ts`, `suppliers.service.ts` e `finance.service.ts` para que todas as chamadas de mutação `.update()` exijam obrigatoriamente `store_id`.
-2. **Atualização de Pacotes (P1):** Aplicar correção de dependências `npm audit fix` para sanar os alertas de `proxy-addr` e `source-map-js`.
-3. **Limpeza do Frontend (P2):** Eliminar os 27 avisos do ESLint para garantir maior estabilidade dos hooks React e otimizar o bundle final.
+2. **Limpeza do Frontend (P2):** Eliminar os 27 avisos do ESLint para garantir maior estabilidade dos hooks React e otimizar o bundle final.

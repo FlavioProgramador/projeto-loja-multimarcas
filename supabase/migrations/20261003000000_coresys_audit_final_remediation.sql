@@ -114,8 +114,14 @@ BEGIN
   END IF;
 
   IF v_customer_id IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM public.customers c WHERE c.id = v_customer_id AND c.is_active = true) THEN
-    RAISE EXCEPTION 'Cliente inválido ou inativo.';
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.customers c
+       WHERE c.id = v_customer_id
+         AND c.store_id = p_store_id
+         AND c.is_active = true
+     ) THEN
+    RAISE EXCEPTION 'Cliente inválido, inativo ou não pertence à loja informada.';
   END IF;
 
   v_method := CASE
@@ -357,8 +363,14 @@ BEGIN
   END IF;
 
   IF v_customer_id IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM public.customers c WHERE c.id = v_customer_id AND c.is_active = true) THEN
-    RAISE EXCEPTION 'Cliente inválido ou inativo.';
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.customers c
+       WHERE c.id = v_customer_id
+         AND c.store_id = p_store_id
+         AND c.is_active = true
+     ) THEN
+    RAISE EXCEPTION 'Cliente inválido, inativo ou não pertence à loja informada.';
   END IF;
 
   FOR v_item IN
@@ -546,9 +558,13 @@ BEGIN
       'SALE', p_sale_id, v_user, 'Cancelamento da venda', 'Cancelamento'
     );
 
-    UPDATE public.product_variants
-    SET stock_quantity = (SELECT COALESCE(sum(si.quantity), 0) FROM public.store_inventory si WHERE si.product_variant_id = id)
-    WHERE id = v_item.product_variant_id;
+    UPDATE public.product_variants pv
+    SET stock_quantity = (
+      SELECT COALESCE(sum(si.quantity), 0)
+      FROM public.store_inventory si
+      WHERE si.product_variant_id = pv.id
+    )
+    WHERE pv.id = v_item.product_variant_id;
   END LOOP;
 
   UPDATE public.sales SET status = 'CANCELLED', completed_at = NULL WHERE id = p_sale_id;

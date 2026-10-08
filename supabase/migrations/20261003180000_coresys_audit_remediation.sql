@@ -49,15 +49,11 @@ DECLARE
   v_item record;
   v_inv record;
 BEGIN
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Autenticação obrigatória.';
-  END IF;
-
   SELECT p.is_active INTO v_profile_active
   FROM public.profiles p
   WHERE p.id = v_user_id;
 
-  IF COALESCE(v_profile_active, false) = false THEN
+  IF v_user_id IS NULL OR COALESCE(v_profile_active, false) = false THEN
     RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
   END IF;
 
@@ -102,7 +98,7 @@ BEGIN
 
   SELECT si.sale_id INTO v_sale_id
   FROM public.sale_idempotency si
-  WHERE si.idempotency_key = v_scoped_key
+  WHERE si.idempotency_key = btrim(p_idempotency_key) AND si.store_id = p_store_id AND si.user_id = v_user_id
   FOR SHARE;
 
   IF v_sale_id IS NOT NULL THEN
@@ -206,7 +202,7 @@ BEGIN
   RETURNING id INTO v_sale_id;
 
   INSERT INTO public.sale_idempotency(idempotency_key, sale_id, store_id, user_id)
-  VALUES(v_scoped_key, v_sale_id, p_store_id, v_user_id);
+  VALUES(btrim(p_idempotency_key), v_sale_id, p_store_id, v_user_id);
 
   FOR v_item IN
     SELECT x.variant_id, sum(x.quantity)::integer quantity
@@ -308,15 +304,11 @@ DECLARE
   v_item record;
   v_inv record;
 BEGIN
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Autenticação obrigatória.';
-  END IF;
-
   SELECT p.is_active INTO v_profile_active
   FROM public.profiles p
   WHERE p.id = v_user_id;
 
-  IF COALESCE(v_profile_active, false) = false THEN
+  IF v_user_id IS NULL OR COALESCE(v_profile_active, false) = false THEN
     RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
   END IF;
 
@@ -357,7 +349,7 @@ BEGIN
 
   SELECT si.sale_id INTO v_sale_id
   FROM public.sale_idempotency si
-  WHERE si.idempotency_key = v_scoped_key
+  WHERE si.idempotency_key = btrim(p_idempotency_key) AND si.store_id = p_store_id AND si.user_id = v_user_id
   FOR SHARE;
 
   IF v_sale_id IS NOT NULL THEN
@@ -442,7 +434,7 @@ BEGIN
   RETURNING id INTO v_sale_id;
 
   INSERT INTO public.sale_idempotency(idempotency_key, sale_id, store_id, user_id)
-  VALUES(v_scoped_key, v_sale_id, p_store_id, v_user_id);
+  VALUES(btrim(p_idempotency_key), v_sale_id, p_store_id, v_user_id);
 
   FOR v_item IN
     SELECT x.variant_id, sum(x.quantity)::integer quantity

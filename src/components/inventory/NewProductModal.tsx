@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Plus, X, Boxes } from 'lucide-react';
+import { Plus, X, Boxes } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 import { ProductSku } from '../../types';

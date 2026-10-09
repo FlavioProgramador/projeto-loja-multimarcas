@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   DollarSign, ShoppingBag, TrendingUp, AlertTriangle,
-  ArrowRight, Plus, Calendar, Trophy, CreditCard,
+  ArrowRight, Plus, Calendar, Trophy,
   Package, Hash
 } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
@@ -11,7 +11,6 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { RevenueChart } from './RevenueChart';
 import { TopProductsChart } from './TopProductsChart';
 import { useTheme } from '../../contexts/ThemeContext';
-import { formatPaymentMethod } from '../../lib/display-labels';
 
 const CHART_COLORS_DARK = ['#73E6CB', '#3EBB9E', '#7CC7B5', '#D8A85E', '#7EB6E6', '#D98282', '#A99BE8'];
 const CHART_COLORS_LIGHT = ['#00674F', '#159A7A', '#2B7A6A', '#B07D19', '#3D79A8', '#A94D4D', '#6B5AA6'];

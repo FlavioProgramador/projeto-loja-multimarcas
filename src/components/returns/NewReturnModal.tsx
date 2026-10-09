@@ -5,10 +5,7 @@ import {
   Plus,
   Trash2,
   Check,
-  AlertCircle,
   ShoppingBag,
-  User,
-  CreditCard,
   Printer
 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -60,7 +57,7 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
   const [selectedProductIdx, setSelectedProductIdx] = useState<number>(0);
   const [selectedSkuIdx, setSelectedSkuIdx] = useState<number>(0);
   const [customQty, setCustomQty] = useState<number>(1);
-  const [customReason, setCustomReason] = useState<ReturnReason>('Tamanho Incorreto');
+  const [customReason] = useState<ReturnReason>('Tamanho Incorreto');
 
   // Success print state
   const [completedReturn, setCompletedReturn] = useState<ReturnRecord | null>(null);

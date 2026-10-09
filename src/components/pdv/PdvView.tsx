@@ -22,9 +22,9 @@ export const PdvView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedColecao, setSelectedColecao] = useState('');
-  const [selectedEstacao, setSelectedEstacao] = useState('');
-  const [selectedGenero, setSelectedGenero] = useState('');
+  const selectedColecao = '';
+  const selectedEstacao = '';
+  const selectedGenero = '';
   const [skuSelections, setSkuSelections] = useState<Record<number, number>>({});
 
   // Checkout inputs
@@ -232,7 +232,7 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = React.useCallback(async () => {
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -336,7 +336,7 @@ export const PdvView: React.FC = () => {
     } else {
       showBanner(`⚠️ ${result.message}`);
     }
-  };
+  }, [activeStoreId, amountPaid, buyerName, calculatedTotal, cart, cpf, creditUsed, matchedCustomer?.uuid, numDescPerc, numDescVal, paymentMethod, installments, pixIdempotencyKey, processSale, clearCart]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {

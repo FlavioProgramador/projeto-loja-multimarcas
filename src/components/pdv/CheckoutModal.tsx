@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShoppingCart, Check, ShieldCheck, CreditCard, User } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { ShoppingCart, Check, ShieldCheck, CreditCard, User, Banknote } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { CartItem } from '../../types';
 import { formatMoeda, formatCpf } from '../../lib/utils';
@@ -40,8 +40,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   qrCodeBase64,
   isGeneratingPix
 }) => {
+  const cashInputRef = useRef<HTMLInputElement>(null);
   const amountNum = parseFloat(amountPaid) || 0;
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
+
+  useEffect(() => {
+    if (isOpen && paymentMethod === 'Dinheiro') {
+      const timer = setTimeout(() => {
+        cashInputRef.current?.focus();
+        cashInputRef.current?.select();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, paymentMethod]);
+
+  const cashPresets = [20, 50, 100, 200];
 
   return (
     <Modal
@@ -132,25 +145,63 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         {/* Calculadora de troco (somente dinheiro) */}
         {paymentMethod === 'Dinheiro' && (
-          <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Valor Recebido (R$):</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Banknote size={16} style={{ color: 'var(--badge-green)' }} /> Valor Recebido (R$):
+              </span>
               <input 
+                ref={cashInputRef}
                 type="number" 
                 step="0.01" 
+                placeholder="0.00"
                 value={amountPaid} 
                 onChange={(e) => setAmountPaid(e.target.value)}
-                style={{ width: '100px', textAlign: 'right' }}
+                style={{
+                  width: '120px',
+                  textAlign: 'right',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-canvas)'
+                }}
               />
             </div>
+
+            {/* Atalhos Rápidos de Cédulas */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Atalhos:</span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                style={{ fontSize: '11px', padding: '3px 8px', borderRadius: 'var(--radius-sm)' }}
+                onClick={() => setAmountPaid(totalFinal.toFixed(2))}
+              >
+                Exato ({formatMoeda(totalFinal)})
+              </button>
+              {cashPresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  style={{ fontSize: '11px', padding: '3px 8px', borderRadius: 'var(--radius-sm)' }}
+                  onClick={() => setAmountPaid(preset.toFixed(2))}
+                >
+                  R$ {preset}
+                </button>
+              ))}
+            </div>
+
             {amountNum >= totalFinal && amountNum > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)', background: 'var(--badge-green-bg)', padding: '6px 10px', borderRadius: 'var(--radius-md)' }}>
                 <span style={{ fontSize: '13px' }}>Troco a devolver:</span>
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(change)}</span>
               </div>
             )}
             {amountNum > 0 && amountNum < totalFinal && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)', background: 'var(--badge-red-bg)', padding: '6px 10px', borderRadius: 'var(--radius-md)' }}>
                 <span style={{ fontSize: '13px' }}>Falta:</span>
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
               </div>

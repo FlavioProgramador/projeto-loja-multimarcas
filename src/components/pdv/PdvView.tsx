@@ -338,6 +338,12 @@ export const PdvView: React.FC = () => {
     }
   };
 
+  // Ref para sempre chamar a versão mais recente sem reconstruir os listeners de teclado
+  const handleConfirmSaleRef = useRef(handleConfirmSale);
+  useEffect(() => {
+    handleConfirmSaleRef.current = handleConfirmSale;
+  });
+
   // ── Atalhos de Teclado ──
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -349,7 +355,7 @@ export const PdvView: React.FC = () => {
       }
       if (e.key === 'F4') {
         e.preventDefault();
-        if (isCheckoutModalOpen) handleConfirmSale();
+        if (isCheckoutModalOpen) handleConfirmSaleRef.current();
         else if (cart.length > 0) setIsCheckoutModalOpen(true);
         else {
           showBanner('⚠️ Carrinho vazio. Pressione F2 para procurar produtos.');
@@ -369,7 +375,7 @@ export const PdvView: React.FC = () => {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isCheckoutModalOpen, isReturnModalOpen, isNewCustomerModalOpen, showCustomerSuggestions, cart.length, searchTerm, clearCart, handleConfirmSale]);
+  }, [isCheckoutModalOpen, isReturnModalOpen, isNewCustomerModalOpen, showCustomerSuggestions, cart.length, searchTerm]);
 
   return (
     <>

@@ -4,7 +4,6 @@ import {
   ArrowUp,
   Boxes,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Edit2,
@@ -15,11 +14,10 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
-  Trash2,
   XCircle,
 } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { Product, StockStatus } from '../../types';
+import { Product } from '../../types';
 import { formatMoeda, getStatusEstoque, totalEstoque } from '../../lib/utils';
 import { StatusBadge } from '../ui/StatusBadge';
 import { NewProductModal } from './NewProductModal';

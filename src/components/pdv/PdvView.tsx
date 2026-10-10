@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -22,9 +22,9 @@ export const PdvView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedColecao, setSelectedColecao] = useState('');
-  const [selectedEstacao, setSelectedEstacao] = useState('');
-  const [selectedGenero, setSelectedGenero] = useState('');
+  const [selectedColecao] = useState('');
+  const [selectedEstacao] = useState('');
+  const [selectedGenero] = useState('');
   const [skuSelections, setSkuSelections] = useState<Record<number, number>>({});
 
   // Checkout inputs
@@ -137,6 +137,20 @@ export const PdvView: React.FC = () => {
   const creditUsed = useCustomerCredit ? maxCreditApplicable : 0;
   const calculatedTotal = Math.max(0, subtotal - discountTotal - creditUsed);
 
+  const discountSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (numDescVal > 0) {
+      parts.push(formatMoeda(numDescVal));
+    }
+    if (numDescPerc > 0) {
+      const percAmount = subtotal * (numDescPerc / 100);
+      parts.push(`${numDescPerc}% (${formatMoeda(percAmount)})`);
+    }
+    if (parts.length === 0) return '';
+    if (parts.length === 1 && numDescPerc === 0) return parts[0];
+    return `${parts.join(' + ')} (Total: ${formatMoeda(discountTotal)})`;
+  }, [numDescVal, numDescPerc, subtotal, discountTotal]);
+
   // ==========================================
   // AÇÕES DO UTILIZADOR
   // ==========================================
@@ -232,7 +246,7 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = useCallback(async () => {
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -336,7 +350,23 @@ export const PdvView: React.FC = () => {
     } else {
       showBanner(`⚠️ ${result.message}`);
     }
-  };
+  }, [
+    paymentMethod,
+    activeStoreId,
+    pixIdempotencyKey,
+    cart,
+    buyerName,
+    cpf,
+    numDescVal,
+    matchedCustomer?.uuid,
+    numDescPerc,
+    processSale,
+    installments,
+    creditUsed,
+    amountPaid,
+    calculatedTotal,
+    clearCart
+  ]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {
@@ -702,7 +732,7 @@ export const PdvView: React.FC = () => {
         </div>
 
         {/* Modais */}
-        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={""} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
+        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={discountSummary} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
         <NewReturnModal isOpen={isReturnModalOpen} onClose={() => setIsReturnModalOpen(false)} />
 
         {/* Modal Customizado de Confirmação para Limpar o Carrinho */}

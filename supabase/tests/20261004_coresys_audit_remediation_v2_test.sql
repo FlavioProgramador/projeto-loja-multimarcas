@@ -105,9 +105,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM public.physical_inventories WHERE id = v_inventory_id AND status = 'COMPLETED'
+    SELECT 1 FROM public.physical_inventories WHERE id = v_inventory_id AND status = 'APPROVED'
   ) THEN
-    RAISE EXCEPTION 'Physical inventory status was not updated to COMPLETED';
+    RAISE EXCEPTION 'Physical inventory status was not updated to APPROVED';
   END IF;
 
   RAISE NOTICE 'AUDIT_REMEDIATION_V2_TEST_PASS';

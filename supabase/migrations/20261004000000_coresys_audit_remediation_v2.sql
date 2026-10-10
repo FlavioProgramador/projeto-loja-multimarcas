@@ -4,6 +4,11 @@
 
 BEGIN;
 
+-- 0) Update physical_inventories status constraint to allow all valid workflow statuses
+ALTER TABLE public.physical_inventories DROP CONSTRAINT IF EXISTS physical_inventories_status_check;
+ALTER TABLE public.physical_inventories ADD CONSTRAINT physical_inventories_status_check
+  CHECK (status IN ('OPEN', 'DRAFT', 'IN_PROGRESS', 'APPROVED', 'COMPLETED', 'CANCELLED'));
+
 -- 1) Harden approve_physical_inventory RPC
 CREATE OR REPLACE FUNCTION public.approve_physical_inventory(p_inventory_id uuid, p_user_id uuid)
 RETURNS boolean
@@ -57,7 +62,11 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada para aprovar inventário.';
   END IF;
 
-  IF v_status NOT IN ('IN_PROGRESS','DRAFT') THEN
+  IF v_status IN ('APPROVED', 'COMPLETED') THEN
+    RETURN true;
+  END IF;
+
+  IF v_status NOT IN ('OPEN', 'IN_PROGRESS', 'DRAFT') THEN
     RAISE EXCEPTION 'Apenas inventários em andamento ou rascunho podem ser aprovados.';
   END IF;
 
@@ -110,7 +119,7 @@ BEGIN
   END LOOP;
 
   UPDATE public.physical_inventories
-  SET status = 'COMPLETED', approved_by = v_actor, updated_at = now()
+  SET status = 'APPROVED', approved_by = v_actor, updated_at = now()
   WHERE id = p_inventory_id;
 
   RETURN true;

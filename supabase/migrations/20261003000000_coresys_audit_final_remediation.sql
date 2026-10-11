@@ -630,8 +630,12 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada para aprovar inventário.';
   END IF;
 
-  IF v_status NOT IN ('IN_PROGRESS','DRAFT') THEN
-    RAISE EXCEPTION 'Apenas inventários em andamento ou rascunho podem ser aprovados.';
+  IF v_status IN ('APPROVED', 'COMPLETED') THEN
+    RETURN true;
+  END IF;
+
+  IF v_status NOT IN ('OPEN', 'IN_PROGRESS', 'DRAFT') THEN
+    RAISE EXCEPTION 'Apenas inventários abertos, em andamento ou rascunho podem ser aprovados.';
   END IF;
 
   FOR item IN SELECT product_variant_id, expected_quantity, counted_quantity, reason FROM public.physical_inventory_items WHERE inventory_id = p_inventory_id AND counted_quantity IS NOT NULL FOR UPDATE LOOP
@@ -656,7 +660,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  UPDATE public.physical_inventories SET status = 'COMPLETED', approved_by = v_actor, updated_at = now() WHERE id = p_inventory_id;
+  UPDATE public.physical_inventories SET status = 'APPROVED', approved_by = v_actor, updated_at = now() WHERE id = p_inventory_id;
   RETURN true;
 END;
 $$;

@@ -82,7 +82,7 @@ export const PdvView: React.FC = () => {
   useEffect(() => {
     const term = customerSearchTerm.trim();
     if (!term) {
-      setCustomerSuggestions([]);
+      setCustomerSuggestions(prev => (prev.length === 0 ? prev : []));
       return;
     }
 
@@ -109,20 +109,24 @@ export const PdvView: React.FC = () => {
   }, [activeStoreId, customerSearchTerm, customers]);
 
   useEffect(() => {
-    if (matchedCustomer) {
-      const stillMatches =
-        (cpf.trim() && matchedCustomer.cpf === cpf.trim())
-        || (buyerName.trim() && matchedCustomer.nome.toLowerCase() === buyerName.trim().toLowerCase());
-      if (stillMatches) return;
-      setMatchedCustomer(null);
-    }
-
     if (!isSupabaseConfigured) {
+      const trimmedCpf = cpf.trim();
+      const trimmedName = buyerName.trim().toLowerCase();
+      if (!trimmedCpf && !trimmedName) {
+        if (matchedCustomer) setMatchedCustomer(null);
+        return;
+      }
       const localMatch = customers.find(customer =>
-        (cpf.trim() && customer.cpf === cpf.trim())
-        || (buyerName.trim() && customer.nome.toLowerCase() === buyerName.trim().toLowerCase())
+        (trimmedCpf && customer.cpf === trimmedCpf)
+        || (trimmedName && customer.nome.toLowerCase() === trimmedName)
       );
-      if (localMatch) setMatchedCustomer(localMatch);
+      if (localMatch) {
+        if (matchedCustomer?.id !== localMatch.id) {
+          setMatchedCustomer(localMatch);
+        }
+      } else if (matchedCustomer) {
+        setMatchedCustomer(null);
+      }
     }
   }, [buyerName, cpf, customers, matchedCustomer]);
 
@@ -302,6 +306,20 @@ export const PdvView: React.FC = () => {
       return;
     }
 
+    if (paymentMethod === 'Dinheiro') {
+      const numericAmountPaid = parseFloat(amountPaid);
+      if (amountPaid.trim() === '') {
+        setAmountPaid(calculatedTotal.toString());
+      } else if (!isNaN(numericAmountPaid) && numericAmountPaid < calculatedTotal) {
+        showBanner('⚠️ O valor pago em dinheiro é inferior ao total da venda.');
+        return;
+      }
+    }
+
+    const effectiveAmountPaid = paymentMethod === 'Dinheiro'
+      ? (amountPaid.trim() === '' ? calculatedTotal : (parseFloat(amountPaid) || calculatedTotal))
+      : calculatedTotal;
+
     const result = await processSale({
       cartItems: cart,
       buyerName: buyerName.trim() || 'Cliente não identificado',
@@ -319,8 +337,8 @@ export const PdvView: React.FC = () => {
         cartItems: [...cart],
         totalFinal: calculatedTotal,
         paymentMethod,
-        amountPaid: parseFloat(amountPaid) || 0,
-        change: Math.max(0, (parseFloat(amountPaid) || 0) - calculatedTotal),
+        amountPaid: effectiveAmountPaid,
+        change: Math.max(0, effectiveAmountPaid - calculatedTotal),
         buyerName: buyerName.trim() || 'Consumidor Final',
         cpf: cpf.trim() || ''
       };
@@ -330,6 +348,7 @@ export const PdvView: React.FC = () => {
       handleClearCustomer();
       setDiscountValue('');
       setDiscountPercent('');
+      setAmountPaid('');
       showBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
 
       setTimeout(() => window.print(), 300);
@@ -357,6 +376,7 @@ export const PdvView: React.FC = () => {
         return;
       }
       if (e.key === 'Escape') {
+        if (isClearCartModalOpen) return setIsClearCartModalOpen(false);
         if (showCustomerSuggestions) return setShowCustomerSuggestions(false);
         if (isCheckoutModalOpen) return setIsCheckoutModalOpen(false);
         if (isReturnModalOpen) return setIsReturnModalOpen(false);
@@ -369,7 +389,7 @@ export const PdvView: React.FC = () => {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isCheckoutModalOpen, isReturnModalOpen, isNewCustomerModalOpen, showCustomerSuggestions, cart.length, searchTerm, clearCart, handleConfirmSale]);
+  }, [isCheckoutModalOpen, isReturnModalOpen, isNewCustomerModalOpen, isClearCartModalOpen, showCustomerSuggestions, cart.length, searchTerm, clearCart, handleConfirmSale]);
 
   return (
     <>

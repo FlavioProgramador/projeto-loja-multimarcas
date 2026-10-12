@@ -140,6 +140,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 step="0.01" 
                 value={amountPaid} 
                 onChange={(e) => setAmountPaid(e.target.value)}
+                aria-label="Valor recebido em dinheiro"
                 style={{ width: '100px', textAlign: 'right' }}
               />
             </div>

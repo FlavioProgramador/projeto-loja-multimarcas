@@ -589,4 +589,595 @@ REVOKE ALL ON FUNCTION public.cancel_sale(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.cancel_sale(uuid) TO authenticated;
 ALTER FUNCTION public.cancel_sale(uuid) SET search_path = public;
 
+-- 5) Harden manage_product
+CREATE OR REPLACE FUNCTION public.manage_product(
+  p_product_id uuid,
+  p_name text,
+  p_brand_name text,
+  p_category_name text,
+  p_sale_price numeric,
+  p_cost_price numeric,
+  p_variants jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_user uuid := auth.uid();
+  v_profile_active boolean;
+  v_role text;
+  v_brand_id uuid;
+  v_category_id uuid;
+  v_product_id uuid;
+  v_variant record;
+  v_variant_ids uuid[] := '{}';
+  v_generated_sku text;
+  v_idx int := 1;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+
+  SELECT is_active INTO v_profile_active FROM public.profiles WHERE id = v_user;
+  IF COALESCE(v_profile_active, false) = false THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role NOT IN ('ADMIN','MANAGER') THEN
+    RAISE EXCEPTION 'Permissão negada.';
+  END IF;
+
+  IF p_name IS NULL OR btrim(p_name) = '' THEN
+    RAISE EXCEPTION 'Nome do produto é obrigatório.';
+  END IF;
+  IF p_sale_price IS NOT NULL AND p_sale_price < 0 THEN
+    RAISE EXCEPTION 'Preço de venda inválido.';
+  END IF;
+  IF p_cost_price IS NOT NULL AND p_cost_price < 0 THEN
+    RAISE EXCEPTION 'Preço de custo inválido.';
+  END IF;
+
+  IF p_brand_name IS NOT NULL AND btrim(p_brand_name) <> '' THEN
+    SELECT id INTO v_brand_id FROM public.brands WHERE name ILIKE btrim(p_brand_name) AND is_active = true LIMIT 1;
+    IF v_brand_id IS NULL THEN
+      INSERT INTO public.brands(name) VALUES(btrim(p_brand_name)) RETURNING id INTO v_brand_id;
+    END IF;
+  END IF;
+
+  IF p_category_name IS NOT NULL AND btrim(p_category_name) <> '' THEN
+    SELECT id INTO v_category_id FROM public.categories WHERE name ILIKE btrim(p_category_name) AND is_active = true LIMIT 1;
+    IF v_category_id IS NULL THEN
+      INSERT INTO public.categories(name) VALUES(btrim(p_category_name)) RETURNING id INTO v_category_id;
+    END IF;
+  END IF;
+
+  IF p_product_id IS NOT NULL THEN
+    UPDATE public.products
+    SET name = btrim(p_name), brand_id = v_brand_id, category_id = v_category_id,
+        sale_price = COALESCE(p_sale_price, sale_price), cost_price = COALESCE(p_cost_price, cost_price)
+    WHERE id = p_product_id
+    RETURNING id INTO v_product_id;
+
+    IF v_product_id IS NULL THEN
+      RAISE EXCEPTION 'Produto não encontrado.';
+    END IF;
+  ELSE
+    INSERT INTO public.products(name, brand_id, category_id, sale_price, cost_price)
+    VALUES(btrim(p_name), v_brand_id, v_category_id, COALESCE(p_sale_price, 0), COALESCE(p_cost_price, 0))
+    RETURNING id INTO v_product_id;
+  END IF;
+
+  FOR v_variant IN
+    SELECT * FROM jsonb_to_recordset(COALESCE(p_variants, '[]'::jsonb))
+      AS (id uuid, sku text, barcode text, size text, color text, minimum_stock int)
+  LOOP
+    v_generated_sku := nullif(trim(v_variant.sku), '');
+    IF v_generated_sku IS NULL THEN
+      v_generated_sku :=
+        upper(substring(regexp_replace(extensions.unaccent(COALESCE(p_name, '')), '[^a-zA-Z0-9]', '', 'g') from 1 for 4))
+        || '-' || upper(substring(regexp_replace(extensions.unaccent(COALESCE(v_variant.size, 'Único')), '[^a-zA-Z0-9]', '', 'g') from 1 for 3))
+        || '-' || upper(substring(regexp_replace(extensions.unaccent(COALESCE(v_variant.color, 'Padrão')), '[^a-zA-Z0-9]', '', 'g') from 1 for 3));
+
+      WHILE EXISTS (
+        SELECT 1 FROM public.product_variants
+        WHERE sku = v_generated_sku AND (v_variant.id IS NULL OR id <> v_variant.id)
+      ) LOOP
+        v_generated_sku := v_generated_sku || v_idx::text;
+        v_idx := v_idx + 1;
+      END LOOP;
+    END IF;
+
+    IF v_variant.barcode IS NOT NULL AND trim(v_variant.barcode) <> '' AND EXISTS (
+      SELECT 1 FROM public.product_variants
+      WHERE barcode = trim(v_variant.barcode) AND (v_variant.id IS NULL OR id <> v_variant.id)
+    ) THEN
+      RAISE EXCEPTION 'Código de barras % já está em uso.', v_variant.barcode;
+    END IF;
+
+    IF v_variant.id IS NOT NULL THEN
+      UPDATE public.product_variants
+      SET sku = trim(v_generated_sku),
+          barcode = nullif(trim(v_variant.barcode), ''),
+          size = COALESCE(v_variant.size, 'Único'),
+          color = COALESCE(v_variant.color, 'Padrão'),
+          minimum_stock = COALESCE(v_variant.minimum_stock, 0)
+      WHERE id = v_variant.id AND product_id = v_product_id;
+
+      v_variant_ids := array_append(v_variant_ids, v_variant.id);
+    ELSE
+      INSERT INTO public.product_variants(product_id, sku, barcode, size, color, minimum_stock, stock_quantity)
+      VALUES(v_product_id, trim(v_generated_sku), nullif(trim(v_variant.barcode), ''),
+             COALESCE(v_variant.size, 'Único'), COALESCE(v_variant.color, 'Padrão'),
+             COALESCE(v_variant.minimum_stock, 0), 0)
+      RETURNING id INTO v_variant.id;
+
+      v_variant_ids := array_append(v_variant_ids, v_variant.id);
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('success', true, 'product_id', v_product_id, 'variant_ids', v_variant_ids);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.manage_product(uuid,text,text,text,numeric,numeric,jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.manage_product(uuid,text,text,text,numeric,numeric,jsonb) TO authenticated;
+ALTER FUNCTION public.manage_product(uuid,text,text,text,numeric,numeric,jsonb) SET search_path = public, extensions;
+
+-- 6) Harden register_stock_entry
+CREATE OR REPLACE FUNCTION public.register_stock_entry(
+  p_variant_id uuid,
+  p_quantity integer,
+  p_unit_cost numeric,
+  p_product_name text,
+  p_store_id uuid,
+  p_reason text DEFAULT 'Compra de fornecedor',
+  p_type text DEFAULT 'PURCHASE'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user uuid := auth.uid();
+  v_profile_active boolean;
+  v_role text;
+  v_before integer;
+  v_after integer;
+  v_total numeric(12,2);
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+
+  SELECT is_active INTO v_profile_active FROM public.profiles WHERE id = v_user;
+  IF COALESCE(v_profile_active, false) = false THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+
+  IF p_store_id IS NULL OR NOT EXISTS (SELECT 1 FROM public.stores WHERE id = p_store_id AND is_active = true) THEN
+    RAISE EXCEPTION 'Loja inválida ou inativa.';
+  END IF;
+
+  v_role := public.get_user_store_role(p_store_id);
+  IF v_role IS NULL OR v_role NOT IN ('ADMIN','MANAGER') THEN
+    RAISE EXCEPTION 'Permissão negada para estoque.';
+  END IF;
+
+  IF p_variant_id IS NULL OR NOT EXISTS (
+    SELECT 1
+    FROM public.product_variants pv
+    JOIN public.products p ON p.id = pv.product_id
+    WHERE pv.id = p_variant_id AND pv.is_active = true AND p.is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Variação não encontrada ou inativa.';
+  END IF;
+
+  IF p_quantity IS NULL OR p_quantity <= 0 THEN
+    RAISE EXCEPTION 'Quantidade inválida.';
+  END IF;
+  IF p_unit_cost IS NULL OR p_unit_cost < 0 THEN
+    RAISE EXCEPTION 'Custo inválido.';
+  END IF;
+
+  SELECT quantity INTO v_before
+  FROM public.store_inventory
+  WHERE store_id = p_store_id AND product_variant_id = p_variant_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    INSERT INTO public.store_inventory(store_id, product_variant_id, quantity, minimum_stock)
+    VALUES(p_store_id, p_variant_id, 0, 0);
+    v_before := 0;
+  END IF;
+
+  v_after := v_before + p_quantity;
+
+  UPDATE public.store_inventory
+  SET quantity = v_after
+  WHERE store_id = p_store_id AND product_variant_id = p_variant_id;
+
+  UPDATE public.product_variants pv
+  SET stock_quantity = (SELECT COALESCE(sum(si.quantity), 0) FROM public.store_inventory si WHERE si.product_variant_id = pv.id)
+  WHERE pv.id = p_variant_id;
+
+  INSERT INTO public.inventory_movements(
+    store_id, product_variant_id, type, quantity, quantity_before, quantity_after,
+    reference_type, user_id, notes, reason
+  )
+  VALUES(
+    p_store_id, p_variant_id, 'ENTRY', p_quantity, v_before, v_after,
+    'STOCK_ENTRY', v_user, 'Entrada de estoque: ' || COALESCE(p_product_name, 'Produto'),
+    COALESCE(p_reason, 'Compra de fornecedor')
+  );
+
+  v_total := round(p_quantity * p_unit_cost, 2);
+  IF v_total > 0 AND upper(COALESCE(p_type, 'PURCHASE')) IN ('PURCHASE','ENTRY') THEN
+    INSERT INTO public.financial_transactions(
+      store_id, type, category, description, amount, status, reference_type, paid_at
+    )
+    VALUES(
+      p_store_id, 'EXPENSE', 'Estoque / Compras',
+      'Entrada de estoque: ' || COALESCE(p_product_name, 'Produto'),
+      v_total, 'PAID', 'STOCK_ENTRY', now()
+    );
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'quantity_before', v_before, 'quantity_after', v_after);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) TO authenticated;
+ALTER FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) SET search_path = public;
+
+-- 7) Harden approve_physical_inventory
+CREATE OR REPLACE FUNCTION public.approve_physical_inventory(p_inventory_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_profile_active boolean := false;
+  v_store_id uuid;
+  v_store_active boolean := false;
+  v_role text;
+  v_status text;
+  v_item record;
+  v_before integer;
+  v_after integer;
+  v_divergence integer;
+BEGIN
+  IF v_actor IS NULL OR p_user_id IS NULL OR p_user_id <> v_actor THEN
+    RAISE EXCEPTION 'Usuário de aprovação inválido.';
+  END IF;
+
+  SELECT p.is_active INTO v_profile_active FROM public.profiles p WHERE p.id = v_actor;
+  IF COALESCE(v_profile_active, false) = false THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+
+  IF p_inventory_id IS NULL THEN
+    RAISE EXCEPTION 'Inventário é obrigatório.';
+  END IF;
+
+  SELECT pi.status, pi.store_id
+    INTO v_status, v_store_id
+  FROM public.physical_inventories pi
+  WHERE pi.id = p_inventory_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Inventário não encontrado.';
+  END IF;
+
+  SELECT s.is_active INTO v_store_active FROM public.stores s WHERE s.id = v_store_id;
+  IF COALESCE(v_store_active, false) = false THEN
+    RAISE EXCEPTION 'Loja do inventário inválida ou inativa.';
+  END IF;
+
+  v_role := public.get_user_store_role(v_store_id);
+  IF v_role IS NULL OR v_role NOT IN ('ADMIN','MANAGER') THEN
+    RAISE EXCEPTION 'Permissão negada para aprovar inventário nesta loja.';
+  END IF;
+
+  IF v_status = 'COMPLETED' OR v_status = 'APPROVED' THEN
+    RETURN true;
+  END IF;
+
+  IF v_status NOT IN ('DRAFT','IN_PROGRESS','OPEN') THEN
+    RAISE EXCEPTION 'Status do inventário não permite aprovação.';
+  END IF;
+
+  FOR v_item IN
+    SELECT pii.product_variant_id, pii.expected_quantity, pii.counted_quantity, pii.reason
+    FROM public.physical_inventory_items pii
+    WHERE pii.inventory_id = p_inventory_id
+  LOOP
+    IF v_item.product_variant_id IS NULL OR v_item.counted_quantity IS NULL OR v_item.counted_quantity < 0 THEN
+      RAISE EXCEPTION 'Item de inventário inválido.';
+    END IF;
+
+    SELECT quantity INTO v_before
+    FROM public.store_inventory
+    WHERE store_id = v_store_id AND product_variant_id = v_item.product_variant_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      INSERT INTO public.store_inventory(store_id, product_variant_id, quantity, minimum_stock)
+      VALUES(v_store_id, v_item.product_variant_id, 0, 0);
+      v_before := 0;
+    END IF;
+
+    v_divergence := v_item.counted_quantity - v_item.expected_quantity;
+    v_after := v_item.counted_quantity;
+
+    IF v_divergence <> 0 THEN
+      UPDATE public.store_inventory
+      SET quantity = v_after
+      WHERE store_id = v_store_id AND product_variant_id = v_item.product_variant_id;
+
+      INSERT INTO public.inventory_movements(
+        store_id, product_variant_id, type, quantity, quantity_before, quantity_after,
+        reference_type, reference_id, user_id, reason, notes
+      )
+      VALUES(
+        v_store_id, v_item.product_variant_id, 'ADJUSTMENT', v_divergence, v_before, v_after,
+        'INVENTORY', p_inventory_id, v_actor, v_item.reason, 'Ajuste de inventário físico'
+      );
+
+      UPDATE public.product_variants pv
+      SET stock_quantity = (
+        SELECT COALESCE(sum(si.quantity), 0)
+        FROM public.store_inventory si
+        WHERE si.product_variant_id = pv.id
+      )
+      WHERE pv.id = v_item.product_variant_id;
+    END IF;
+  END LOOP;
+
+  UPDATE public.physical_inventories
+  SET status = 'APPROVED', approved_by = v_actor, updated_at = now()
+  WHERE id = p_inventory_id;
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.approve_physical_inventory(uuid,uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.approve_physical_inventory(uuid,uuid) TO authenticated;
+ALTER FUNCTION public.approve_physical_inventory(uuid,uuid) SET search_path = public;
+
+-- 8) Harden report functions with mandatory store_id filtering and search_path
+DROP FUNCTION IF EXISTS public.report_stock_status(uuid);
+CREATE OR REPLACE FUNCTION public.report_stock_status(p_store_id uuid)
+RETURNS TABLE(product_id uuid, product_name text, variant_id uuid, variant_sku text, stock_quantity integer, reserved_quantity integer, minimum_stock integer, status text)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Autenticação obrigatória.';
+  END IF;
+  IF public.current_user_role() IS NULL THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+  IF p_store_id IS NULL OR NOT public.has_store_access(p_store_id) THEN
+    RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+
+  RETURN QUERY
+  SELECT p.id, p.name, pv.id, pv.sku, si.quantity, pv.reserved_quantity, pv.minimum_stock,
+         CASE WHEN si.quantity = 0 THEN 'OUT_OF_STOCK'
+              WHEN si.quantity <= pv.minimum_stock THEN 'LOW_STOCK'
+              ELSE 'OK' END
+  FROM public.products p
+  JOIN public.product_variants pv ON pv.product_id = p.id
+  JOIN public.store_inventory si
+    ON si.product_variant_id = pv.id AND si.store_id = p_store_id
+  WHERE p.is_active = true AND pv.is_active = true
+  ORDER BY CASE WHEN si.quantity = 0 THEN 1
+                WHEN si.quantity <= pv.minimum_stock THEN 2
+                ELSE 3 END,
+           si.quantity;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.report_top_selling_products(integer,uuid);
+CREATE OR REPLACE FUNCTION public.report_top_selling_products(p_limit integer, p_store_id uuid)
+RETURNS TABLE(product_id uuid, product_name text, total_quantity_sold bigint, total_revenue numeric)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Autenticação obrigatória.';
+  END IF;
+  IF public.current_user_role() IS NULL THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+  IF p_store_id IS NULL OR NOT public.has_store_access(p_store_id) THEN
+    RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+  IF COALESCE(p_limit, 0) < 1 OR COALESCE(p_limit, 0) > 100 THEN
+    RAISE EXCEPTION 'Limite inválido.';
+  END IF;
+
+  RETURN QUERY
+  SELECT p.id, p.name, sum(si.quantity)::bigint, sum(si.total)::numeric
+  FROM public.sale_items si
+  JOIN public.sales s ON s.id = si.sale_id
+  JOIN public.products p ON p.id = si.product_id
+  WHERE s.store_id = p_store_id AND s.status = 'COMPLETED'
+  GROUP BY p.id, p.name
+  ORDER BY total_quantity_sold DESC
+  LIMIT p_limit;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.report_inventory_movements_summary(timestamptz,timestamptz,uuid);
+CREATE OR REPLACE FUNCTION public.report_inventory_movements_summary(
+  p_start_date timestamptz,
+  p_end_date timestamptz,
+  p_store_id uuid
+)
+RETURNS TABLE(movement_type text, total_quantity bigint)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Autenticação obrigatória.';
+  END IF;
+  IF public.current_user_role() IS NULL THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+  IF p_store_id IS NULL OR NOT public.has_store_access(p_store_id) THEN
+    RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+  IF p_start_date IS NULL OR p_end_date IS NULL OR p_start_date > p_end_date THEN
+    RAISE EXCEPTION 'Período inválido.';
+  END IF;
+
+  RETURN QUERY
+  SELECT im.type, sum(im.quantity)::bigint
+  FROM public.inventory_movements im
+  WHERE im.store_id = p_store_id
+    AND im.created_at >= p_start_date
+    AND im.created_at <= p_end_date
+  GROUP BY im.type
+  ORDER BY total_quantity DESC;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.get_profitability_by_product(uuid,date,date);
+CREATE OR REPLACE FUNCTION public.get_profitability_by_product(
+  p_store_id uuid,
+  start_date date,
+  end_date date
+)
+RETURNS TABLE(product_id uuid, product_name text, category_id uuid, total_quantity bigint, total_revenue numeric, total_cost numeric, margin_value numeric, margin_percentage numeric)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Autenticação obrigatória.';
+  END IF;
+  IF public.current_user_role() IS NULL THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+  IF p_store_id IS NULL OR NOT public.has_store_access(p_store_id) THEN
+    RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+
+  RETURN QUERY
+  SELECT p.id, p.name, p.category_id, sum(si.quantity)::bigint, sum(si.total), sum(si.quantity * p.cost_price),
+         sum(si.total) - sum(si.quantity * p.cost_price),
+         CASE WHEN sum(si.total) > 0
+              THEN ((sum(si.total) - sum(si.quantity * p.cost_price)) / sum(si.total)) * 100
+              ELSE 0 END
+  FROM public.sale_items si
+  JOIN public.sales s ON s.id = si.sale_id
+  JOIN public.products p ON p.id = si.product_id
+  WHERE s.store_id = p_store_id
+    AND s.status = 'COMPLETED'
+    AND (start_date IS NULL OR s.completed_at::date >= start_date)
+    AND (end_date IS NULL OR s.completed_at::date <= end_date)
+  GROUP BY p.id, p.name, p.category_id
+  ORDER BY margin_value DESC;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.get_profitability_by_category(uuid,date,date);
+CREATE OR REPLACE FUNCTION public.get_profitability_by_category(
+  p_store_id uuid,
+  start_date date,
+  end_date date
+)
+RETURNS TABLE(category_id uuid, category_name text, total_quantity bigint, total_revenue numeric, total_cost numeric, margin_value numeric, margin_percentage numeric)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Autenticação obrigatória.';
+  END IF;
+  IF public.current_user_role() IS NULL THEN
+    RAISE EXCEPTION 'Perfil autenticado inexistente ou inativo.';
+  END IF;
+  IF p_store_id IS NULL OR NOT public.has_store_access(p_store_id) THEN
+    RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+
+  RETURN QUERY
+  SELECT c.id, COALESCE(c.name, 'Sem Categoria'), sum(si.quantity)::bigint, sum(si.total), sum(si.quantity * p.cost_price),
+         sum(si.total) - sum(si.quantity * p.cost_price),
+         CASE WHEN sum(si.total) > 0
+              THEN ((sum(si.total) - sum(si.quantity * p.cost_price)) / sum(si.total)) * 100
+              ELSE 0 END
+  FROM public.sale_items si
+  JOIN public.sales s ON s.id = si.sale_id
+  JOIN public.products p ON p.id = si.product_id
+  LEFT JOIN public.categories c ON c.id = p.category_id
+  WHERE s.store_id = p_store_id
+    AND s.status = 'COMPLETED'
+    AND (start_date IS NULL OR s.completed_at::date >= start_date)
+    AND (end_date IS NULL OR s.completed_at::date <= end_date)
+  GROUP BY c.id, c.name
+  ORDER BY margin_value DESC;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.report_stock_status(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.report_stock_status(uuid) TO authenticated;
+ALTER FUNCTION public.report_stock_status(uuid) SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.report_top_selling_products(integer,uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.report_top_selling_products(integer,uuid) TO authenticated;
+ALTER FUNCTION public.report_top_selling_products(integer,uuid) SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz,uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz,uuid) TO authenticated;
+ALTER FUNCTION public.report_inventory_movements_summary(timestamptz,timestamptz,uuid) SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.get_profitability_by_product(uuid,date,date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_profitability_by_product(uuid,date,date) TO authenticated;
+ALTER FUNCTION public.get_profitability_by_product(uuid,date,date) SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.get_profitability_by_category(uuid,date,date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_profitability_by_category(uuid,date,date) TO authenticated;
+ALTER FUNCTION public.get_profitability_by_category(uuid,date,date) SET search_path = public;
+
+-- 9) Harden physical_inventories UPDATE RLS Policy
+DROP POLICY IF EXISTS "physical_inventories_update_policy" ON public.physical_inventories;
+DROP POLICY IF EXISTS "physical_inventories_update" ON public.physical_inventories;
+
+CREATE POLICY "physical_inventories_update_policy"
+ON public.physical_inventories
+FOR UPDATE TO authenticated
+USING (
+  public.has_store_access(store_id)
+  AND (public.get_user_store_role(store_id) IN ('ADMIN','MANAGER'))
+)
+WITH CHECK (
+  public.has_store_access(store_id)
+  AND (public.get_user_store_role(store_id) IN ('ADMIN','MANAGER'))
+);
+
 COMMIT;

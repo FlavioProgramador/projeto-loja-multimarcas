@@ -886,11 +886,11 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada para aprovar inventário nesta loja.';
   END IF;
 
-  IF v_status = 'COMPLETED' THEN
+  IF v_status = 'COMPLETED' OR v_status = 'APPROVED' THEN
     RETURN true;
   END IF;
 
-  IF v_status NOT IN ('DRAFT','IN_PROGRESS') THEN
+  IF v_status NOT IN ('DRAFT','IN_PROGRESS','OPEN') THEN
     RAISE EXCEPTION 'Status do inventário não permite aprovação.';
   END IF;
 
@@ -942,7 +942,7 @@ BEGIN
   END LOOP;
 
   UPDATE public.physical_inventories
-  SET status = 'COMPLETED', approved_by = v_actor, updated_at = now()
+  SET status = 'APPROVED', approved_by = v_actor, updated_at = now()
   WHERE id = p_inventory_id;
 
   RETURN true;

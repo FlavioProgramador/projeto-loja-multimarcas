@@ -897,7 +897,7 @@ BEGIN
   FOR v_item IN
     SELECT pii.product_variant_id, pii.expected_quantity, pii.counted_quantity, pii.reason
     FROM public.physical_inventory_items pii
-    WHERE pii.physical_inventory_id = p_inventory_id
+    WHERE pii.inventory_id = p_inventory_id
   LOOP
     IF v_item.product_variant_id IS NULL OR v_item.counted_quantity IS NULL OR v_item.counted_quantity < 0 THEN
       RAISE EXCEPTION 'Item de inventário inválido.';

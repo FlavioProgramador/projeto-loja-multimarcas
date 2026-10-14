@@ -102,6 +102,23 @@ describe('CartContext - Stock Validation and Management', () => {
     expect(result.current.cart[0].qtd).toBe(2);
   });
 
+  it('remove o item do carrinho quando a quantidade é decrementada até zero via updateQuantity', () => {
+    const { result } = renderHook(() => useCart(), { wrapper });
+
+    act(() => {
+      result.current.addItem(mockProduct, 0);
+    });
+    expect(result.current.cart).toHaveLength(1);
+    expect(result.current.subtotal).toBe(99.9);
+
+    act(() => {
+      result.current.updateQuantity(0, -1);
+    });
+
+    expect(result.current.cart).toHaveLength(0);
+    expect(result.current.subtotal).toBe(0);
+  });
+
   it('permite remover item e limpar carrinho', () => {
     const { result } = renderHook(() => useCart(), { wrapper });
 

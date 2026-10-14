@@ -556,9 +556,9 @@ export const PdvView: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                         <button
-                          onClick={() => updateQuantity(idx, -1)}
+                          onClick={() => item.qtd <= 1 ? removeItem(idx) : updateQuantity(idx, -1)}
                           style={{ border: '1px solid var(--border-color)', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Diminuir quantidade"
+                          title={item.qtd <= 1 ? "Remover item" : "Diminuir quantidade"}
                         >
                           -
                         </button>

@@ -9,19 +9,25 @@ export interface DashboardMetrics {
 }
 
 export const DashboardService = {
-  async getMetrics(): Promise<DashboardMetrics | null> {
+  async getMetrics(storeId?: string): Promise<DashboardMetrics | null> {
     if (!isSupabaseConfigured) return null;
 
     try {
       const todayStr = new Date().toISOString().slice(0, 10);
       const currentMonthStr = new Date().toISOString().slice(0, 7);
 
-      // 1. Buscar vendas
-      const { data: sales, error: salesError } = await supabase
+      // 1. Buscar vendas com isolamento por loja
+      let query = supabase
         .from('sales')
         .select('id, sale_number, total, created_at, customer_name, payments(method, installments), sale_items(product_name, quantity)')
         .eq('status', 'COMPLETED')
         .order('created_at', { ascending: false });
+
+      if (storeId) {
+        query = query.eq('store_id', storeId);
+      }
+
+      const { data: sales, error: salesError } = await query;
 
       if (salesError) throw salesError;
 
@@ -33,11 +39,17 @@ export const DashboardService = {
       const totalVendas = allSales.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
       const ticketMedio = allSales.length > 0 ? totalVendas / allSales.length : 0;
 
-      // 2. Buscar itens em baixo estoque
-      const { data: lowStockVariants } = await supabase
-        .from('product_variants')
-        .select('id, stock_quantity')
-        .lte('stock_quantity', 2);
+      // 2. Buscar itens em baixo estoque por loja
+      let lowStockQuery = supabase
+        .from('store_inventory')
+        .select('id, quantity')
+        .lte('quantity', 2);
+
+      if (storeId) {
+        lowStockQuery = lowStockQuery.eq('store_id', storeId);
+      }
+
+      const { data: lowStockVariants } = await lowStockQuery;
 
       const lowStockCount = (lowStockVariants || []).length;
 

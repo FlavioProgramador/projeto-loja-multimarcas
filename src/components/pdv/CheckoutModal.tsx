@@ -42,6 +42,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const amountNum = parseFloat(amountPaid) || 0;
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
+  const isCashInsufficient = paymentMethod === 'Dinheiro' && amountNum < totalFinal;
 
   return (
     <Modal
@@ -140,19 +141,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 step="0.01" 
                 value={amountPaid} 
                 onChange={(e) => setAmountPaid(e.target.value)}
-                style={{ width: '100px', textAlign: 'right' }}
+                style={{ width: '110px', textAlign: 'right' }}
+                placeholder="0.00"
               />
             </div>
-            {amountNum >= totalFinal && amountNum > 0 && (
+            {amountNum >= totalFinal && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)' }}>
                 <span style={{ fontSize: '13px' }}>Troco a devolver:</span>
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(change)}</span>
               </div>
             )}
-            {amountNum > 0 && amountNum < totalFinal && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)' }}>
-                <span style={{ fontSize: '13px' }}>Falta:</span>
-                <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
+            {isCashInsufficient && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)' }}>
+                  <span style={{ fontSize: '13px' }}>Falta:</span>
+                  <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--badge-red)', fontWeight: 500 }}>
+                  ⚠️ O valor recebido deve ser igual ou superior ao total final.
+                </div>
               </div>
             )}
           </div>
@@ -186,7 +193,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+            <button
+              className="btn"
+              onClick={onConfirm}
+              style={{
+                flex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                opacity: (isGeneratingPix || isCashInsufficient) ? 0.6 : 1,
+                cursor: (isGeneratingPix || isCashInsufficient) ? 'not-allowed' : 'pointer'
+              }}
+              disabled={isGeneratingPix || isCashInsufficient}
+            >
               <Check size={16} />
               <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
               <kbd className="kbd-key-primary">F4</kbd>

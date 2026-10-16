@@ -41,13 +41,17 @@ BEGIN
     RAISE EXCEPTION 'Loja é obrigatória.';
   END IF;
 
+  IF NOT public.has_store_access(p_store_id) THEN
+    RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+
   SELECT is_active INTO v_store_active FROM public.stores WHERE id = p_store_id;
   IF COALESCE(v_store_active, false) = false THEN
     RAISE EXCEPTION 'Loja inválida ou inativa.';
   END IF;
 
-  v_role := public.get_user_store_role(p_store_id);
-  IF v_role IS NULL OR v_role NOT IN ('ADMIN', 'MANAGER', 'CASHIER', 'STOCKIST') THEN
+  v_role := upper(COALESCE(public.get_user_store_role(p_store_id), ''));
+  IF v_role NOT IN ('ADMIN', 'MANAGER', 'CASHIER', 'STOCKIST', 'EMPLOYEE') THEN
     RAISE EXCEPTION 'Permissão negada para consultar estoque desta loja.';
   END IF;
 
@@ -119,13 +123,17 @@ BEGIN
     RAISE EXCEPTION 'Loja é obrigatória.';
   END IF;
 
+  IF NOT public.has_store_access(p_store_id) THEN
+    RAISE EXCEPTION 'Acesso negado à loja.';
+  END IF;
+
   SELECT is_active INTO v_store_active FROM public.stores WHERE id = p_store_id;
   IF COALESCE(v_store_active, false) = false THEN
     RAISE EXCEPTION 'Loja inválida ou inativa.';
   END IF;
 
-  v_role := public.get_user_store_role(p_store_id);
-  IF v_role IS NULL OR v_role NOT IN ('ADMIN', 'MANAGER', 'CASHIER') THEN
+  v_role := upper(COALESCE(public.get_user_store_role(p_store_id), ''));
+  IF v_role NOT IN ('ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE') THEN
     RAISE EXCEPTION 'Permissão negada para consultar relatórios desta loja.';
   END IF;
 
@@ -156,7 +164,7 @@ ALTER FUNCTION public.report_top_selling_products(uuid, integer, timestamptz, ti
 DROP FUNCTION IF EXISTS public.approve_physical_inventory(uuid, uuid);
 
 CREATE OR REPLACE FUNCTION public.approve_physical_inventory(p_inventory_id uuid, p_user_id uuid)
-RETURNS jsonb
+RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -169,13 +177,10 @@ DECLARE
   v_role text;
   v_item record;
   v_stock_before integer;
+  v_divergence integer;
 BEGIN
-  IF v_auth_uid IS NULL THEN
-    RAISE EXCEPTION 'Acesso não autenticado.';
-  END IF;
-
-  IF p_user_id IS NULL OR v_auth_uid <> p_user_id THEN
-    RAISE EXCEPTION 'Identificador de usuário divergente do usuário autenticado.';
+  IF v_auth_uid IS NULL OR p_user_id IS NULL OR p_user_id <> v_auth_uid THEN
+    RAISE EXCEPTION 'Usuário de aprovação inválido.';
   END IF;
 
   SELECT is_active INTO v_profile_active FROM public.profiles WHERE id = v_auth_uid;
@@ -185,11 +190,11 @@ BEGIN
 
   SELECT * INTO v_inventory FROM public.physical_inventories WHERE id = p_inventory_id FOR UPDATE;
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Inventário físico não encontrado.';
+    RAISE EXCEPTION 'Inventário não encontrado.';
   END IF;
 
-  IF v_inventory.status <> 'IN_PROGRESS' THEN
-    RAISE EXCEPTION 'Apenas inventários em andamento podem ser aprovados.';
+  IF v_inventory.status NOT IN ('IN_PROGRESS', 'OPEN', 'DRAFT') THEN
+    RAISE EXCEPTION 'Apenas inventários em andamento ou rascunho podem ser aprovados.';
   END IF;
 
   SELECT is_active INTO v_store_active FROM public.stores WHERE id = v_inventory.store_id;
@@ -197,16 +202,22 @@ BEGIN
     RAISE EXCEPTION 'Loja do inventário inválida ou inativa.';
   END IF;
 
-  v_role := public.get_user_store_role(v_inventory.store_id);
-  IF v_role IS NULL OR v_role NOT IN ('ADMIN', 'MANAGER') THEN
-    RAISE EXCEPTION 'Permissão negada. Apenas Administradores ou Gerentes podem aprovar inventários.';
+  v_role := upper(COALESCE(public.get_user_store_role(v_inventory.store_id), ''));
+  IF v_role NOT IN ('ADMIN', 'MANAGER') THEN
+    RAISE EXCEPTION 'Permissão negada para aprovar inventário.';
   END IF;
 
   FOR v_item IN
-    SELECT pii.product_variant_id, pii.counted_quantity, pii.system_quantity
+    SELECT pii.product_variant_id, pii.expected_quantity, pii.counted_quantity, pii.reason
     FROM public.physical_inventory_items pii
-    WHERE pii.physical_inventory_id = p_inventory_id
+    WHERE pii.inventory_id = p_inventory_id
+      AND pii.counted_quantity IS NOT NULL
+    FOR UPDATE
   LOOP
+    IF v_item.product_variant_id IS NULL OR v_item.counted_quantity < 0 THEN
+      RAISE EXCEPTION 'Item de inventário inválido.';
+    END IF;
+
     SELECT quantity INTO v_stock_before
     FROM public.store_inventory
     WHERE store_id = v_inventory.store_id AND product_variant_id = v_item.product_variant_id
@@ -214,45 +225,47 @@ BEGIN
 
     IF NOT FOUND THEN
       INSERT INTO public.store_inventory(store_id, product_variant_id, quantity, minimum_stock)
-      VALUES(v_inventory.store_id, v_item.product_variant_id, v_item.counted_quantity, 0);
+      VALUES(v_inventory.store_id, v_item.product_variant_id, 0, 0);
       v_stock_before := 0;
-    ELSE
+    END IF;
+
+    v_divergence := v_item.counted_quantity - COALESCE(v_item.expected_quantity, v_stock_before);
+
+    IF v_divergence <> 0 THEN
       UPDATE public.store_inventory
       SET quantity = v_item.counted_quantity
       WHERE store_id = v_inventory.store_id AND product_variant_id = v_item.product_variant_id;
-    END IF;
 
-    IF v_item.counted_quantity <> COALESCE(v_stock_before, 0) THEN
       INSERT INTO public.inventory_movements(
         store_id, product_variant_id, type, quantity, quantity_before, quantity_after,
         reference_type, reference_id, user_id, notes, reason
       )
       VALUES(
         v_inventory.store_id, v_item.product_variant_id, 'ADJUSTMENT',
-        ABS(v_item.counted_quantity - COALESCE(v_stock_before, 0)),
-        COALESCE(v_stock_before, 0), v_item.counted_quantity,
-        'PHYSICAL_INVENTORY', p_inventory_id, v_auth_uid,
-        'Ajuste por inventário físico aprovado', 'Inventário Físico'
+        v_divergence, COALESCE(v_stock_before, 0), v_item.counted_quantity,
+        'INVENTORY', p_inventory_id, v_auth_uid,
+        'Ajuste por inventário físico aprovado', COALESCE(v_item.reason, 'Inventário Físico')
       );
-    END IF;
 
-    UPDATE public.product_variants pv
-    SET stock_quantity = (
-      SELECT COALESCE(SUM(si.quantity), 0)
-      FROM public.store_inventory si
-      WHERE si.product_variant_id = pv.id
-    )
-    WHERE pv.id = v_item.product_variant_id;
+      UPDATE public.product_variants pv
+      SET stock_quantity = (
+        SELECT COALESCE(SUM(si.quantity), 0)
+        FROM public.store_inventory si
+        WHERE si.product_variant_id = pv.id
+      )
+      WHERE pv.id = v_item.product_variant_id;
+    END IF;
   END LOOP;
 
   UPDATE public.physical_inventories
-  SET status = 'COMPLETED',
+  SET status = 'APPROVED',
       approved_by = v_auth_uid,
       approved_at = now(),
-      completed_at = now()
+      completed_at = now(),
+      updated_at = now()
   WHERE id = p_inventory_id;
 
-  RETURN jsonb_build_object('success', true, 'message', 'Inventário físico aprovado com sucesso.');
+  RETURN true;
 END;
 $$;
 

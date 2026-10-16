@@ -260,7 +260,6 @@ BEGIN
   UPDATE public.physical_inventories
   SET status = 'APPROVED',
       approved_by = v_auth_uid,
-      approved_at = now(),
       completed_at = now(),
       updated_at = now()
   WHERE id = p_inventory_id;

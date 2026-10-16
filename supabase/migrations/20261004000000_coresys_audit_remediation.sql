@@ -4,19 +4,21 @@
 BEGIN;
 
 -- 1. Ensure report_stock_status filters strictly by p_store_id and checks store permissions fail-closed
+DROP FUNCTION IF EXISTS public.report_stock_status(uuid);
+
 CREATE OR REPLACE FUNCTION public.report_stock_status(p_store_id uuid)
 RETURNS TABLE (
-  variant_id uuid,
   product_id uuid,
   product_name text,
-  sku text,
-  size text,
-  color text,
+  variant_id uuid,
+  variant_sku text,
   stock_quantity integer,
+  reserved_quantity integer,
   minimum_stock integer,
   status text
 )
 LANGUAGE plpgsql
+STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
@@ -51,18 +53,17 @@ BEGIN
 
   RETURN QUERY
   SELECT
-    pv.id AS variant_id,
     p.id AS product_id,
     p.name AS product_name,
-    pv.sku,
-    pv.size,
-    pv.color,
+    pv.id AS variant_id,
+    pv.sku AS variant_sku,
     COALESCE(si.quantity, 0)::integer AS stock_quantity,
+    COALESCE(pv.reserved_quantity, 0)::integer AS reserved_quantity,
     COALESCE(si.minimum_stock, pv.minimum_stock, 0)::integer AS minimum_stock,
     CASE
       WHEN COALESCE(si.quantity, 0) <= 0 THEN 'OUT_OF_STOCK'
       WHEN COALESCE(si.quantity, 0) <= COALESCE(si.minimum_stock, pv.minimum_stock, 0) THEN 'LOW_STOCK'
-      ELSE 'IN_STOCK'
+      ELSE 'OK'
     END AS status
   FROM public.store_inventory si
   JOIN public.product_variants pv ON pv.id = si.product_variant_id
@@ -80,6 +81,8 @@ ALTER FUNCTION public.report_stock_status(uuid) SET search_path = public;
 
 
 -- 2. Ensure report_top_selling_products filters strictly by p_store_id
+DROP FUNCTION IF EXISTS public.report_top_selling_products(uuid, integer, timestamptz, timestamptz);
+
 CREATE OR REPLACE FUNCTION public.report_top_selling_products(
   p_store_id uuid,
   p_limit integer DEFAULT 10,
@@ -93,6 +96,7 @@ RETURNS TABLE (
   total_revenue numeric
 )
 LANGUAGE plpgsql
+STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
@@ -149,6 +153,8 @@ ALTER FUNCTION public.report_top_selling_products(uuid, integer, timestamptz, ti
 
 
 -- 3. Ensure approve_physical_inventory strictly checks user identity and store permissions
+DROP FUNCTION IF EXISTS public.approve_physical_inventory(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION public.approve_physical_inventory(p_inventory_id uuid, p_user_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql

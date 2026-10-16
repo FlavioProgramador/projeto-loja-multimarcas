@@ -131,32 +131,84 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         </div>
 
         {/* Calculadora de troco (somente dinheiro) */}
-        {paymentMethod === 'Dinheiro' && (
-          <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Valor Recebido (R$):</span>
-              <input 
-                type="number" 
-                step="0.01" 
-                value={amountPaid} 
-                onChange={(e) => setAmountPaid(e.target.value)}
-                style={{ width: '100px', textAlign: 'right' }}
-              />
+        {paymentMethod === 'Dinheiro' && (() => {
+          const standardBills = [10, 20, 50, 100, 200];
+          let quickBills = standardBills.filter(bill => bill >= totalFinal);
+          if (quickBills.length === 0 && totalFinal > 0) {
+            const nextFifty = Math.ceil(totalFinal / 50) * 50;
+            const nextHundred = Math.ceil(totalFinal / 100) * 100;
+            quickBills = Array.from(new Set([nextFifty, nextHundred]));
+          }
+
+          return (
+            <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Valor Recebido (R$):</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                  placeholder={totalFinal > 0 ? totalFinal.toFixed(2) : '0.00'}
+                  style={{ width: '110px', textAlign: 'right' }}
+                />
+              </div>
+
+              {/* Botões Rápidos de Valor/Cédulas */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Sugestões:</span>
+                <button
+                  type="button"
+                  onClick={() => setAmountPaid(totalFinal.toString())}
+                  style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-color)',
+                    background: amountNum === totalFinal ? 'var(--primary)' : 'var(--bg-canvas)',
+                    color: amountNum === totalFinal ? '#fff' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Exato ({formatMoeda(totalFinal)})
+                </button>
+                {quickBills.map(bill => (
+                  <button
+                    key={bill}
+                    type="button"
+                    onClick={() => setAmountPaid(bill.toString())}
+                    style={{
+                      fontSize: '11px',
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      background: amountNum === bill ? 'var(--primary)' : 'var(--bg-canvas)',
+                      color: amountNum === bill ? '#fff' : 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    R$ {bill}
+                  </button>
+                ))}
+              </div>
+
+              {amountNum >= totalFinal && amountNum > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)', marginTop: '2px' }}>
+                  <span style={{ fontSize: '13px' }}>Troco a devolver:</span>
+                  <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(change)}</span>
+                </div>
+              )}
+              {amountNum > 0 && amountNum < totalFinal && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)', marginTop: '2px' }}>
+                  <span style={{ fontSize: '13px' }}>Falta:</span>
+                  <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
+                </div>
+              )}
             </div>
-            {amountNum >= totalFinal && amountNum > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)' }}>
-                <span style={{ fontSize: '13px' }}>Troco a devolver:</span>
-                <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(change)}</span>
-              </div>
-            )}
-            {amountNum > 0 && amountNum < totalFinal && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)' }}>
-                <span style={{ fontSize: '13px' }}>Falta:</span>
-                <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* PIX Payment UI */}
         {paymentMethod === 'PIX' && (

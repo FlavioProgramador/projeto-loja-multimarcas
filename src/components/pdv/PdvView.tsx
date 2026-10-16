@@ -219,6 +219,7 @@ export const PdvView: React.FC = () => {
             handleClearCustomer();
             setDiscountValue('');
             setDiscountPercent('');
+            setAmountPaid('');
             setQrCodeBase64(null);
             setPendingSaleId(null);
             setPixIdempotencyKey(null);
@@ -330,6 +331,7 @@ export const PdvView: React.FC = () => {
       handleClearCustomer();
       setDiscountValue('');
       setDiscountPercent('');
+      setAmountPaid('');
       showBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
 
       setTimeout(() => window.print(), 300);
@@ -702,7 +704,27 @@ export const PdvView: React.FC = () => {
         </div>
 
         {/* Modais */}
-        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={""} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
+        <CheckoutModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => {
+            setIsCheckoutModalOpen(false);
+            setAmountPaid('');
+          }}
+          onConfirm={handleConfirmSale}
+          buyerName={buyerName}
+          cpf={cpf}
+          paymentMethod={paymentMethod}
+          installments={installments}
+          cartItems={cart}
+          subtotal={subtotal}
+          totalFinal={calculatedTotal}
+          discountSummary={""}
+          creditUsed={creditUsed}
+          amountPaid={amountPaid}
+          setAmountPaid={setAmountPaid}
+          qrCodeBase64={qrCodeBase64}
+          isGeneratingPix={isGeneratingPix}
+        />
         <NewReturnModal isOpen={isReturnModalOpen} onClose={() => setIsReturnModalOpen(false)} />
 
         {/* Modal Customizado de Confirmação para Limpar o Carrinho */}

@@ -233,6 +233,14 @@ export const PdvView: React.FC = () => {
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
   const handleConfirmSale = async () => {
+    if (paymentMethod === 'Dinheiro') {
+      const paidNum = parseFloat(amountPaid) || 0;
+      if (amountPaid.trim() === '' || paidNum < calculatedTotal - 0.009) {
+        showBanner('⚠️ Informe um valor pago em dinheiro igual ou superior ao total da venda.');
+        return;
+      }
+    }
+
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -315,12 +323,13 @@ export const PdvView: React.FC = () => {
     });
 
     if (result.success) {
+      const paidNum = paymentMethod === 'Dinheiro' ? (parseFloat(amountPaid) || calculatedTotal) : calculatedTotal;
       const saleDataToPrint = {
         cartItems: [...cart],
         totalFinal: calculatedTotal,
         paymentMethod,
-        amountPaid: parseFloat(amountPaid) || 0,
-        change: Math.max(0, (parseFloat(amountPaid) || 0) - calculatedTotal),
+        amountPaid: paidNum,
+        change: Math.max(0, paidNum - calculatedTotal),
         buyerName: buyerName.trim() || 'Consumidor Final',
         cpf: cpf.trim() || ''
       };
@@ -330,6 +339,7 @@ export const PdvView: React.FC = () => {
       handleClearCustomer();
       setDiscountValue('');
       setDiscountPercent('');
+      setAmountPaid('');
       showBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
 
       setTimeout(() => window.print(), 300);

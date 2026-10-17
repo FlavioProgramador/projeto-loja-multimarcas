@@ -42,6 +42,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const amountNum = parseFloat(amountPaid) || 0;
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
+  const isCashInsufficient = paymentMethod === 'Dinheiro' && (amountPaid.trim() === '' || amountNum < totalFinal - 0.009);
 
   return (
     <Modal
@@ -135,24 +136,41 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div style={{ background: 'var(--bg-surface-subtle)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Valor Recebido (R$):</span>
-              <input 
-                type="number" 
-                step="0.01" 
-                value={amountPaid} 
-                onChange={(e) => setAmountPaid(e.target.value)}
-                style={{ width: '100px', textAlign: 'right' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setAmountPaid(totalFinal.toFixed(2))}
+                  style={{ fontSize: '11px', padding: '3px 8px', height: '28px' }}
+                  title="Preencher com o valor exato"
+                >
+                  Exato
+                </button>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                  style={{ width: '100px', textAlign: 'right' }}
+                  placeholder={totalFinal.toFixed(2)}
+                />
+              </div>
             </div>
-            {amountNum >= totalFinal && amountNum > 0 && (
+            {!isCashInsufficient && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)' }}>
                 <span style={{ fontSize: '13px' }}>Troco a devolver:</span>
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(change)}</span>
               </div>
             )}
-            {amountNum > 0 && amountNum < totalFinal && (
+            {amountPaid.trim() !== '' && amountNum < totalFinal - 0.009 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)' }}>
                 <span style={{ fontSize: '13px' }}>Falta:</span>
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
+              </div>
+            )}
+            {amountPaid.trim() === '' && (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                Clique em "Exato" ou digite o valor recebido.
               </div>
             )}
           </div>
@@ -186,7 +204,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix || isCashInsufficient}>
               <Check size={16} />
               <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
               <kbd className="kbd-key-primary">F4</kbd>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -22,9 +22,6 @@ export const PdvView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedColecao, setSelectedColecao] = useState('');
-  const [selectedEstacao, setSelectedEstacao] = useState('');
-  const [selectedGenero, setSelectedGenero] = useState('');
   const [skuSelections, setSkuSelections] = useState<Record<number, number>>({});
 
   // Checkout inputs
@@ -68,16 +65,13 @@ export const PdvView: React.FC = () => {
     [products]);
 
   const filteredProducts = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase();
     return products.filter(p => {
-      const searchLower = searchTerm.toLowerCase();
       const matchesSearch = p.nome.toLowerCase().includes(searchLower) || p.marca.toLowerCase().includes(searchLower);
       const matchesCat = selectedCategory === '' || selectedCategory === 'Todos' || p.categoria === selectedCategory;
-      const matchesCol = selectedColecao === '' || selectedColecao === 'Todas' || p.colecao === selectedColecao;
-      const matchesEst = selectedEstacao === '' || selectedEstacao === 'Todas' || p.estacao === selectedEstacao;
-      const matchesGen = selectedGenero === '' || selectedGenero === 'Todos' || p.genero === selectedGenero;
-      return matchesSearch && matchesCat && matchesCol && matchesEst && matchesGen;
+      return matchesSearch && matchesCat;
     });
-  }, [products, searchTerm, selectedCategory, selectedColecao, selectedEstacao, selectedGenero]);
+  }, [products, searchTerm, selectedCategory]);
 
   useEffect(() => {
     const term = customerSearchTerm.trim();
@@ -232,7 +226,7 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = useCallback(async () => {
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -336,7 +330,7 @@ export const PdvView: React.FC = () => {
     } else {
       showBanner(`⚠️ ${result.message}`);
     }
-  };
+  }, [paymentMethod, activeStoreId, pixIdempotencyKey, cart, buyerName, cpf, numDescVal, matchedCustomer?.uuid, numDescPerc, processSale, installments, creditUsed, calculatedTotal, amountPaid, clearCart]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {

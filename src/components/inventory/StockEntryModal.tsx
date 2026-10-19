@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowUp, PackagePlus } from 'lucide-react';
+import { PackagePlus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 

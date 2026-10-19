@@ -185,6 +185,9 @@ export const PdvView: React.FC = () => {
       showBanner('⚠️ O carrinho está vazio. Adicione produtos para prosseguir.');
       return;
     }
+    if (paymentMethod === 'Dinheiro' && !amountPaid) {
+      setAmountPaid(calculatedTotal.toFixed(2));
+    }
     setIsCheckoutModalOpen(true);
   };
 
@@ -232,7 +235,15 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = React.useCallback(async () => {
+    if (paymentMethod === 'Dinheiro') {
+      const numAmountPaid = parseFloat(amountPaid) || 0;
+      if (numAmountPaid < calculatedTotal) {
+        showBanner('⚠️ O valor recebido em dinheiro é inferior ao total da venda.');
+        return;
+      }
+    }
+
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -336,7 +347,23 @@ export const PdvView: React.FC = () => {
     } else {
       showBanner(`⚠️ ${result.message}`);
     }
-  };
+  }, [
+    paymentMethod,
+    amountPaid,
+    calculatedTotal,
+    activeStoreId,
+    pixIdempotencyKey,
+    cart,
+    buyerName,
+    cpf,
+    numDescVal,
+    matchedCustomer?.uuid,
+    numDescPerc,
+    processSale,
+    installments,
+    creditUsed,
+    clearCart
+  ]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {

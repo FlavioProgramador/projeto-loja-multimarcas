@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, CreditCard, Inbox, RefreshCw, Search, Wallet, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { FinanceService, FinanceFixedExpense, FinanceTransaction, type FinanceSummary } from '../../services/finance.service';
@@ -31,7 +31,7 @@ export const FinanceView:React.FC = () => {
   const [page,setPage]=useState(1);
   const [selected,setSelected]=useState<FinanceTransaction|null>(null);
 
-  const loadTransactions=async()=>{
+  const loadTransactions=useCallback(async()=>{
     if(!activeStoreId){
       setTransactions([]);
       setTotal(0);
@@ -64,9 +64,9 @@ export const FinanceView:React.FC = () => {
     }finally{
       setLoading(false);
     }
-  };
+  },[activeStoreId,page,period,type,status,query]);
 
-  const loadExpenses=async()=>{
+  const loadExpenses=useCallback(async()=>{
     if(!activeStoreId){setExpenses([]);return;}
     try{
       setExpenses(await FinanceService.getExpenseRecords(activeStoreId));
@@ -74,16 +74,16 @@ export const FinanceView:React.FC = () => {
       console.error('Erro ao carregar despesas fixas:',error);
       setExpenses([]);
     }
-  };
+  },[activeStoreId]);
 
   useEffect(()=>setPage(1),[activeStoreId,period,type,status,query]);
 
   useEffect(()=>{
     const timer=window.setTimeout(()=>{void loadTransactions();},query.trim()?250:0);
     return ()=>window.clearTimeout(timer);
-  },[activeStoreId,page,period,type,status,query]);
+  },[loadTransactions,query]);
 
-  useEffect(()=>{void loadExpenses();},[activeStoreId]);
+  useEffect(()=>{void loadExpenses();},[loadExpenses]);
 
   const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
   const rows=transactions;

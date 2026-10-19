@@ -5,10 +5,7 @@ import {
   Plus,
   Trash2,
   Check,
-  AlertCircle,
   ShoppingBag,
-  User,
-  CreditCard,
   Printer
 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -384,7 +381,7 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
                 <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>
                   Adicionar Peça do Catálogo para Devolução:
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr auto', gap: '8px', alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.8fr 1.2fr auto', gap: '8px', alignItems: 'end' }}>
                   <div>
                     <label style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Produto:</label>
                     <select
@@ -427,6 +424,19 @@ export const NewReturnModal: React.FC<NewReturnModalProps> = ({
                       onChange={e => setCustomQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
                       style={{ fontSize: '12px' }}
                     />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Motivo:</label>
+                    <select
+                      value={customReason}
+                      onChange={e => setCustomReason(e.target.value as ReturnReason)}
+                      style={{ fontSize: '12px' }}
+                    >
+                      {RETURN_REASONS.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <button

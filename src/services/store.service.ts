@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase/client';
-import type { Store, UserStoreAccess } from '../types';
+import type { UserStoreAccess } from '../types';
 
 export const storeService = {
   async getUserStores(): Promise<UserStoreAccess[]> {

@@ -103,7 +103,7 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
       chartInstance.current?.destroy();
       chartInstance.current = null;
     };
-  }, [theme, color]);
+  }, [theme, color, labels, data]);
 
   useEffect(() => {
     const chart = chartInstance.current;

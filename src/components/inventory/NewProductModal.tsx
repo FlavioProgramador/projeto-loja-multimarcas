@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Plus, X, Boxes } from 'lucide-react';
+import { Plus, X, Boxes, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 import { ProductSku } from '../../types';
@@ -7,9 +7,10 @@ import { ProductSku } from '../../types';
 interface NewProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 }
 
-export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose }) => {
+export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { addProduct } = useStore();
 
   const [nome, setNome] = useState('');
@@ -19,20 +20,39 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
   const [skus, setSkus] = useState<ProductSku[]>([
     { tamanho: 'P', cor: 'Preto', qtd: 10 }
   ]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const resetForm = () => {
+    setNome('');
+    setMarca('');
+    setCategoria('');
+    setPreco('');
+    setSkus([{ tamanho: 'P', cor: 'Preto', qtd: 10 }]);
+    setError(null);
+  };
+
+  const handleClose = () => {
+    setError(null);
+    onClose();
+  };
 
   const handleAddSkuRow = () => {
+    setError(null);
     setSkus(prev => [...prev, { tamanho: 'M', cor: 'Preto', qtd: 0 }]);
   };
 
   const handleRemoveSkuRow = (index: number) => {
     if (skus.length <= 1) {
-      alert('Mantenha pelo menos uma variação cadastrada.');
+      setError('Mantenha pelo menos uma variação cadastrada.');
       return;
     }
+    setError(null);
     setSkus(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSkuChange = (index: number, field: keyof ProductSku, val: string | number) => {
+    setError(null);
     setSkus(prev => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: val };
@@ -40,42 +60,47 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const numPreco = parseFloat(preco);
     if (!nome.trim() || !marca.trim() || !categoria.trim() || isNaN(numPreco) || numPreco <= 0) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
+      setError('Por favor, preencha todos os campos obrigatórios e informe um preço válido.');
       return;
     }
 
     if (skus.length === 0) {
-      alert('Adicione pelo menos uma variação.');
+      setError('Adicione pelo menos uma variação.');
       return;
     }
 
-    addProduct({
-      nome: nome.trim(),
-      marca: marca.trim(),
-      categoria: categoria.trim(),
-      preco: numPreco,
-      skus: skus.map(s => ({
-        tamanho: s.tamanho.trim() || 'Único',
-        cor: s.cor.trim() || 'Padrão',
-        qtd: Number(s.qtd) || 0
-      }))
-    });
+    setSaving(true);
+    setError(null);
+    try {
+      await addProduct({
+        nome: nome.trim(),
+        marca: marca.trim(),
+        categoria: categoria.trim(),
+        preco: numPreco,
+        skus: skus.map(s => ({
+          tamanho: s.tamanho.trim() || 'Único',
+          cor: s.cor.trim() || 'Padrão',
+          qtd: Math.max(0, Number(s.qtd) || 0)
+        }))
+      });
 
-    onClose();
-    setNome('');
-    setMarca('');
-    setCategoria('');
-    setPreco('');
-    setSkus([{ tamanho: 'P', cor: 'Preto', qtd: 10 }]);
+      onSuccess?.('Produto cadastrado com sucesso.');
+      resetForm();
+      onClose();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Não foi possível cadastrar o produto.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Boxes size={18} style={{ color: 'var(--primary)' }} />
@@ -89,7 +114,7 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
         <input
           placeholder="Ex: Camiseta Oversized Minimal"
           value={nome}
-          onChange={e => setNome(e.target.value)}
+          onChange={e => { setError(null); setNome(e.target.value); }}
         />
       </div>
 
@@ -99,7 +124,7 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
           <input
             placeholder="Ex: Cyclone, Nike, Oakley..."
             value={marca}
-            onChange={e => setMarca(e.target.value)}
+            onChange={e => { setError(null); setMarca(e.target.value); }}
           />
         </div>
 
@@ -108,7 +133,7 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
           <input
             placeholder="Ex: Camisas, Calçados..."
             value={categoria}
-            onChange={e => setCategoria(e.target.value)}
+            onChange={e => { setError(null); setCategoria(e.target.value); }}
           />
         </div>
       </div>
@@ -120,10 +145,9 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
           step="0.01"
           placeholder="0.00"
           value={preco}
-          onChange={e => setPreco(e.target.value)}
+          onChange={e => { setError(null); setPreco(e.target.value); }}
         />
       </div>
-
 
       <div className="form-group">
         <label>Grade de Variações (Tamanho / Cor / Estoque Inicial)</label>
@@ -171,11 +195,24 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
         </button>
       </div>
 
+      {error && (
+        <div className="inventory-form-message error" role="alert">
+          <AlertCircle size={15} />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '8px', marginTop: '18px' }}>
-        <button type="button" className="btn" onClick={handleSave} style={{ flex: 1 }}>
-          Salvar Produto
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void handleSave()}
+          style={{ flex: 1 }}
+          disabled={saving}
+        >
+          {saving ? 'Salvando...' : 'Salvar Produto'}
         </button>
-        <button type="button" className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
+        <button type="button" className="btn btn-outline" onClick={handleClose} style={{ flex: 1 }}>
           Cancelar
         </button>
       </div>

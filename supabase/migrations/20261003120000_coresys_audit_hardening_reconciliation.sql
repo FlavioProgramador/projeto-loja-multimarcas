@@ -68,8 +68,12 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada para aprovar inventário nesta loja.';
   END IF;
 
-  IF v_status NOT IN ('OPEN', 'IN_PROGRESS', 'DRAFT') THEN
-    RAISE EXCEPTION 'Apenas inventários abertos ou em andamento podem ser aprovados.';
+  IF v_status = 'APPROVED' THEN
+    RETURN true;
+  END IF;
+
+  IF v_status <> 'OPEN' THEN
+    RAISE EXCEPTION 'Apenas inventários OPEN podem ser aprovados.';
   END IF;
 
   SELECT count(*)::integer INTO v_item_count
@@ -137,7 +141,7 @@ BEGIN
   END LOOP;
 
   UPDATE public.physical_inventories
-  SET status = 'COMPLETED',
+  SET status = 'APPROVED',
       approved_by = v_actor,
       updated_at = now()
   WHERE id = p_inventory_id;

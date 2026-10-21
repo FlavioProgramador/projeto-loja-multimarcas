@@ -52,6 +52,11 @@ export function useSalesDomain({
       return { success: false, message: 'Carrinho vazio', totalFinal: 0 };
     }
 
+    const subtotal = cartItems.reduce((acc, item) => acc + item.preco * item.qtd, 0);
+    const safeDiscountValue = Math.max(0, Math.min(subtotal, discountValue || 0));
+    const safeDiscountPercent = Math.max(0, Math.min(100, discountPercent || 0));
+    const safeCreditUsed = Math.max(0, creditUsed || 0);
+
     if (isSupabaseConfigured) {
       if (!activeStoreId) {
         return { success: false, message: 'Nenhuma loja ativa selecionada', totalFinal: 0 };
@@ -60,15 +65,15 @@ export function useSalesDomain({
       if (cartItems.every(item => item.variantId)) {
         const rpcResult = await SalesService.completeSale({
           storeId: activeStoreId, cartItems, buyerName, cpf, customerId, paymentMethod,
-          installments, discountValue: discountValue + creditUsed,
-          discountPercent, idempotencyKey: generateIdempotencyKey(),
+          installments, discountValue: safeDiscountValue + safeCreditUsed,
+          discountPercent: safeDiscountPercent, idempotencyKey: generateIdempotencyKey(),
         });
 
         if (rpcResult.success) {
-          if (creditUsed > 0) {
+          if (safeCreditUsed > 0) {
             setCustomers(prev => prev.map(c =>
               c.cpf === cpf || c.nome.toLowerCase() === buyerName.toLowerCase()
-                ? { ...c, saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed) }
+                ? { ...c, saldoCredito: Math.max(0, (c.saldoCredito || 0) - safeCreditUsed) }
                 : c
             ));
           }
@@ -82,9 +87,8 @@ export function useSalesDomain({
       return { success: false, message: 'Não foi possível concluir a venda no servidor. A operação não foi registrada localmente.', totalFinal: 0 };
     }
 
-    const subtotal = cartItems.reduce((acc, item) => acc + item.preco * item.qtd, 0);
-    const discountTotal = discountValue + subtotal * (discountPercent / 100);
-    const totalFinal = Math.max(0, subtotal - discountTotal - creditUsed);
+    const discountTotal = Math.min(subtotal, safeDiscountValue + subtotal * (safeDiscountPercent / 100));
+    const totalFinal = Math.max(0, subtotal - discountTotal - safeCreditUsed);
     const nextVendaNum = movements.length + 1004;
     const vendaIdFormatted = `PDV #${nextVendaNum}`;
     const currentDate = hoje();
@@ -94,7 +98,7 @@ export function useSalesDomain({
 
     let paymentFormatted = paymentMethod;
     if (paymentMethod === 'Cartão' && installments > 1) paymentFormatted += ` ${installments}x`;
-    if (creditUsed > 0) paymentFormatted += ` (Abatido R$ ${creditUsed.toFixed(2)} de Crédito)`;
+    if (safeCreditUsed > 0) paymentFormatted += ` (Abatido R$ ${safeCreditUsed.toFixed(2)} de Crédito)`;
 
     setProducts(prev => prev.map(prod => {
       const matchingItems = cartItems.filter(item => item.produtoId === prod.id);
@@ -119,7 +123,7 @@ export function useSalesDomain({
       produtos: cartItems.map(i => `${i.nome} (${i.tamanho}/${i.cor}) x${i.qtd}`).join(', '),
       data: currentDate,
       vendaId: vendaIdFormatted,
-      creditoUtilizado: creditUsed,
+      creditoUtilizado: safeCreditUsed,
     };
     setMovements(prev => [newMovement, ...prev]);
 
@@ -131,8 +135,8 @@ export function useSalesDomain({
         vendaId: vendaIdFormatted, valor: totalFinal, data: currentDate,
         itens: cartItems.map(i => `${i.nome} x${i.qtd}`).join(', '),
       };
-      const creditDebitMovement = creditUsed > 0
-        ? [{ id: Date.now(), tipo: 'saida' as const, valor: creditUsed,
+      const creditDebitMovement = safeCreditUsed > 0
+        ? [{ id: Date.now(), tipo: 'saida' as const, valor: safeCreditUsed,
             descricao: `Uso de crédito na Venda ${vendaIdFormatted}`,
             data: currentDate, referenciaId: vendaIdFormatted }]
         : [];
@@ -141,7 +145,7 @@ export function useSalesDomain({
         return prev.map(c => c.id === existingCustomer.id
           ? {
               ...c,
-              saldoCredito: Math.max(0, (c.saldoCredito || 0) - creditUsed),
+              saldoCredito: Math.max(0, (c.saldoCredito || 0) - safeCreditUsed),
               historico: [purchaseRecord, ...c.historico],
               movimentacoesCredito: [...creditDebitMovement, ...(c.movimentacoesCredito || [])],
             }

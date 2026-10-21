@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight,
   ClipboardList, Clock3, Filter, Inbox, Package, RefreshCw,
@@ -66,7 +66,7 @@ export const MovementsView: React.FC = () => {
   const [selectedMovement, setSelectedMovement] = useState<MovementRecord | null>(null);
   const [page, setPage] = useState(1);
 
-  const loadMovements = async () => {
+  const loadMovements = useCallback(async () => {
     if (!activeStoreId) {
       setMovements([]);
       setIsLoading(false);
@@ -76,9 +76,9 @@ export const MovementsView: React.FC = () => {
     const data = await MovementsService.getAll(activeStoreId);
     setMovements(data);
     setIsLoading(false);
-  };
+  }, [activeStoreId]);
 
-  useEffect(() => { void loadMovements(); }, [activeStoreId]);
+  useEffect(() => { void loadMovements(); }, [loadMovements]);
 
   const filteredMovements = useMemo(() => {
     const start = periodStart(period);

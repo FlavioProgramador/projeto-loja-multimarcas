@@ -130,9 +130,11 @@ export const PdvView: React.FC = () => {
   // CÁLCULOS FINANCEIROS
   // ==========================================
   const availableCredit = matchedCustomer?.saldoCredito || 0;
-  const numDescVal = parseFloat(discountValue) || 0;
-  const numDescPerc = parseFloat(discountPercent) || 0;
-  const discountTotal = numDescVal + subtotal * (numDescPerc / 100);
+  const rawDescVal = parseFloat(discountValue) || 0;
+  const rawDescPerc = parseFloat(discountPercent) || 0;
+  const numDescVal = Math.max(0, Math.min(subtotal, rawDescVal));
+  const numDescPerc = Math.max(0, Math.min(100, rawDescPerc));
+  const discountTotal = Math.min(subtotal, numDescVal + subtotal * (numDescPerc / 100));
   const maxCreditApplicable = Math.min(availableCredit, Math.max(0, subtotal - discountTotal));
   const creditUsed = useCustomerCredit ? maxCreditApplicable : 0;
   const calculatedTotal = Math.max(0, subtotal - discountTotal - creditUsed);
@@ -653,8 +655,8 @@ export const PdvView: React.FC = () => {
 
             {/* Descontos e Pagamento Unificados */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '6px', marginBottom: '12px' }}>
-              <input type="number" placeholder="Desc R$" step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
-              <input type="number" placeholder="Desc %" step="1" value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
+              <input type="number" placeholder="Desc R$" step="0.01" min="0" max={subtotal > 0 ? subtotal : undefined} value={discountValue} onChange={e => setDiscountValue(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
+              <input type="number" placeholder="Desc %" step="1" min="0" max="100" value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }} />
               <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ fontSize: '12px', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-canvas)' }}>
                 <option value="PIX">PIX</option>
                 <option value="Cartão">Cartão</option>

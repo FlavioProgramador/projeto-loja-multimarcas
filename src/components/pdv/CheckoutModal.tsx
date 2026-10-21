@@ -40,7 +40,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   qrCodeBase64,
   isGeneratingPix
 }) => {
-  const amountNum = parseFloat(amountPaid) || 0;
+  const amountNum = Math.max(0, parseFloat(amountPaid) || 0);
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
 
   return (
@@ -138,6 +138,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <input 
                 type="number" 
                 step="0.01" 
+                min="0"
                 value={amountPaid} 
                 onChange={(e) => setAmountPaid(e.target.value)}
                 style={{ width: '100px', textAlign: 'right' }}

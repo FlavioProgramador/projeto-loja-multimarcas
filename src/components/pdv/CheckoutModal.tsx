@@ -143,6 +143,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 style={{ width: '100px', textAlign: 'right' }}
               />
             </div>
+
+            {/* Atalhos rápidos de valores */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+              <button
+                type="button"
+                onClick={() => setAmountPaid(totalFinal.toFixed(2))}
+                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', cursor: 'pointer', color: 'var(--text-primary)' }}
+              >
+                Exato ({formatMoeda(totalFinal)})
+              </button>
+              {[20, 50, 100, 200]
+                .filter(val => val >= totalFinal)
+                .map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setAmountPaid(val.toString())}
+                    style={{ fontSize: '11px', padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', cursor: 'pointer', color: 'var(--text-primary)' }}
+                  >
+                    R$ {val}
+                  </button>
+                ))}
+            </div>
+
             {amountNum >= totalFinal && amountNum > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)' }}>
                 <span style={{ fontSize: '13px' }}>Troco a devolver:</span>

@@ -95,7 +95,7 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({
       chartInstance.current?.destroy();
       chartInstance.current = null;
     };
-  }, [theme, colors]);
+  }, [theme, colors, labels, data]);
 
   useEffect(() => {
     const chart = chartInstance.current;

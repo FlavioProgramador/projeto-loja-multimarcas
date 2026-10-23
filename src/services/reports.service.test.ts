@@ -81,4 +81,22 @@ describe('ReportsService.getCommercialSummary', () => {
 
     expect(fromMock).not.toHaveBeenCalled();
   });
+
+  it('exige store_id obrigatório nas consultas de relatórios por loja', async () => {
+    rpcMock.mockResolvedValue({
+      data: [],
+      error: null,
+    });
+
+    await ReportsService.getStockStatus('store-a');
+    expect(rpcMock).toHaveBeenCalledWith('report_stock_status', {
+      p_store_id: 'store-a',
+    });
+
+    await ReportsService.getTopProducts('store-a', 5);
+    expect(rpcMock).toHaveBeenCalledWith('report_top_selling_products', {
+      p_store_id: 'store-a',
+      p_limit: 5,
+    });
+  });
 });

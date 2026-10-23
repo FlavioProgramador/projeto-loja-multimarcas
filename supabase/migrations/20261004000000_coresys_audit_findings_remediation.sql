@@ -307,7 +307,7 @@ BEGIN
   END IF;
 
   IF p_store_id IS NULL THEN
-    RAISE EXCEPTION 'Loja obrigatória.';
+    RAISE EXCEPTION 'Loja obrigatoria.';
   END IF;
 
   SELECT s.is_active INTO v_store_active
@@ -642,12 +642,12 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada para aprovar inventário.';
   END IF;
 
-  IF v_status = 'APPROVED' OR v_status = 'COMPLETED' THEN
+  IF v_status = 'APPROVED' THEN
     RETURN true;
   END IF;
 
   IF v_status NOT IN ('OPEN', 'IN_PROGRESS', 'DRAFT') THEN
-    RAISE EXCEPTION 'Apenas inventários em andamento ou rascunho podem ser aprovados.';
+    RAISE EXCEPTION 'Apenas inventários OPEN podem ser aprovados.';
   END IF;
 
   SELECT count(*),
@@ -727,7 +727,7 @@ BEGIN
   END LOOP;
 
   UPDATE public.physical_inventories
-  SET status = 'COMPLETED', approved_by = v_actor, updated_at = now()
+  SET status = 'APPROVED', approved_by = v_actor, updated_at = now()
   WHERE id = p_inventory_id;
 
   RETURN true;

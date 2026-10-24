@@ -18,7 +18,7 @@
     "test:all": "npm run typecheck && npm run lint && npm test",
     "check:functions": "deno check supabase/functions/create-mp-pix/index.ts supabase/functions/mp-webhook/index.ts supabase/functions/mp-pix-reconciliation-worker/index.ts",
     "test:e2e": "playwright test",
-    "security:dependencies": "npm audit --audit-level=moderate"
+    "security:dependencies": "npm audit --audit-level=high"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

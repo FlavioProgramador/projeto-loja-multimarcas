@@ -23,4 +23,10 @@ describe('permissões por módulo e loja ativa', () => {
     expect(getRoleLabel('CASHIER')).toBe('Caixa');
     expect(getRoleLabel(null)).toBe('Usuário');
   });
+
+  it('trata papéis nulos ou desconhecidos com comportamento fail-closed', () => {
+    expect(canAccessModule(null as any, 'automacoes')).toBe(false);
+    expect(canAccessModule(undefined as any, 'relatorios')).toBe(false);
+    expect(canAccessModule('UNKNOWN_ROLE' as any, 'pdv')).toBe(false);
+  });
 });

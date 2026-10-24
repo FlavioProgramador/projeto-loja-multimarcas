@@ -18,6 +18,9 @@ BEGIN
 END $$;
 
 -- 2) Harden approve_physical_inventory with strict actor validation & fail-closed role check
+-- Drop existing function first because changing return type (from boolean to jsonb) requires DROP in PostgreSQL
+DROP FUNCTION IF EXISTS public.approve_physical_inventory(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION public.approve_physical_inventory(p_inventory_id uuid, p_user_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql

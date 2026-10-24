@@ -2,12 +2,34 @@ import React, { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
+import { validateCPF } from '../../lib/validation';
 
 interface NewCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void; // Prop adicionada para disparar o aviso de sucesso sem alert()
+  onSuccess?: () => void;
 }
+
+export const formatCpfInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
+export const formatPhoneInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return digits ? `(${digits}` : '';
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+export const validateEmail = (email: string): boolean => {
+  if (!email.trim()) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+};
 
 export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { addCustomer } = useStore();
@@ -19,7 +41,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
   const [email, setEmail] = useState('');
   const [endereco, setEndereco] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
-  const [error, setError] = useState<string | null>(null); // Estado para o erro visual
+  const [error, setError] = useState<string | null>(null);
 
   const resetForm = () => {
     setNome('');
@@ -32,9 +54,31 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
     setError(null);
   };
 
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = formatCpfInput(e.target.value);
+    setCpf(masked);
+    if (error) setError(null);
+  };
+
+  const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = formatPhoneInput(e.target.value);
+    setTelefone(masked);
+    if (error) setError(null);
+  };
+
   const handleSave = () => {
     if (!nome.trim() || !cpf.trim()) {
       setError('Os campos Nome e CPF são obrigatórios.');
+      return;
+    }
+
+    if (!validateCPF(cpf)) {
+      setError('O CPF informado não é válido. Digite 11 números no formato 000.000.000-00.');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setError('O e-mail informado é inválido.');
       return;
     }
 
@@ -61,6 +105,10 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
     resetForm();
   };
 
+  const hasNameError = Boolean(error && !nome.trim());
+  const hasCpfError = Boolean(error && (!cpf.trim() || !validateCPF(cpf)));
+  const hasEmailError = Boolean(error && !validateEmail(email));
+
   return (
     <Modal
       isOpen={isOpen}
@@ -80,28 +128,35 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
       </div>
 
       <div className="form-group">
-        <label>Nome Completo *</label>
+        <label htmlFor="customer-nome">Nome Completo *</label>
         <input
+          id="customer-nome"
           placeholder="Ex: Carlos Eduardo"
           value={nome}
-          onChange={e => { setNome(e.target.value); setError(null); }}
-          style={{ borderColor: error && !nome.trim() ? 'var(--badge-red)' : undefined }}
+          onChange={e => { setNome(e.target.value); if (error) setError(null); }}
+          aria-invalid={hasNameError}
+          aria-describedby={error ? 'customer-form-error' : undefined}
+          style={{ borderColor: hasNameError ? 'var(--badge-red)' : undefined }}
         />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         <div className="form-group">
-          <label>CPF *</label>
+          <label htmlFor="customer-cpf">CPF *</label>
           <input
+            id="customer-cpf"
             placeholder="000.000.000-00"
             value={cpf}
-            onChange={e => { setCpf(e.target.value); setError(null); }}
-            style={{ borderColor: error && !cpf.trim() ? 'var(--badge-red)' : undefined }}
+            onChange={handleCpfChange}
+            aria-invalid={hasCpfError}
+            aria-describedby={error ? 'customer-form-error' : undefined}
+            style={{ borderColor: hasCpfError ? 'var(--badge-red)' : undefined }}
           />
         </div>
         <div className="form-group">
-          <label>RG</label>
+          <label htmlFor="customer-rg">RG</label>
           <input
+            id="customer-rg"
             placeholder="00.000.000-0"
             value={rg}
             onChange={e => setRg(e.target.value)}
@@ -110,8 +165,9 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
       </div>
 
       <div className="form-group">
-        <label>Data de Nascimento</label>
+        <label htmlFor="customer-data-nascimento">Data de Nascimento</label>
         <input
+          id="customer-data-nascimento"
           type="date"
           value={dataNascimento}
           onChange={e => setDataNascimento(e.target.value)}
@@ -128,27 +184,33 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         <div className="form-group">
-          <label>Telefone / WhatsApp</label>
+          <label htmlFor="customer-telefone">Telefone / WhatsApp</label>
           <input
+            id="customer-telefone"
             placeholder="(11) 99999-9999"
             value={telefone}
-            onChange={e => setTelefone(e.target.value)}
+            onChange={handleTelefoneChange}
           />
         </div>
         <div className="form-group">
-          <label>E-mail</label>
+          <label htmlFor="customer-email">E-mail</label>
           <input
+            id="customer-email"
             type="email"
             placeholder="email@exemplo.com"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={e => { setEmail(e.target.value); if (error) setError(null); }}
+            aria-invalid={hasEmailError}
+            aria-describedby={error ? 'customer-form-error' : undefined}
+            style={{ borderColor: hasEmailError ? 'var(--badge-red)' : undefined }}
           />
         </div>
       </div>
 
       <div className="form-group">
-        <label>Endereço</label>
+        <label htmlFor="customer-endereco">Endereço</label>
         <input
+          id="customer-endereco"
           placeholder="Rua, número, bairro, cidade"
           value={endereco}
           onChange={e => setEndereco(e.target.value)}
@@ -157,19 +219,23 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onCl
 
       {/* Mensagem de Erro Visual */}
       {error && (
-        <div style={{
-          marginTop: '12px',
-          padding: '10px 12px',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
-          borderRadius: 'var(--radius-md)',
-          color: 'var(--badge-red)',
-          fontSize: '12.5px',
-          fontWeight: 500,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        <div
+          id="customer-form-error"
+          role="alert"
+          style={{
+            marginTop: '12px',
+            padding: '10px 12px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--badge-red)',
+            fontSize: '12.5px',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
           ⚠️ {error}
         </div>
       )}

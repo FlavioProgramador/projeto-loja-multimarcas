@@ -465,15 +465,19 @@ export const CustomersService = {
     return data;
   },
 
-  async update(uuid: string, customer: Partial<{
-    nome: string;
-    cpf: string;
-    rg: string;
-    telefone: string;
-    email: string;
-    endereco: string;
-    dataNascimento: string;
-  }>): Promise<void> {
+  async update(
+    uuid: string,
+    customer: Partial<{
+      nome: string;
+      cpf: string;
+      rg: string;
+      telefone: string;
+      email: string;
+      endereco: string;
+      dataNascimento: string;
+    }>,
+    storeId?: string,
+  ): Promise<void> {
     if (!isSupabaseConfigured) return;
 
     const payload = {
@@ -486,18 +490,27 @@ export const CustomersService = {
       ...(customer.dataNascimento !== undefined && { birth_date: customer.dataNascimento || null }),
     };
 
-    const { error } = await supabase.from('customers').update(payload).eq('id', uuid);
+    let query = supabase.from('customers').update(payload).eq('id', uuid);
+    if (storeId) {
+      query = query.eq('store_id', storeId);
+    }
+
+    const { error } = await query;
     if (error) throw error;
   },
 
-  async remove(uuid: string): Promise<void> {
+  async remove(uuid: string, storeId?: string): Promise<void> {
     if (!isSupabaseConfigured) return;
 
-    const { error } = await supabase
+    let query = supabase
       .from('customers')
       .update({ is_active: false })
       .eq('id', uuid);
+    if (storeId) {
+      query = query.eq('store_id', storeId);
+    }
 
+    const { error } = await query;
     if (error) throw error;
   },
 };

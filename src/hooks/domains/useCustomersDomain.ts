@@ -25,12 +25,12 @@ export function useCustomersDomain(
     ));
 
     try {
-      await CustomersService.update(targetUuid, data);
+      await CustomersService.update(targetUuid, data, activeStoreId ?? undefined);
     } catch (error) {
       setCustomers(snapshot);
       throw error;
     }
-  }, [customers, setCustomers]);
+  }, [customers, setCustomers, activeStoreId]);
 
   const deleteCustomer = useCallback(async (id: number | string) => {
     const target = customers.find(c => String(c.uuid || c.id) === String(id));
@@ -43,12 +43,12 @@ export function useCustomersDomain(
     setCustomers(prev => prev.filter(c => String(c.uuid || c.id) !== String(id)));
 
     try {
-      await CustomersService.remove(targetUuid);
+      await CustomersService.remove(targetUuid, activeStoreId ?? undefined);
     } catch (error) {
       setCustomers(snapshot);
       throw error;
     }
-  }, [customers, setCustomers]);
+  }, [customers, setCustomers, activeStoreId]);
 
   return { addCustomer, updateCustomer, deleteCustomer };
 }

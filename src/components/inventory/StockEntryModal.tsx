@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowUp, PackagePlus } from 'lucide-react';
+import { PackagePlus, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 
@@ -15,6 +15,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
   const [skuIndex, setSkuIndex] = useState<number>(0);
   const [qtd, setQtd] = useState<string>('1');
   const [custo, setCusto] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   // If new product or new variant
   const [brand, setBrand] = useState('');
@@ -27,64 +28,77 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
     p => p.nome.toLowerCase() === productName.trim().toLowerCase()
   );
 
-  const handleSave = () => {
-    const numQtd = parseInt(qtd) || 0;
-    const numCusto = parseFloat(custo) || 0;
-
-    if (!productName.trim()) {
-      alert('Informe o nome do produto.');
-      return;
-    }
-
-    if (numQtd <= 0 || numCusto <= 0) {
-      alert('Quantidade e custo unitário devem ser maiores que zero.');
-      return;
-    }
-
-    if (!selectedProduct) {
-      const numPrice = parseFloat(price) || 0;
-      if (numPrice <= 0) {
-        alert('Para novo produto, informe o preço de venda.');
-        return;
-      }
-      registerStockEntry({
-        productName: productName.trim(),
-        brand: brand.trim() || 'Genérica',
-        category: category.trim() || 'Geral',
-        price: numPrice,
-        skuIndex: -1,
-        qtd: numQtd,
-        custoUnitario: numCusto,
-        newSize: newSize.trim() || 'Único',
-        newColor: newColor.trim() || 'Padrão'
-      });
-    } else {
-      registerStockEntry({
-        productName: selectedProduct.nome,
-        skuIndex: skuIndex,
-        qtd: numQtd,
-        custoUnitario: numCusto,
-        newSize: newSize.trim() || undefined,
-        newColor: newColor.trim() || undefined
-      });
-    }
-
-    onClose();
+  const resetForm = () => {
     setProductName('');
+    setSkuIndex(0);
     setQtd('1');
     setCusto('');
+    setError(null);
     setBrand('');
     setCategory('');
     setPrice('');
     setNewSize('');
     setNewColor('');
-    alert('Entrada de estoque registrada com sucesso!');
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleSave = async () => {
+    const numQtd = parseInt(qtd) || 0;
+    const numCusto = parseFloat(custo) || 0;
+
+    if (!productName.trim()) {
+      setError('Informe o nome do produto.');
+      return;
+    }
+
+    if (numQtd <= 0 || numCusto <= 0) {
+      setError('Quantidade e custo unitário devem ser maiores que zero.');
+      return;
+    }
+
+    try {
+      if (!selectedProduct) {
+        const numPrice = parseFloat(price) || 0;
+        if (numPrice <= 0) {
+          setError('Para novo produto, informe o preço de venda válido.');
+          return;
+        }
+        await registerStockEntry({
+          productName: productName.trim(),
+          brand: brand.trim() || 'Genérica',
+          category: category.trim() || 'Geral',
+          price: numPrice,
+          skuIndex: -1,
+          qtd: numQtd,
+          custoUnitario: numCusto,
+          newSize: newSize.trim() || 'Único',
+          newColor: newColor.trim() || 'Padrão'
+        });
+      } else {
+        await registerStockEntry({
+          productName: selectedProduct.nome,
+          skuIndex: skuIndex,
+          qtd: numQtd,
+          custoUnitario: numCusto,
+          newSize: newSize.trim() || undefined,
+          newColor: newColor.trim() || undefined
+        });
+      }
+
+      handleClose();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Não foi possível registrar a entrada de estoque.');
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <PackagePlus size={18} style={{ color: 'var(--primary)' }} />
@@ -101,6 +115,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
           onChange={e => {
             setProductName(e.target.value);
             setSkuIndex(0);
+            setError(null);
           }}
           list="productListOptions"
         />
@@ -234,11 +249,18 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
         </div>
       </div>
 
+      {error && (
+        <div className="inventory-form-message error" role="alert" style={{ marginTop: '12px' }}>
+          <AlertCircle size={15} />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-        <button type="button" className="btn" onClick={handleSave} style={{ flex: 1 }}>
+        <button type="button" className="btn" onClick={() => void handleSave()} style={{ flex: 1 }}>
           Registrar Entrada
         </button>
-        <button type="button" className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
+        <button type="button" className="btn btn-outline" onClick={handleClose} style={{ flex: 1 }}>
           Cancelar
         </button>
       </div>

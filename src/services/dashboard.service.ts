@@ -9,7 +9,7 @@ export interface DashboardMetrics {
 }
 
 export const DashboardService = {
-  async getMetrics(): Promise<DashboardMetrics | null> {
+  async getMetrics(storeId?: string): Promise<DashboardMetrics | null> {
     if (!isSupabaseConfigured) return null;
 
     try {
@@ -17,11 +17,17 @@ export const DashboardService = {
       const currentMonthStr = new Date().toISOString().slice(0, 7);
 
       // 1. Buscar vendas
-      const { data: sales, error: salesError } = await supabase
+      let salesQuery = supabase
         .from('sales')
         .select('id, sale_number, total, created_at, customer_name, payments(method, installments), sale_items(product_name, quantity)')
         .eq('status', 'COMPLETED')
         .order('created_at', { ascending: false });
+
+      if (storeId) {
+        salesQuery = salesQuery.eq('store_id', storeId);
+      }
+
+      const { data: sales, error: salesError } = await salesQuery;
 
       if (salesError) throw salesError;
 
@@ -34,12 +40,25 @@ export const DashboardService = {
       const ticketMedio = allSales.length > 0 ? totalVendas / allSales.length : 0;
 
       // 2. Buscar itens em baixo estoque
-      const { data: lowStockVariants } = await supabase
-        .from('product_variants')
-        .select('id, stock_quantity')
-        .lte('stock_quantity', 2);
+      let lowStockCount = 0;
+      if (storeId) {
+        const { data: lowStockInventory, error: inventoryError } = await supabase
+          .from('store_inventory')
+          .select('id, quantity')
+          .eq('store_id', storeId)
+          .lte('quantity', 2);
 
-      const lowStockCount = (lowStockVariants || []).length;
+        if (!inventoryError) {
+          lowStockCount = (lowStockInventory || []).length;
+        }
+      } else {
+        const { data: lowStockVariants } = await supabase
+          .from('product_variants')
+          .select('id, stock_quantity')
+          .lte('stock_quantity', 2);
+
+        lowStockCount = (lowStockVariants || []).length;
+      }
 
       // 3. Vendas recentes formatadas
       const recentSales = allSales.slice(0, 5).map((s: any, idx: number) => {

@@ -4,7 +4,6 @@ import {
   ArrowUp,
   Boxes,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Edit2,
@@ -15,11 +14,10 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
-  Trash2,
   XCircle,
 } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { Product, StockStatus } from '../../types';
+import { Product } from '../../types';
 import { formatMoeda, getStatusEstoque, totalEstoque } from '../../lib/utils';
 import { StatusBadge } from '../ui/StatusBadge';
 import { NewProductModal } from './NewProductModal';
@@ -61,6 +59,11 @@ export const InventoryView: React.FC = () => {
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const handleSuccessNotice = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(null), 3500);
+  };
 
   const brands = useMemo(
     () => Array.from(new Set(products.map(product => product.marca).filter(Boolean))).sort(),
@@ -419,15 +422,20 @@ export const InventoryView: React.FC = () => {
         </div>
       </section>
 
-      <NewProductModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} />
-      <StockEntryModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} />
+      <NewProductModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onSuccess={handleSuccessNotice}
+      />
+      <StockEntryModal
+        isOpen={isEntryModalOpen}
+        onClose={() => setIsEntryModalOpen(false)}
+        onSuccess={handleSuccessNotice}
+      />
       <EditProductModal
         isOpen={!!editingProduct}
         onClose={() => setEditingProduct(null)}
-        onSuccess={message => {
-          setNotice(message);
-          window.setTimeout(() => setNotice(null), 3500);
-        }}
+        onSuccess={handleSuccessNotice}
         product={editingProduct}
       />
     </div>

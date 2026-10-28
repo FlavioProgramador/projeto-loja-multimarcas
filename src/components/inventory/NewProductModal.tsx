@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Plus, X, Boxes } from 'lucide-react';
+import { Plus, X, Boxes, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 import { ProductSku } from '../../types';
@@ -7,9 +7,10 @@ import { ProductSku } from '../../types';
 interface NewProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 }
 
-export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose }) => {
+export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { addProduct } = useStore();
 
   const [nome, setNome] = useState('');
@@ -19,20 +20,31 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
   const [skus, setSkus] = useState<ProductSku[]>([
     { tamanho: 'P', cor: 'Preto', qtd: 10 }
   ]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleClose = () => {
+    setError(null);
+    setSaving(false);
+    onClose();
+  };
 
   const handleAddSkuRow = () => {
+    setError(null);
     setSkus(prev => [...prev, { tamanho: 'M', cor: 'Preto', qtd: 0 }]);
   };
 
   const handleRemoveSkuRow = (index: number) => {
     if (skus.length <= 1) {
-      alert('Mantenha pelo menos uma variação cadastrada.');
+      setError('Mantenha pelo menos uma variação cadastrada.');
       return;
     }
+    setError(null);
     setSkus(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSkuChange = (index: number, field: keyof ProductSku, val: string | number) => {
+    setError(null);
     setSkus(prev => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: val };
@@ -40,42 +52,54 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const numPreco = parseFloat(preco);
     if (!nome.trim() || !marca.trim() || !categoria.trim() || isNaN(numPreco) || numPreco <= 0) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
+      setError('Por favor, preencha todos os campos obrigatórios e informe um preço válido.');
       return;
     }
 
     if (skus.length === 0) {
-      alert('Adicione pelo menos uma variação.');
+      setError('Adicione pelo menos uma variação.');
       return;
     }
 
-    addProduct({
-      nome: nome.trim(),
-      marca: marca.trim(),
-      categoria: categoria.trim(),
-      preco: numPreco,
-      skus: skus.map(s => ({
-        tamanho: s.tamanho.trim() || 'Único',
-        cor: s.cor.trim() || 'Padrão',
-        qtd: Number(s.qtd) || 0
-      }))
-    });
+    setSaving(true);
+    setError(null);
 
-    onClose();
-    setNome('');
-    setMarca('');
-    setCategoria('');
-    setPreco('');
-    setSkus([{ tamanho: 'P', cor: 'Preto', qtd: 10 }]);
+    try {
+      await addProduct({
+        nome: nome.trim(),
+        marca: marca.trim(),
+        categoria: categoria.trim(),
+        preco: numPreco,
+        skus: skus.map(s => ({
+          tamanho: s.tamanho.trim() || 'Único',
+          cor: s.cor.trim() || 'Padrão',
+          qtd: Number(s.qtd) || 0
+        }))
+      });
+
+      onSuccess?.('Produto cadastrado com sucesso!');
+      setNome('');
+      setMarca('');
+      setCategoria('');
+      setPreco('');
+      setSkus([{ tamanho: 'P', cor: 'Preto', qtd: 10 }]);
+      handleClose();
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : 'Não foi possível cadastrar o produto.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Boxes size={18} style={{ color: 'var(--primary)' }} />
@@ -89,7 +113,11 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
         <input
           placeholder="Ex: Camiseta Oversized Minimal"
           value={nome}
-          onChange={e => setNome(e.target.value)}
+          onChange={e => {
+            setNome(e.target.value);
+            setError(null);
+          }}
+          disabled={saving}
         />
       </div>
 
@@ -99,7 +127,11 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
           <input
             placeholder="Ex: Cyclone, Nike, Oakley..."
             value={marca}
-            onChange={e => setMarca(e.target.value)}
+            onChange={e => {
+              setMarca(e.target.value);
+              setError(null);
+            }}
+            disabled={saving}
           />
         </div>
 
@@ -108,7 +140,11 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
           <input
             placeholder="Ex: Camisas, Calçados..."
             value={categoria}
-            onChange={e => setCategoria(e.target.value)}
+            onChange={e => {
+              setCategoria(e.target.value);
+              setError(null);
+            }}
+            disabled={saving}
           />
         </div>
       </div>
@@ -120,10 +156,13 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
           step="0.01"
           placeholder="0.00"
           value={preco}
-          onChange={e => setPreco(e.target.value)}
+          onChange={e => {
+            setPreco(e.target.value);
+            setError(null);
+          }}
+          disabled={saving}
         />
       </div>
-
 
       <div className="form-group">
         <label>Grade de Variações (Tamanho / Cor / Estoque Inicial)</label>
@@ -135,25 +174,29 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
                 value={sku.tamanho}
                 onChange={e => handleSkuChange(idx, 'tamanho', e.target.value)}
                 style={{ flex: 1 }}
+                disabled={saving}
               />
               <input
                 placeholder="Cor"
                 value={sku.cor}
                 onChange={e => handleSkuChange(idx, 'cor', e.target.value)}
                 style={{ flex: 1 }}
+                disabled={saving}
               />
               <input
                 type="number"
                 placeholder="Qtd"
                 value={sku.qtd}
-                onChange={e => handleSkuChange(idx, 'qtd', parseInt(e.target.value) || 0)}
+                onChange={e => handleSkuChange(idx, 'qtd', parseInt(e.target.value, 10) || 0)}
                 style={{ width: '68px', fontFamily: 'var(--font-mono)' }}
+                disabled={saving}
               />
               <button
                 type="button"
                 className="btn-remove"
                 onClick={() => handleRemoveSkuRow(idx)}
                 title="Remover variação"
+                disabled={saving}
               >
                 <X size={15} />
               </button>
@@ -166,16 +209,36 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
           className="btn btn-sm btn-outline"
           onClick={handleAddSkuRow}
           style={{ marginTop: '10px' }}
+          disabled={saving}
         >
           <Plus size={13} /> Adicionar Variação
         </button>
       </div>
 
+      {error && (
+        <div className="inventory-form-message error" role="alert" style={{ marginTop: '12px' }}>
+          <AlertCircle size={15} />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '8px', marginTop: '18px' }}>
-        <button type="button" className="btn" onClick={handleSave} style={{ flex: 1 }}>
-          Salvar Produto
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void handleSave()}
+          style={{ flex: 1 }}
+          disabled={saving}
+        >
+          {saving ? 'Salvando...' : 'Salvar Produto'}
         </button>
-        <button type="button" className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={handleClose}
+          style={{ flex: 1 }}
+          disabled={saving}
+        >
           Cancelar
         </button>
       </div>

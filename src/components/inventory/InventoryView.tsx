@@ -62,6 +62,11 @@ export const InventoryView: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const handleSuccessNotice = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(null), 3500);
+  };
+
   const brands = useMemo(
     () => Array.from(new Set(products.map(product => product.marca).filter(Boolean))).sort(),
     [products]
@@ -419,15 +424,20 @@ export const InventoryView: React.FC = () => {
         </div>
       </section>
 
-      <NewProductModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} />
-      <StockEntryModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} />
+      <NewProductModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onSuccess={handleSuccessNotice}
+      />
+      <StockEntryModal
+        isOpen={isEntryModalOpen}
+        onClose={() => setIsEntryModalOpen(false)}
+        onSuccess={handleSuccessNotice}
+      />
       <EditProductModal
         isOpen={!!editingProduct}
         onClose={() => setEditingProduct(null)}
-        onSuccess={message => {
-          setNotice(message);
-          window.setTimeout(() => setNotice(null), 3500);
-        }}
+        onSuccess={handleSuccessNotice}
         product={editingProduct}
       />
     </div>

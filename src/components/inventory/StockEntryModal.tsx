@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { ArrowUp, PackagePlus } from 'lucide-react';
+import { PackagePlus, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 
 interface StockEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 }
 
-export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClose }) => {
+export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { products, registerStockEntry } = useStore();
 
   const [productName, setProductName] = useState('');
@@ -23,68 +24,97 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
   const [newSize, setNewSize] = useState('');
   const [newColor, setNewColor] = useState('');
 
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const selectedProduct = products.find(
     p => p.nome.toLowerCase() === productName.trim().toLowerCase()
   );
 
-  const handleSave = () => {
-    const numQtd = parseInt(qtd) || 0;
-    const numCusto = parseFloat(custo) || 0;
+  const handleClose = () => {
+    setError(null);
+    setSaving(false);
+    onClose();
+  };
+
+  const handleSave = async () => {
+    const numQtd = parseInt(qtd, 10);
+    const numCusto = parseFloat(custo);
 
     if (!productName.trim()) {
-      alert('Informe o nome do produto.');
+      setError('Informe o nome do produto.');
       return;
     }
 
-    if (numQtd <= 0 || numCusto <= 0) {
-      alert('Quantidade e custo unitário devem ser maiores que zero.');
+    if (isNaN(numQtd) || numQtd <= 0) {
+      setError('A quantidade de entrada deve ser um número maior que zero.');
+      return;
+    }
+
+    if (isNaN(numCusto) || numCusto < 0) {
+      setError('O custo unitário deve ser um valor válido e não negativo.');
       return;
     }
 
     if (!selectedProduct) {
-      const numPrice = parseFloat(price) || 0;
-      if (numPrice <= 0) {
-        alert('Para novo produto, informe o preço de venda.');
+      const numPrice = parseFloat(price);
+      if (isNaN(numPrice) || numPrice <= 0) {
+        setError('Para novo produto, informe um preço de venda válido.');
         return;
       }
-      registerStockEntry({
-        productName: productName.trim(),
-        brand: brand.trim() || 'Genérica',
-        category: category.trim() || 'Geral',
-        price: numPrice,
-        skuIndex: -1,
-        qtd: numQtd,
-        custoUnitario: numCusto,
-        newSize: newSize.trim() || 'Único',
-        newColor: newColor.trim() || 'Padrão'
-      });
-    } else {
-      registerStockEntry({
-        productName: selectedProduct.nome,
-        skuIndex: skuIndex,
-        qtd: numQtd,
-        custoUnitario: numCusto,
-        newSize: newSize.trim() || undefined,
-        newColor: newColor.trim() || undefined
-      });
     }
 
-    onClose();
-    setProductName('');
-    setQtd('1');
-    setCusto('');
-    setBrand('');
-    setCategory('');
-    setPrice('');
-    setNewSize('');
-    setNewColor('');
-    alert('Entrada de estoque registrada com sucesso!');
+    setSaving(true);
+    setError(null);
+
+    try {
+      if (!selectedProduct) {
+        const numPrice = parseFloat(price);
+        await registerStockEntry({
+          productName: productName.trim(),
+          brand: brand.trim() || 'Genérica',
+          category: category.trim() || 'Geral',
+          price: numPrice,
+          skuIndex: -1,
+          qtd: numQtd,
+          custoUnitario: numCusto,
+          newSize: newSize.trim() || 'Único',
+          newColor: newColor.trim() || 'Padrão'
+        });
+      } else {
+        await registerStockEntry({
+          productName: selectedProduct.nome,
+          skuIndex: skuIndex,
+          qtd: numQtd,
+          custoUnitario: numCusto,
+          newSize: newSize.trim() || undefined,
+          newColor: newColor.trim() || undefined
+        });
+      }
+
+      onSuccess?.('Entrada de estoque registrada com sucesso!');
+      setProductName('');
+      setQtd('1');
+      setCusto('');
+      setBrand('');
+      setCategory('');
+      setPrice('');
+      setNewSize('');
+      setNewColor('');
+      handleClose();
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : 'Não foi possível registrar a entrada de estoque.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <PackagePlus size={18} style={{ color: 'var(--primary)' }} />
@@ -101,8 +131,10 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
           onChange={e => {
             setProductName(e.target.value);
             setSkuIndex(0);
+            setError(null);
           }}
           list="productListOptions"
+          disabled={saving}
         />
         <datalist id="productListOptions">
           {products.map(p => (
@@ -131,6 +163,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
                 placeholder="Ex: Cyclone"
                 value={brand}
                 onChange={e => setBrand(e.target.value)}
+                disabled={saving}
               />
             </div>
             <div className="form-group">
@@ -139,6 +172,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
                 placeholder="Ex: Camisas"
                 value={category}
                 onChange={e => setCategory(e.target.value)}
+                disabled={saving}
               />
             </div>
           </div>
@@ -150,6 +184,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
               placeholder="0.00"
               value={price}
               onChange={e => setPrice(e.target.value)}
+              disabled={saving}
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -159,6 +194,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
                 placeholder="Ex: M"
                 value={newSize}
                 onChange={e => setNewSize(e.target.value)}
+                disabled={saving}
               />
             </div>
             <div className="form-group">
@@ -167,6 +203,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
                 placeholder="Ex: Preto"
                 value={newColor}
                 onChange={e => setNewColor(e.target.value)}
+                disabled={saving}
               />
             </div>
           </div>
@@ -178,7 +215,8 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
           <label>Variação / SKU de Destino</label>
           <select
             value={skuIndex}
-            onChange={e => setSkuIndex(parseInt(e.target.value))}
+            onChange={e => setSkuIndex(parseInt(e.target.value, 10))}
+            disabled={saving}
           >
             {selectedProduct.skus.map((s, i) => (
               <option key={i} value={i}>
@@ -198,6 +236,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
               placeholder="Ex: GG"
               value={newSize}
               onChange={e => setNewSize(e.target.value)}
+              disabled={saving}
             />
           </div>
           <div className="form-group">
@@ -206,6 +245,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
               placeholder="Ex: Azul"
               value={newColor}
               onChange={e => setNewColor(e.target.value)}
+              disabled={saving}
             />
           </div>
         </div>
@@ -219,6 +259,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
             min="1"
             value={qtd}
             onChange={e => setQtd(e.target.value)}
+            disabled={saving}
           />
         </div>
 
@@ -230,15 +271,35 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({ isOpen, onClos
             placeholder="0.00"
             value={custo}
             onChange={e => setCusto(e.target.value)}
+            disabled={saving}
           />
         </div>
       </div>
 
+      {error && (
+        <div className="inventory-form-message error" role="alert" style={{ marginTop: '12px' }}>
+          <AlertCircle size={15} />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-        <button type="button" className="btn" onClick={handleSave} style={{ flex: 1 }}>
-          Registrar Entrada
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void handleSave()}
+          style={{ flex: 1 }}
+          disabled={saving}
+        >
+          {saving ? 'Registrando...' : 'Registrar Entrada'}
         </button>
-        <button type="button" className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={handleClose}
+          style={{ flex: 1 }}
+          disabled={saving}
+        >
           Cancelar
         </button>
       </div>

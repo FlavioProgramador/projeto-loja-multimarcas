@@ -140,19 +140,45 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 step="0.01" 
                 value={amountPaid} 
                 onChange={(e) => setAmountPaid(e.target.value)}
+                placeholder="0.00"
                 style={{ width: '100px', textAlign: 'right' }}
+                aria-label="Valor Recebido em Dinheiro"
               />
             </div>
+
+            {/* Atalhos rápidos de valores */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                style={{ fontSize: '11px', padding: '4px 8px' }}
+                onClick={() => setAmountPaid(totalFinal.toFixed(2))}
+              >
+                Exato ({formatMoeda(totalFinal)})
+              </button>
+              {[20, 50, 100, 200].map(val => (
+                <button
+                  key={val}
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  style={{ fontSize: '11px', padding: '4px 8px' }}
+                  onClick={() => setAmountPaid(val.toString())}
+                >
+                  R$ {val}
+                </button>
+              ))}
+            </div>
+
             {amountNum >= totalFinal && amountNum > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-green)' }}>
                 <span style={{ fontSize: '13px' }}>Troco a devolver:</span>
                 <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(change)}</span>
               </div>
             )}
-            {amountNum > 0 && amountNum < totalFinal && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)' }}>
-                <span style={{ fontSize: '13px' }}>Falta:</span>
-                <span style={{ fontSize: '16px', fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
+            {amountNum < totalFinal && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--badge-red)', fontSize: '12.5px' }}>
+                <span>⚠️ Falta para o total:</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>{formatMoeda(totalFinal - amountNum)}</span>
               </div>
             )}
           </div>
@@ -186,7 +212,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+            <button
+              className="btn"
+              onClick={onConfirm}
+              style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              disabled={isGeneratingPix || (paymentMethod === 'Dinheiro' && amountNum < totalFinal)}
+            >
               <Check size={16} />
               <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
               <kbd className="kbd-key-primary">F4</kbd>

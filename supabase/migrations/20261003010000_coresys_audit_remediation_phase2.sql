@@ -149,7 +149,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.approve_physical_inventory(uuid, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.approve_physical_inventory(uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.approve_physical_inventory(uuid, uuid) TO authenticated;
 ALTER FUNCTION public.approve_physical_inventory(uuid, uuid) SET search_path = public;
 
@@ -295,7 +295,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.manage_product(uuid, text, text, text, numeric, numeric, jsonb) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.manage_product(uuid, text, text, text, numeric, numeric, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.manage_product(uuid, text, text, text, numeric, numeric, jsonb) TO authenticated;
 ALTER FUNCTION public.manage_product(uuid, text, text, text, numeric, numeric, jsonb) SET search_path = public, extensions;
 

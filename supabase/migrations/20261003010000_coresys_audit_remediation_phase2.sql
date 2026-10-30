@@ -1,6 +1,6 @@
 -- CoreSys Audit Remediation Phase 2 Migration
 -- Date: 2026-10-03
--- Scope: Harden approve_physical_inventory and manage_product with fail-closed role checks and explicit search_path
+-- Scope: Harden approve_physical_inventory, manage_product, process_return, and register_stock_entry with fail-closed role checks, strict grants, and explicit search_path
 
 BEGIN;
 
@@ -298,5 +298,21 @@ $$;
 REVOKE ALL ON FUNCTION public.manage_product(uuid, text, text, text, numeric, numeric, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.manage_product(uuid, text, text, text, numeric, numeric, jsonb) TO authenticated;
 ALTER FUNCTION public.manage_product(uuid, text, text, text, numeric, numeric, jsonb) SET search_path = public, extensions;
+
+-- 3) Revoke EXECUTE from PUBLIC and anon for process_return and register_stock_entry
+DO $$
+BEGIN
+  IF to_regprocedure('public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) FROM PUBLIC, anon, authenticated';
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) TO authenticated';
+    EXECUTE 'ALTER FUNCTION public.process_return(uuid,uuid,uuid,text,text,jsonb,text,text) SET search_path = public';
+  END IF;
+
+  IF to_regprocedure('public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) FROM PUBLIC, anon, authenticated';
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) TO authenticated';
+    EXECUTE 'ALTER FUNCTION public.register_stock_entry(uuid,integer,numeric,text,uuid,text,text) SET search_path = public';
+  END IF;
+END $$;
 
 COMMIT;

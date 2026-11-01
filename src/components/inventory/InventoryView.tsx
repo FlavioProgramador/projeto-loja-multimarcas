@@ -4,7 +4,6 @@ import {
   ArrowUp,
   Boxes,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Edit2,
@@ -15,11 +14,10 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
-  Trash2,
   XCircle,
 } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
-import { Product, StockStatus } from '../../types';
+import { Product } from '../../types';
 import { formatMoeda, getStatusEstoque, totalEstoque } from '../../lib/utils';
 import { StatusBadge } from '../ui/StatusBadge';
 import { NewProductModal } from './NewProductModal';
@@ -419,7 +417,14 @@ export const InventoryView: React.FC = () => {
         </div>
       </section>
 
-      <NewProductModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} />
+      <NewProductModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onSuccess={message => {
+          setNotice(message);
+          window.setTimeout(() => setNotice(null), 3500);
+        }}
+      />
       <StockEntryModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} />
       <EditProductModal
         isOpen={!!editingProduct}

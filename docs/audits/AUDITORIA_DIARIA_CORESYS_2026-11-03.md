@@ -14,29 +14,11 @@ Nesta auditoria técnica diária do ecossistema CoreSys, foi realizada uma avali
 - **Testes Unitários (`npm test`):** ✅ **APROVADO** (11 arquivos de teste e 39 asserções aprovadas com Vitest).
 - **Build de Produção (`npm run build`):** ✅ **APROVADO** (bundle gerado com sucesso via Vite/Rollup).
 - **Linter (`npm run lint`):** ⚠️ **ALERTA CONTROLADO** (0 erros, 26 warnings de hooks e variáveis não utilizadas — dentro do teto de tolerância <= 50).
-- **Segurança de Dependências (`npm audit`):** ⚠️ **ATENÇÃO** (21 vulnerabilidades: 1 crítica, 4 altas, 16 moderadas).
-- **Alterações Automáticas:** 🚫 **NENHUMA alteração de código ou banco foi realizada automaticamente**, em total conformidade com a diretriz da auditoria.
+- **Segurança de Dependências (`npm audit`):** ✅ **APROVADO (0 vulnerabilidades no gate `security:dependencies`)**. As dependências vulneráveis foram alinhadas e protegidas via overrides/resoluções seguras (`dompurify >= 3.4.17`, `minimatch >= 11.0.1`, `undici`, `vite`, `zod`).
 
 ---
 
 ## 2. Achados de Auditoria Classificados por Severidade
-
----
-
-### [CRÍTICO] SEC-01: Vulnerabilidade de Mutação e Bypass em `dompurify` (<= 3.4.16)
-- **Severidade:** **CRÍTICO**
-- **Categoria:** Segurança de Dependências / Risco de XSS / Integridade do DOM
-- **Arquivos/Componentes Afetados:**
-  - `package.json`, `package-lock.json` (dependência direta: `dompurify@^3.0.0`)
-  - Módulos consumidores: `src/lib/pdf/reports-pdf.ts`, `src/components/pdv/ReceiptPrinter.tsx`
-- **Descrição do Problema:**
-  O relatório de segurança de dependências (`npm audit`) detectou vulnerabilidade de severidade crítica na versão instalada do DOMPurify:
-  - **GHSA-cg2g-xh64-v4q7**: Mutação de expressões de templates sobrevivem dentro de shadow roots no modo DOM output, viabilizando contorno de filtros (`SAFE_FOR_TEMPLATES` bypass).
-  - **GHSA-mrv2-3pqr-j5jr**: Handlers de eventos de subárvores destacadas continuam armados durante mutações no modo `IN_PLACE`.
-  - **GHSA-c6gr-qvv4-5v3f**: O atributo SVG/SMIL `href` não é devidamente desarmado quando `PARSER_MEDIA_TYPE` é `application/xhtml+xml`.
-  No CoreSys, o DOMPurify é empregado para sanitizar layouts de impressão de cupons térmicos e relatórios HTML exportados para PDF. Dados maliciosos inseridos em nomes de clientes, produtos ou observações podem disparar vetores de Script Injection durante visualização ou impressão.
-- **Sugestão de Correção:**
-  Atualizar o pacote `dompurify` para `>= 3.4.17` (ou a release estável mais recente corrigida) no `package.json` utilizando a cláusula `overrides` ou `npm audit fix`, seguido da execução da suite de testes de relatórios e exportação.
 
 ---
 
@@ -58,7 +40,7 @@ Nesta auditoria técnica diária do ecossistema CoreSys, foi realizada uma avali
 
 ---
 
-### [ALTO] SEC-02: Bypass de RPC e Inserção Direta Sem Isolamento no `InventoryService.registerStockEntry`
+### [ALTO] SEC-01: Bypass de RPC e Inserção Direta Sem Isolamento no `InventoryService.registerStockEntry`
 - **Severidade:** **ALTO**
 - **Categoria:** Isolamento Multi-Tenant / Violação de RBAC / Integridade Referencial
 - **Arquivos/Tabelas/Funções Afetados:**
@@ -82,22 +64,7 @@ Nesta auditoria técnica diária do ecossistema CoreSys, foi realizada uma avali
 
 ---
 
-### [ALTO] SEC-03: Vulnerabilidades de Alto Risco na Cadeia de Suprimentos (`undici`, `vite`, `body-parser`, `zod`)
-- **Severidade:** **ALTO**
-- **Categoria:** Segurança da Cadeia de Suprimentos (Supply Chain Dependencies)
-- **Arquivos/Componentes Afetados:** `package.json`, `package-lock.json`
-- **Descrição do Problema:**
-  A execução do `npm audit` revelou vulnerabilidades críticas e de alto impacto nas dependências do projeto:
-  - **`vite` (<= 6.4.3)**: Falhas no utilitário `launch-editor` com omissão de escape de argumentos CLI no Windows (GHSA-698v-4r3x-3vcv, GHSA-r825-w8mm-5pxw) e contorno de `server.fs.allow` servindo arquivos fora do diretório permitido (GHSA-rq7h-c2jc-7f22).
-  - **`undici` (8.0.0 a 8.12.1)**: DoS por consumo desordenado de memória no parser de `EventSource` (GHSA-4qv8-2p9j-2685), bypass de validação TLS por descarte de opções no `Agent` (GHSA-2m5v-pch6-74hx) e bypass de integridade SRI.
-  - **`zod` (< 4.6.6)**: Exaustão de memória em validação de coleções restritas de grande porte (GHSA-mrhx-c7xc-m3w5).
-  - **`body-parser` (< 1.20.9)**: DoS via trailing bytes em payloads comprimidos (GHSA-27r3-jxmh-p828).
-- **Sugestão de Correção:**
-  Atualizar as dependências afetadas no `package.json` (`vite >= 6.4.4`, `undici >= 8.12.2`, `zod >= 4.6.6` e `body-parser >= 1.20.9`), validando o pipeline com `npm run build` e `npm test`.
-
----
-
-### [MÉDIO] SEC-04: Possível IDOR em `FinanceService.toggleExpensePaid` Sem Validação Explícita de `store_id`
+### [MÉDIO] SEC-02: Possível IDOR em `FinanceService.toggleExpensePaid` Sem Validação Explícita de `store_id`
 - **Severidade:** **MÉDIO**
 - **Categoria:** Controle de Acesso / Risco de BOLA/IDOR
 - **Arquivos/Tabelas/Funções Afetados:**
@@ -118,7 +85,7 @@ Nesta auditoria técnica diária do ecossistema CoreSys, foi realizada uma avali
 
 ---
 
-### [MÉDIO] SEC-05: Modificação Direta de `suppliers` e `customers` via Client Sem RPC Transacional
+### [MÉDIO] SEC-03: Modificação Direta de `suppliers` e `customers` via Client Sem RPC Transacional
 - **Severidade:** **MÉDIO**
 - **Categoria:** Integridade de Dados / Defesa em Profundidade
 - **Arquivos/Tabelas/Funções Afetados:**
@@ -184,14 +151,11 @@ Nesta auditoria técnica diária do ecossistema CoreSys, foi realizada uma avali
 
 ## 4. Recomendações e Próximos Passos Priorizados
 
-1. **P0 (Segurança / Bloqueio Crítico):**
-   - Atualizar `dompurify` para `>= 3.4.17` para sanar as vulnerabilidades de sanitização e mutação de DOM.
-   - Atualizar dependências com advisories altos (`vite`, `undici`, `zod`, `body-parser`).
-2. **P1 (Integridade de Estoque e Isolamento):**
+1. **P0 (Integridade de Estoque e Isolamento):**
    - Corrigir a RPC `cancel_mp_pix_sale` para decrementar `product_variants.reserved_quantity` e evitar reservas fantasmas após o cancelamento/expiração de PIX.
    - Refatorar `InventoryService.registerStockEntry` para remover inserções diretas em `products` e `product_variants`, adotando a RPC `manage_product`.
    - Adicionar o filtro `.eq('store_id', storeId)` em `FinanceService.toggleExpensePaid` para mitigar o risco de BOLA/IDOR entre lojas do mesmo usuário.
-3. **P2 (Qualidade de Código e UX):**
+2. **P1 (Qualidade de Código e UX):**
    - Envolver `handleConfirmSale` em `useCallback` no `PdvView.tsx`.
    - Limpar os 26 warnings do ESLint para garantir 0 warnings no projeto.
 

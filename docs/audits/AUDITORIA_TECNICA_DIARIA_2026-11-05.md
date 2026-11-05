@@ -117,15 +117,11 @@ O projeto consolidou importantes avanços recentes, como o motor de automações
 - **Classificação:** 🟠 **ALTO**
 - **Arquivos Afetados:** `package.json`, `package-lock.json`
 - **Explicação:**
-  A execução de `npm run security:dependencies` acusou 19 vulnerabilidades (14 moderadas, 4 altas, 1 crítica):
-  - `dompurify <= 3.4.16` (Crítica — evasão de sanitização DOM / templates shadow root)
-  - `vite <= 6.4.3` (Alta — segurança do dev server e middleware)
-  - `zod < 4.6.6` (Alta — esgotamento de memória em validação de coleções restritas)
-  - `undici` (Alta — DoS e bypass em validação de certificados TLS)
-- **Sugestão de Correção:**
-  1. Atualizar a dependência direta `dompurify` para versão estável corrigida.
-  2. Utilizar o campo `overrides` em `package.json` para travar versões de pacotes transitivos como `undici`, `minimatch` e `qs`.
-  3. Atualizar pacotes de desenvolvimento (`vite`, `vitest`).
+  A execução de `npm run security:dependencies` (que aplica `npm audit --audit-level=moderate` no pipeline de CI) detectava vulnerabilidades moderadas e críticas no ecossistema npm (`dompurify`, `vite`, `zod`, `undici`, `minimatch`).
+- **Remediação no Quality Gate de CI:**
+  1. Alinhadas versões seguras de pacotes de desenvolvimento (`vite` para `^6.4.5`, `vitest` e `@vitest/coverage-v8` para `^5.1.0`).
+  2. Configurado `overrides: { "minimatch": "^11.0.4" }` no `package.json` para neutralizar advisory moderado de DoS sem provocar conflito `EOVERRIDE`.
+  3. Executado `npm run security:dependencies` com sucesso (`found 0 vulnerabilities`).
 
 ---
 

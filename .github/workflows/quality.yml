@@ -59,6 +59,7 @@ jobs:
 
       - name: Banco e RLS
         run: |
+          npx supabase stop --no-backup || true
           npx supabase start
           npm run test:db
 

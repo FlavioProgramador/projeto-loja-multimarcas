@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Plus, X, Boxes } from 'lucide-react';
+import { Plus, X, Boxes, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useStore } from '../../contexts/StoreContext';
 import { ProductSku } from '../../types';
@@ -7,9 +7,10 @@ import { ProductSku } from '../../types';
 interface NewProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 }
 
-export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose }) => {
+export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { addProduct } = useStore();
 
   const [nome, setNome] = useState('');
@@ -19,16 +20,34 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
   const [skus, setSkus] = useState<ProductSku[]>([
     { tamanho: 'P', cor: 'Preto', qtd: 10 }
   ]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const resetForm = () => {
+    setNome('');
+    setMarca('');
+    setCategoria('');
+    setPreco('');
+    setSkus([{ tamanho: 'P', cor: 'Preto', qtd: 10 }]);
+    setError(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleAddSkuRow = () => {
+    setError(null);
     setSkus(prev => [...prev, { tamanho: 'M', cor: 'Preto', qtd: 0 }]);
   };
 
   const handleRemoveSkuRow = (index: number) => {
     if (skus.length <= 1) {
-      alert('Mantenha pelo menos uma variação cadastrada.');
+      setError('Mantenha pelo menos uma variação cadastrada.');
       return;
     }
+    setError(null);
     setSkus(prev => prev.filter((_, idx) => idx !== index));
   };
 
@@ -40,42 +59,54 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const numPreco = parseFloat(preco);
     if (!nome.trim() || !marca.trim() || !categoria.trim() || isNaN(numPreco) || numPreco <= 0) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
+      setError('Preencha todos os campos obrigatórios e informe um preço de venda válido.');
       return;
     }
 
     if (skus.length === 0) {
-      alert('Adicione pelo menos uma variação.');
+      setError('Adicione pelo menos uma variação.');
       return;
     }
 
-    addProduct({
-      nome: nome.trim(),
-      marca: marca.trim(),
-      categoria: categoria.trim(),
-      preco: numPreco,
-      skus: skus.map(s => ({
-        tamanho: s.tamanho.trim() || 'Único',
-        cor: s.cor.trim() || 'Padrão',
-        qtd: Number(s.qtd) || 0
-      }))
-    });
+    const hasInvalidQty = skus.some(s => Number(s.qtd) < 0 || isNaN(Number(s.qtd)));
+    if (hasInvalidQty) {
+      setError('A quantidade de estoque das variações não pode ser negativa.');
+      return;
+    }
 
-    onClose();
-    setNome('');
-    setMarca('');
-    setCategoria('');
-    setPreco('');
-    setSkus([{ tamanho: 'P', cor: 'Preto', qtd: 10 }]);
+    setSaving(true);
+    setError(null);
+
+    try {
+      await addProduct({
+        nome: nome.trim(),
+        marca: marca.trim(),
+        categoria: categoria.trim(),
+        preco: numPreco,
+        skus: skus.map(s => ({
+          tamanho: s.tamanho.trim() || 'Único',
+          cor: s.cor.trim() || 'Padrão',
+          qtd: Number(s.qtd) || 0
+        }))
+      });
+
+      onSuccess?.('Produto cadastrado com sucesso.');
+      resetForm();
+      onClose();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Não foi possível cadastrar o produto.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Boxes size={18} style={{ color: 'var(--primary)' }} />
@@ -171,11 +202,30 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClos
         </button>
       </div>
 
+      {error && (
+        <div className="inventory-form-message error" role="alert" style={{ marginTop: '14px' }}>
+          <AlertCircle size={15} />
+          <span>{error}</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '8px', marginTop: '18px' }}>
-        <button type="button" className="btn" onClick={handleSave} style={{ flex: 1 }}>
-          Salvar Produto
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void handleSave()}
+          style={{ flex: 1 }}
+          disabled={saving}
+        >
+          {saving ? 'Salvando...' : 'Salvar Produto'}
         </button>
-        <button type="button" className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={handleClose}
+          style={{ flex: 1 }}
+          disabled={saving}
+        >
           Cancelar
         </button>
       </div>

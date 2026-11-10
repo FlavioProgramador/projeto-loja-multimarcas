@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Check, ShoppingCart, User, RotateCcw, X } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -22,9 +22,6 @@ export const PdvView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedColecao, setSelectedColecao] = useState('');
-  const [selectedEstacao, setSelectedEstacao] = useState('');
-  const [selectedGenero, setSelectedGenero] = useState('');
   const [skuSelections, setSkuSelections] = useState<Record<number, number>>({});
 
   // Checkout inputs
@@ -40,6 +37,7 @@ export const PdvView: React.FC = () => {
   const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
   const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
   const [amountPaid, setAmountPaid] = useState<string>('');
+  const [isProcessingSale, setIsProcessingSale] = useState(false);
 
   // PIX Integration States
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
@@ -72,12 +70,9 @@ export const PdvView: React.FC = () => {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = p.nome.toLowerCase().includes(searchLower) || p.marca.toLowerCase().includes(searchLower);
       const matchesCat = selectedCategory === '' || selectedCategory === 'Todos' || p.categoria === selectedCategory;
-      const matchesCol = selectedColecao === '' || selectedColecao === 'Todas' || p.colecao === selectedColecao;
-      const matchesEst = selectedEstacao === '' || selectedEstacao === 'Todas' || p.estacao === selectedEstacao;
-      const matchesGen = selectedGenero === '' || selectedGenero === 'Todos' || p.genero === selectedGenero;
-      return matchesSearch && matchesCat && matchesCol && matchesEst && matchesGen;
+      return matchesSearch && matchesCat;
     });
-  }, [products, searchTerm, selectedCategory, selectedColecao, selectedEstacao, selectedGenero]);
+  }, [products, searchTerm, selectedCategory]);
 
   useEffect(() => {
     const term = customerSearchTerm.trim();
@@ -136,6 +131,13 @@ export const PdvView: React.FC = () => {
   const maxCreditApplicable = Math.min(availableCredit, Math.max(0, subtotal - discountTotal));
   const creditUsed = useCustomerCredit ? maxCreditApplicable : 0;
   const calculatedTotal = Math.max(0, subtotal - discountTotal - creditUsed);
+
+  const discountSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (numDescVal > 0) parts.push(formatMoeda(numDescVal));
+    if (numDescPerc > 0) parts.push(`${numDescPerc}%`);
+    return parts.join(' + ');
+  }, [numDescVal, numDescPerc]);
 
   // ==========================================
   // AÇÕES DO UTILIZADOR
@@ -232,7 +234,9 @@ export const PdvView: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [pendingSaleId, cart, calculatedTotal, buyerName, cpf, clearCart]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = useCallback(async () => {
+    if (isProcessingSale || isGeneratingPix) return;
+
     if (paymentMethod === 'PIX') {
       if (!isSupabaseConfigured) {
         showBanner('⚠️ Supabase não configurado corretamente. O PIX requer o backend real.');
@@ -302,41 +306,67 @@ export const PdvView: React.FC = () => {
       return;
     }
 
-    const result = await processSale({
-      cartItems: cart,
-      buyerName: buyerName.trim() || 'Cliente não identificado',
-      cpf: cpf.trim() || 'Não informado',
-      customerId: matchedCustomer?.uuid,
-      paymentMethod,
-      installments,
-      discountValue: numDescVal,
-      discountPercent: numDescPerc,
-      creditUsed
-    });
-
-    if (result.success) {
-      const saleDataToPrint = {
-        cartItems: [...cart],
-        totalFinal: calculatedTotal,
+    setIsProcessingSale(true);
+    try {
+      const result = await processSale({
+        cartItems: cart,
+        buyerName: buyerName.trim() || 'Cliente não identificado',
+        cpf: cpf.trim() || 'Não informado',
+        customerId: matchedCustomer?.uuid,
         paymentMethod,
-        amountPaid: parseFloat(amountPaid) || 0,
-        change: Math.max(0, (parseFloat(amountPaid) || 0) - calculatedTotal),
-        buyerName: buyerName.trim() || 'Consumidor Final',
-        cpf: cpf.trim() || ''
-      };
-      setLastSaleData(saleDataToPrint);
-      clearCart();
-      setIsCheckoutModalOpen(false);
-      handleClearCustomer();
-      setDiscountValue('');
-      setDiscountPercent('');
-      showBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
+        installments,
+        discountValue: numDescVal,
+        discountPercent: numDescPerc,
+        creditUsed
+      });
 
-      setTimeout(() => window.print(), 300);
-    } else {
-      showBanner(`⚠️ ${result.message}`);
+      if (result.success) {
+        const saleDataToPrint = {
+          cartItems: [...cart],
+          totalFinal: calculatedTotal,
+          paymentMethod,
+          amountPaid: parseFloat(amountPaid) || 0,
+          change: Math.max(0, (parseFloat(amountPaid) || 0) - calculatedTotal),
+          buyerName: buyerName.trim() || 'Consumidor Final',
+          cpf: cpf.trim() || ''
+        };
+        setLastSaleData(saleDataToPrint);
+        clearCart();
+        setIsCheckoutModalOpen(false);
+        handleClearCustomer();
+        setDiscountValue('');
+        setDiscountPercent('');
+        showBanner(`✅ Venda finalizada com sucesso! Total: ${formatMoeda(result.totalFinal)}`);
+
+        setTimeout(() => window.print(), 300);
+      } else {
+        showBanner(`⚠️ ${result.message}`);
+      }
+    } catch (err: any) {
+      console.error('Sale error:', err);
+      showBanner(`⚠️ Erro ao processar venda: ${err.message || 'Erro inesperado'}`);
+    } finally {
+      setIsProcessingSale(false);
     }
-  };
+  }, [
+    isProcessingSale,
+    isGeneratingPix,
+    paymentMethod,
+    installments,
+    activeStoreId,
+    pixIdempotencyKey,
+    cart,
+    buyerName,
+    cpf,
+    numDescVal,
+    numDescPerc,
+    matchedCustomer,
+    creditUsed,
+    processSale,
+    calculatedTotal,
+    amountPaid,
+    clearCart
+  ]);
 
   // ── Atalhos de Teclado ──
   useEffect(() => {
@@ -349,6 +379,7 @@ export const PdvView: React.FC = () => {
       }
       if (e.key === 'F4') {
         e.preventDefault();
+        if (isProcessingSale || isGeneratingPix) return;
         if (isCheckoutModalOpen) handleConfirmSale();
         else if (cart.length > 0) setIsCheckoutModalOpen(true);
         else {
@@ -357,6 +388,7 @@ export const PdvView: React.FC = () => {
         return;
       }
       if (e.key === 'Escape') {
+        if (isProcessingSale) return;
         if (showCustomerSuggestions) return setShowCustomerSuggestions(false);
         if (isCheckoutModalOpen) return setIsCheckoutModalOpen(false);
         if (isReturnModalOpen) return setIsReturnModalOpen(false);
@@ -369,7 +401,17 @@ export const PdvView: React.FC = () => {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isCheckoutModalOpen, isReturnModalOpen, isNewCustomerModalOpen, showCustomerSuggestions, cart.length, searchTerm, clearCart, handleConfirmSale]);
+  }, [
+    isProcessingSale,
+    isGeneratingPix,
+    isCheckoutModalOpen,
+    isReturnModalOpen,
+    isNewCustomerModalOpen,
+    showCustomerSuggestions,
+    cart.length,
+    searchTerm,
+    handleConfirmSale
+  ]);
 
   return (
     <>
@@ -702,7 +744,25 @@ export const PdvView: React.FC = () => {
         </div>
 
         {/* Modais */}
-        <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} onConfirm={handleConfirmSale} buyerName={buyerName} cpf={cpf} paymentMethod={paymentMethod} installments={installments} cartItems={cart} subtotal={subtotal} totalFinal={calculatedTotal} discountSummary={""} creditUsed={creditUsed} amountPaid={amountPaid} setAmountPaid={setAmountPaid} qrCodeBase64={qrCodeBase64} isGeneratingPix={isGeneratingPix} />
+        <CheckoutModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => setIsCheckoutModalOpen(false)}
+          onConfirm={handleConfirmSale}
+          buyerName={buyerName}
+          cpf={cpf}
+          paymentMethod={paymentMethod}
+          installments={installments}
+          cartItems={cart}
+          subtotal={subtotal}
+          totalFinal={calculatedTotal}
+          discountSummary={discountSummary}
+          creditUsed={creditUsed}
+          amountPaid={amountPaid}
+          setAmountPaid={setAmountPaid}
+          qrCodeBase64={qrCodeBase64}
+          isGeneratingPix={isGeneratingPix}
+          isProcessing={isProcessingSale}
+        />
         <NewReturnModal isOpen={isReturnModalOpen} onClose={() => setIsReturnModalOpen(false)} />
 
         {/* Modal Customizado de Confirmação para Limpar o Carrinho */}

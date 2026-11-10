@@ -21,6 +21,7 @@ interface CheckoutModalProps {
   setAmountPaid: (val: string) => void;
   qrCodeBase64?: string | null;
   isGeneratingPix?: boolean;
+  isProcessing?: boolean;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -38,7 +39,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   amountPaid,
   setAmountPaid,
   qrCodeBase64,
-  isGeneratingPix
+  isGeneratingPix = false,
+  isProcessing = false
 }) => {
   const amountNum = parseFloat(amountPaid) || 0;
   const change = amountNum > totalFinal ? amountNum - totalFinal : 0;
@@ -186,13 +188,43 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
           {(!qrCodeBase64 || paymentMethod !== 'PIX') && (
-            <button className="btn" onClick={onConfirm} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} disabled={isGeneratingPix}>
+            <button
+              className="btn"
+              onClick={onConfirm}
+              style={{
+                flex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                opacity: (isGeneratingPix || isProcessing) ? 0.7 : 1,
+                cursor: (isGeneratingPix || isProcessing) ? 'not-allowed' : 'pointer'
+              }}
+              disabled={isGeneratingPix || isProcessing}
+            >
               <Check size={16} />
-              <span>{paymentMethod === 'PIX' ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX') : 'Confirmar & Imprimir'}</span>
+              <span>
+                {paymentMethod === 'PIX'
+                  ? (isGeneratingPix ? 'Gerando...' : 'Gerar PIX')
+                  : (isProcessing ? 'Processando...' : 'Confirmar & Imprimir')}
+              </span>
               <kbd className="kbd-key-primary">F4</kbd>
             </button>
           )}
-          <button className="btn btn-outline" onClick={onClose} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <button
+            className="btn btn-outline"
+            onClick={onClose}
+            disabled={isProcessing}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              opacity: isProcessing ? 0.7 : 1,
+              cursor: isProcessing ? 'not-allowed' : 'pointer'
+            }}
+          >
             <span>{qrCodeBase64 ? 'Cancelar PIX' : 'Voltar'}</span>
             <kbd className="kbd-key">ESC</kbd>
           </button>
